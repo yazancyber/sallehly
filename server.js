@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS requests(
   status TEXT DEFAULT 'new',
   offer_price REAL,
   arrival_time TEXT,
-  commission_charged REAL DEFAULT 0,
+  commission_charged REAL DEFAULT NULL,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(customer_id) REFERENCES users(id),
@@ -320,6 +320,8 @@ try {
   demoTechs.forEach(t => ins.run(t[0], t[1], t[2], demoPass, t[3], t[4], t[5], t[9], t[6], t[7], t[8], 20));
 } catch(e) { console.warn('demo tech seed skipped', e.message); }
 
+const IS_PROD = process.env.NODE_ENV === 'production';
+const COOKIE_OPTS = { httpOnly: true, sameSite: 'strict', secure: IS_PROD };
 function sign(user){ return jwt.sign({ id:user.id, role:user.role, name:user.name }, JWT_SECRET, { expiresIn:'7d' }); }
 function auth(req,res,next){
   const h = req.headers.authorization || '';
@@ -385,7 +387,7 @@ app.post('/api/auth/register', upload.single('avatar'), (req,res)=>{
     const info = db.prepare('INSERT INTO users(role,name,email,phone,password_hash,national_number,city,services,areas,avatar_url,is_active) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
       .run(role,name,email,phone,hash, role==='technician'?national_number:null, city, services, areas, avatar_url, isActive);
     const user = db.prepare('SELECT * FROM users WHERE id=?').get(info.lastInsertRowid);
-    const token = sign(user); res.cookie('token', token, { httpOnly:true, sameSite:'strict' }); res.json({token,user:userPublic(user), message:'تم إنشاء الحساب بنجاح'});
+    const token = sign(user); res.cookie('token', token, COOKIE_OPTS); res.json({token,user:userPublic(user), message:'تم إنشاء الحساب بنجاح'});
   } catch(e){
     if(String(e.message).includes('UNIQUE')) return res.status(409).json({error:'البريد أو رقم الهاتف أو الرقم الوطني مستخدم مسبقاً'});
     res.status(500).json({error:'تعذر إنشاء الحساب'});
@@ -396,7 +398,7 @@ app.post('/api/auth/login', (req,res)=>{
   const user = db.prepare('SELECT * FROM users WHERE email=?').get(email);
   if(!user || !bcrypt.compareSync(password, user.password_hash)) return res.status(401).json({error:'بيانات الدخول غير صحيحة'});
   if(!user.is_active) return res.status(403).json({error:'الحساب موقوف'});
-  const token = sign(user); res.cookie('token', token, { httpOnly:true, sameSite:'strict' }); res.json({token,user:userPublic(user)});
+  const token = sign(user); res.cookie('token', token, COOKIE_OPTS); res.json({token,user:userPublic(user)});
 });
 app.post('/api/auth/logout', (req,res)=>{ res.clearCookie('token'); res.json({ok:true}); });
 app.get('/api/me', auth, (req,res)=> {
@@ -542,20 +544,23 @@ app.post('/api/requests/:id/status', auth, (req,res)=>{
   if(!allowed.includes(status)) return res.status(400).json({error:'حالة غير صحيحة'});
   if(req.user.role!=='admin' && req.user.id!==r.customer_id && req.user.id!==r.technician_id) return res.status(403).json({error:'لا تملك صلاحية'});
   if(status==='مكتمل' && req.user.role!=='admin' && req.user.id!==r.customer_id) return res.status(403).json({error:'إكمال الطلب يكون من العميل فقط'});
-  if(status==='مكتمل' && r.technician_id && !r.commission_charged){
-    const tech = db.prepare('SELECT * FROM users WHERE id=?').get(r.technician_id);
-    let charge = 0;
-    if(tech.free_orders_used < 2){
-      db.prepare('UPDATE users SET free_orders_used=free_orders_used+1, completed_jobs=completed_jobs+1 WHERE id=?').run(tech.id);
-      db.prepare('INSERT INTO ledger(user_id,type,amount,balance_after,note) VALUES(?,?,?,?,?)').run(tech.id,'طلب مجاني',0,tech.balance,'تم احتساب الطلب ضمن أول طلبين مجانيين');
-    } else {
-      charge = 2;
-      if(tech.balance < charge) return res.status(400).json({error:'رصيد الفني غير كافٍ لإكمال الطلب. يجب شحن الرصيد أولاً.'});
-      const after = Number((tech.balance - charge).toFixed(2));
-      db.prepare('UPDATE users SET balance=?, completed_jobs=completed_jobs+1 WHERE id=?').run(after, tech.id);
-      db.prepare('INSERT INTO ledger(user_id,type,amount,balance_after,note) VALUES(?,?,?,?,?)').run(tech.id,'خصم عمولة طلب',-charge,after,`خصم عمولة الطلب رقم ${r.id}`);
-    }
-    db.prepare('UPDATE requests SET commission_charged=? WHERE id=?').run(charge, r.id);
+  if(status==='مكتمل' && r.technician_id && r.commission_charged === null){
+    const doComplete = db.transaction(()=>{
+      const tech = db.prepare('SELECT * FROM users WHERE id=?').get(r.technician_id);
+      let charge = 0;
+      if(tech.free_orders_used < 2){
+        db.prepare('UPDATE users SET free_orders_used=free_orders_used+1, completed_jobs=completed_jobs+1 WHERE id=?').run(tech.id);
+        db.prepare('INSERT INTO ledger(user_id,type,amount,balance_after,note) VALUES(?,?,?,?,?)').run(tech.id,'طلب مجاني',0,tech.balance,'تم احتساب الطلب ضمن أول طلبين مجانيين');
+      } else {
+        charge = 2;
+        if(tech.balance < charge) throw Object.assign(new Error('رصيد الفني غير كافٍ لإكمال الطلب. يجب شحن الرصيد أولاً.'), {status:400});
+        const after = Number((tech.balance - charge).toFixed(2));
+        db.prepare('UPDATE users SET balance=?, completed_jobs=completed_jobs+1 WHERE id=?').run(after, tech.id);
+        db.prepare('INSERT INTO ledger(user_id,type,amount,balance_after,note) VALUES(?,?,?,?,?)').run(tech.id,'خصم عمولة طلب',-charge,after,`خصم عمولة الطلب رقم ${r.id}`);
+      }
+      db.prepare('UPDATE requests SET commission_charged=? WHERE id=?').run(charge, r.id);
+    });
+    try { doComplete(); } catch(e){ return res.status(e.status||500).json({error:e.message}); }
   }
   db.prepare('UPDATE requests SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(status, r.id);
   const request = db.prepare('SELECT * FROM requests WHERE id=?').get(r.id);
@@ -676,13 +681,16 @@ app.post('/api/admin/topups/:id/review', auth, requireRole('admin'), (req,res)=>
   if(!t || t.status!=='pending') return res.status(400).json({error:'طلب الشحن غير صالح'});
   const status=clean(req.body.status);
   if(!['approved','rejected'].includes(status)) return res.status(400).json({error:'قرار غير صحيح'});
-  if(status==='approved'){
-    const tech=db.prepare('SELECT * FROM users WHERE id=?').get(t.technician_id);
-    const add=Number(t.amount)+Number(t.bonus||0); const after=Number((tech.balance+add).toFixed(2));
-    db.prepare('UPDATE users SET balance=? WHERE id=?').run(after, tech.id);
-    db.prepare('INSERT INTO ledger(user_id,type,amount,balance_after,note) VALUES(?,?,?,?,?)').run(tech.id,'شحن رصيد',add,after,`موافقة على طلب شحن رقم ${t.id}`);
-  }
-  db.prepare('UPDATE topups SET status=?, admin_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?').run(status, clean(req.body.admin_note), t.id);
+  const doReview = db.transaction(()=>{
+    if(status==='approved'){
+      const tech=db.prepare('SELECT * FROM users WHERE id=?').get(t.technician_id);
+      const add=Number(t.amount)+Number(t.bonus||0); const after=Number((tech.balance+add).toFixed(2));
+      db.prepare('UPDATE users SET balance=? WHERE id=?').run(after, tech.id);
+      db.prepare('INSERT INTO ledger(user_id,type,amount,balance_after,note) VALUES(?,?,?,?,?)').run(tech.id,'شحن رصيد',add,after,`موافقة على طلب شحن رقم ${t.id}`);
+    }
+    db.prepare('UPDATE topups SET status=?, admin_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?').run(status, clean(req.body.admin_note), t.id);
+  });
+  doReview();
   res.json({topup: db.prepare('SELECT * FROM topups WHERE id=?').get(t.id)});
 });
 
@@ -695,9 +703,14 @@ app.post('/api/me/profile', auth, (req,res)=>{
   const phone = clean(req.body.phone);
   const city = clean(req.body.city);
   const areas = clean(req.body.areas || req.body.area);
+  const services = req.body.services ? (Array.isArray(req.body.services) ? req.body.services.join(',') : clean(req.body.services)) : null;
   if(name.length < 2) return res.status(400).json({error:'الاسم قصير'});
-  if(phone.length < 7) return res.status(400).json({error:'رقم الهاتف غير صحيح'});
-  db.prepare('UPDATE users SET name=?, phone=?, city=?, areas=? WHERE id=?').run(name, phone, city, areas, req.user.id);
+  if(!/^07\d{8}$/.test(phone)) return res.status(400).json({error:'رقم الهاتف يجب أن يبدأ 07 ويتكون من 10 أرقام'});
+  if(req.user.role === 'technician' && services !== null){
+    db.prepare('UPDATE users SET name=?, phone=?, city=?, areas=?, services=? WHERE id=?').run(name, phone, city, areas, services, req.user.id);
+  } else {
+    db.prepare('UPDATE users SET name=?, phone=?, city=?, areas=? WHERE id=?').run(name, phone, city, areas, req.user.id);
+  }
   res.json({user:userPublic(db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id))});
 });
 
@@ -722,7 +735,7 @@ app.get('/api/admin/stats', auth, requireRole('admin'), (req,res)=>{
   res.json({stats:{customers:one("SELECT COUNT(*) c FROM users WHERE role='customer'"), technicians:one("SELECT COUNT(*) c FROM users WHERE role='technician'"), requests:one('SELECT COUNT(*) c FROM requests'), pendingTopups:one("SELECT COUNT(*) c FROM topups WHERE status='pending'"), completed:one("SELECT COUNT(*) c FROM requests WHERE status='مكتمل'")}});
 });
 app.get('/api/admin/users', auth, requireRole('admin'), (req,res)=> res.json({users: db.prepare('SELECT id,role,name,email,phone,national_number,city,areas,services,is_active,balance,free_orders_used,rating_avg,rating_count,completed_jobs,created_at FROM users ORDER BY id DESC').all()}));
-app.post('/api/admin/users/:id/toggle', auth, requireRole('admin'), (req,res)=>{ const u=db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id); db.prepare('UPDATE users SET is_active=? WHERE id=?').run(u.is_active?0:1,u.id); res.json({ok:true}); });
+app.post('/api/admin/users/:id/toggle', auth, requireRole('admin'), (req,res)=>{ const u=db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id); if(!u) return res.status(404).json({error:'المستخدم غير موجود'}); db.prepare('UPDATE users SET is_active=? WHERE id=?').run(u.is_active?0:1,u.id); res.json({ok:true}); });
 
 app.post('/api/admin/services', auth, requireRole('admin'), (req,res)=>{
   const name = clean(req.body.name);
@@ -799,4 +812,4 @@ app.use((err, req, res, next)=>{
 });
 
 app.get('*', (req,res)=> res.sendFile(path.join(BASE,'public','index.html')));
-server.listen(PORT, ()=> console.log(`صلّحلي V5 يعمل على http://localhost:${PORT}`));
+server.listen(PORT, ()=> console.log(`صلّحلي يعمل على http://localhost:${PORT}`));

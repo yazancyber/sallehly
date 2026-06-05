@@ -274,3 +274,25 @@ body.dashboard-mode .v20-live-strip{
 .v40-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.v40-main-service{position:relative;overflow:hidden;text-align:right;background:#fff;border:1px solid #dbeafe;border-radius:28px;padding:24px;box-shadow:0 18px 45px rgba(15,23,42,.08);cursor:pointer}.v40-main-service:before{content:"";position:absolute;width:120px;height:120px;border-radius:50%;background:#e0f2fe;left:-40px;top:-40px}.v40-main-service span{position:relative;width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,#dbeafe,#ede9fe);display:grid;place-items:center;font-size:34px;margin-bottom:16px}.v40-main-service h3{position:relative;margin:0 0 8px;color:#071331;font-size:23px}.v40-main-service p{position:relative;color:#64748b;line-height:1.7}.v40-main-service em{position:relative;font-style:normal;color:#2563eb;font-weight:900}
 .v40-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:34px}.v40-steps div{background:#071331;color:#fff;border-radius:28px;padding:24px}.v40-steps b{color:#93c5fd;font-size:24px}.v40-steps h3{font-size:24px}.v40-steps p{color:#cbd5e1;line-height:1.7}
 @media(max-width:900px){.v40-home{display:block;padding:10px;margin:10px auto}.v40-hero-card{border-radius:0 0 34px 34px;min-height:auto;padding:28px 22px;text-align:right}.v40-brand-big span{width:58px;height:58px}.v40-brand-big b{font-size:36px}.v40-hero-card h1{font-size:34px}.v40-hero-card p{font-size:17px}.v40-actions{display:grid;grid-template-columns:1fr}.v40-stats{grid-template-columns:repeat(3,1fr);gap:8px}.v40-phone-preview{margin:16px auto 0;max-width:100%;border-radius:30px}.v40-live-strip,.v40-services-grid,.v40-steps{padding:0 12px}.v40-section-title h2{font-size:28px}.v40-track{animation-duration:70s}.v40-grid{grid-template-columns:1fr}.v40-steps{grid-template-columns:1fr}.v40-service-pill{min-width:185px}.v40-main-service{border-radius:24px}.nav{position:sticky;top:0;z-index:900}}
+
+/* === Dashboard Hero Metrics - 4 cards in one row === */
+.hero-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+.metric-card-sm {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  padding: 10px 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.metric-card-sm:hover { transform: translateY(-2px); }
+.mc-icon { font-size: 20px; margin-bottom: 6px; }
+.mc-val  { font-size: 20px; font-weight: 800; line-height: 1; }
+.mc-label{ font-size: 10px; color: rgba(255,255,255,0.6); margin: 3px 0; }
+.mc-badge{ font-size: 9px; color: #a78bfa; font-weight: 600; }
