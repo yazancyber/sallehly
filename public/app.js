@@ -54,7 +54,27 @@ function howPage(){app.innerHTML=`<div class="page"><h1>آلية العمل</h1>
 function techPage(){app.innerHTML=`<div class="page"><h1>نظام الفنيين</h1><div class="cards2">${state.meta.packages.map(p=>`<div class="card package"><h3>${p.name}</h3><strong>${p.amount} د.أ</strong><p>رصيد إضافي: ${p.bonus} د.أ</p><p>خصم كل طلب مكتمل: ${p.commission_per_order} د.أ</p></div>`).join('')}</div><br><button class="btn" onclick="register('technician')">سجل كفني الآن</button></div>`}
 function contact(){app.innerHTML=`<div class="page"><div class="card"><h1>تواصل معنا</h1><p class="muted">للاستفسار أو شحن رصيد الفنيين: 0790000000</p></div></div>`}
 function login(){app.innerHTML=`<div class="page"><div class="card" style="max-width:520px;margin:auto"><h1>تسجيل الدخول</h1><form class="form" onsubmit="doLogin(event)"><div class="field"><label>البريد الإلكتروني</label><input id="email" type="email" required></div><div class="field"><label>كلمة السر</label><input id="password" type="password" required></div><button class="btn">دخول</button><p class="muted">حساب الإدارة لا يظهر للعامة. اطلب بيانات الدخول من مالك المنصة.</p></form></div></div>`}
-async function doLogin(e){e.preventDefault();try{let j=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:email.value,password:password.value})});state.user=j.user;toast('تم تسجيل الدخول');dashboard()}catch(err){toast(err.message)}}
+async function doLogin(e){
+  e.preventDefault();
+  const emailVal = document.getElementById('email')?.value?.trim();
+  const passVal  = document.getElementById('password')?.value;
+  const btn      = document.getElementById('loginBtn');
+  const errBox   = document.getElementById('loginError');
+  if(errBox) errBox.style.display='none';
+  if(!emailVal || !passVal){ if(errBox){errBox.textContent='يرجى تعبئة جميع الحقول';errBox.style.display='block';} return; }
+  if(btn){ btn.disabled=true; btn.querySelector('.btn-text').style.display='none'; btn.querySelector('.btn-spinner').style.display='inline'; }
+  try{
+    const j = await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:emailVal,password:passVal})});
+    state.user = j.user;
+    toast('تم تسجيل الدخول');
+    dashboard();
+  } catch(err){
+    if(errBox){ errBox.textContent=err.message||'بيانات غير صحيحة'; errBox.style.display='block'; }
+    else toast(err.message);
+  } finally {
+    if(btn){ btn.disabled=false; btn.querySelector('.btn-text').style.display='inline'; btn.querySelector('.btn-spinner').style.display='none'; }
+  }
+}
 function register(role='customer'){app.innerHTML=`<div class="page"><div class="card" style="max-width:760px;margin:auto"><h1>إنشاء حساب</h1><form class="form two" onsubmit="doRegister(event)"><div class="field"><label>نوع الحساب</label><select id="role" onchange="toggleTech()"><option value="customer">عميل</option><option value="technician">فني</option></select></div><div class="field"><label>الاسم الكامل</label><input id="name" placeholder="مثال: أحمد محمد" required minlength="2"></div><div class="field techOnly"><label>الصورة الشخصية للفني</label><input id="avatar" type="file" accept="image/png,image/jpeg,image/webp"><small class="muted">مطلوبة للفني فقط حتى يظهر للعميل بشكل موثوق.</small></div><div class="field"><label>البريد الإلكتروني</label><input id="remail" type="email" required></div><div class="field"><label>رقم الهاتف</label><input id="phone" placeholder="0791234567" required></div><div class="field"><label>كلمة السر</label><input id="rpassword" type="password" required minlength="8"></div><div class="field"><label>المحافظة</label><select id="city">${state.meta.cities.map(c=>`<option>${c}</option>`).join('')}</select></div><div class="field techOnly"><label>الرقم الوطني</label><input id="national" placeholder="10 أرقام"></div><div class="field techOnly"><label>الخدمات</label><select id="srv" multiple size="5">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field techOnly"><label>مناطق العمل</label><select id="areas" multiple size="5">${state.meta.cities.map(c=>`<option>${c}</option>`).join('')}</select></div><div></div><button class="btn">إنشاء الحساب</button></form></div></div>`;$('#role').value=role;toggleTech()}
 function toggleTech(){document.querySelectorAll('.techOnly').forEach(x=>x.style.display=$('#role').value==='technician'?'block':'none')}
 function vals(sel){return Array.from($(sel).selectedOptions||[]).map(o=>o.value)}
@@ -68,7 +88,8 @@ function showOtpScreen(email) {
     <p class="muted" style="margin-bottom:24px">أرسلنا كود مكون من 6 أرقام إلى<br><b>${email}</b></p>
     <form class="form" onsubmit="doVerifyOtp(event)">
       <div class="field">
-        <input id="otpInput" type="text" inputmode="numeric" maxlength="6" placeholder="أدخل الكود" required
+        <input id="otpInput" type="text" inputmode="numeric" maxlength="6" placeholder="● ● ● ● ● ●" required
+          oninput="this.value=this.value.replace(/[^0-9]/g,'')"
           style="text-align:center;font-size:28px;font-weight:900;letter-spacing:10px;padding:16px">
       </div>
       <button class="btn" style="width:100%">تأكيد الحساب</button>
@@ -1531,26 +1552,70 @@ if(!window.v22LiveStarted){
 /* ===== Sallehly V23 Security + Mobile Polish ===== */
 login=function(){
   state.tab='dash';
-  app.innerHTML=`<div class="auth-page v23-auth"><div class="auth-shell v23-auth-shell">
-    <div class="auth-card v23-auth-card">
-      <div class="auth-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img"><b>صلّحلي</b></div>
-      <h1>تسجيل الدخول</h1>
-      <p class="muted">ادخل بحسابك فقط. حساب الإدارة مخفي ولا تظهر بياناته داخل الموقع لحماية المنصة.</p>
-      <form class="form v23-login-form" onsubmit="doLogin(event)">
-        <div class="field"><label>البريد الإلكتروني</label><input id="email" type="email" autocomplete="email" placeholder="example@email.com" required></div>
-        <div class="field"><label>كلمة السر</label><input id="password" type="password" autocomplete="current-password" placeholder="••••••••" required></div>
-        <button class="btn big" type="submit">دخول آمن</button>
+  app.innerHTML=`<div class="login-page">
+    <video autoplay muted loop playsinline class="login-video">
+      <source src="/videos/login.mp4" type="video/mp4">
+    </video>
+    <div class="login-overlay"></div>
+    <div class="login-card">
+      <img src="/logo.png" alt="صلّحلي" class="login-logo"
+           onerror="this.style.display='none';document.querySelector('.login-logo-fallback').style.display='flex'">
+      <div class="login-logo-fallback" style="display:none"><span>🔧</span></div>
+      <h1 class="login-title">أهلاً بك</h1>
+      <p class="login-subtitle">سجّل دخولك إلى منصة <strong>صلّحلي</strong></p>
+      <div class="login-error" id="loginError" style="display:none"></div>
+      <form id="loginForm" onsubmit="doLogin(event)" novalidate>
+        <div class="login-group">
+          <label for="email">البريد الإلكتروني</label>
+          <div class="input-wrap">
+            <span class="input-icon">✉️</span>
+            <input type="email" id="email" name="email" placeholder="example@email.com" autocomplete="email" required>
+          </div>
+        </div>
+        <div class="login-group">
+          <label for="password">كلمة المرور</label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
+            <button type="button" class="toggle-password" onclick="const i=document.getElementById('password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'" aria-label="إظهار/إخفاء">👁</button>
+          </div>
+        </div>
+        <button class="login-btn" type="submit" id="loginBtn">
+          <span class="btn-text">تسجيل الدخول</span>
+          <span class="btn-spinner" style="display:none">⏳</span>
+        </button>
       </form>
-      <div class="login-hint secure-hint"><b>🔐 حماية الإدارة</b><span>لا توجد بيانات أدمن ظاهرة في الواجهة أو ملفات GitHub.</span><span>يتم ضبط حساب الإدارة من ملف .env على السيرفر.</span></div>
-      <button class="btn ghost" onclick="register('customer')">إنشاء حساب جديد</button>
+      <div class="login-links">
+        <a href="#" onclick="go('register');return false">إنشاء حساب جديد</a>
+        <span style="color:rgba(255,255,255,.3);font-size:12px">حساب الإدارة من .env فقط</span>
+      </div>
     </div>
-    <div class="auth-side v23-auth-side"><div class="welcome-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img"></div><h2>صلّحلي</h2><p>منصة صيانة آمنة، صلاحيات منفصلة، وتصميم متوافق مع الهاتف.</p><div class="secure-list"><span>JWT</span><span>Roles</span><span>Protected Admin</span></div></div>
-  </div></div>`;
+  </div>`;
 }
 
 ;(function(){
   const css=`
   .secure-hint{background:#eef7ff;border:1px solid #cfe3ff;color:#173263}.secure-hint b{color:#0b3bd8}.v23-auth{padding:18px}.v23-auth-shell{width:min(96vw,1080px)}.v23-auth-card h1{font-size:clamp(30px,5vw,52px)}.secure-list{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px}.secure-list span{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);padding:8px 12px;border-radius:999px;font-weight:900}
+  .login-page{min-height:100vh;display:flex;justify-content:center;align-items:center;padding:24px;position:relative;overflow:hidden;background:#0d0d1a}
+  .login-video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-3}
+  .login-overlay{position:fixed;inset:0;background:linear-gradient(135deg,rgba(5,15,40,.88),rgba(15,23,42,.70));z-index:-2}
+  .login-card{width:min(460px,95vw);padding:40px 36px;border-radius:32px;background:rgba(255,255,255,.08);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.15);box-shadow:0 30px 80px rgba(0,0,0,.4);animation:loginAppear .7s ease}
+  @supports not (backdrop-filter:blur(24px)){.login-card{background:rgba(5,15,40,.94)}}
+  .login-logo{width:88px;height:88px;margin:0 auto 16px;display:block;border-radius:22px;box-shadow:0 12px 36px rgba(124,58,237,.45)}
+  .login-title{text-align:center;color:#fff;font-size:34px;font-weight:900;margin:0 0 6px}
+  .login-subtitle{text-align:center;color:rgba(255,255,255,.65);margin:0 0 28px;font-size:14px}
+  .login-group{margin-bottom:16px}
+  .login-group label{display:block;color:#fff;margin-bottom:7px;font-weight:700;font-size:14px}
+  .login-group input{width:100%;height:54px;border-radius:16px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;padding:0 16px;font-size:15px;outline:none;transition:.25s;box-sizing:border-box}
+  .login-group input:focus{border-color:#60a5fa;box-shadow:0 0 0 4px rgba(96,165,250,.18)}
+  .login-group input::placeholder{color:rgba(255,255,255,.35)}
+  .login-btn{width:100%;height:56px;border:none;border-radius:16px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;font-size:17px;font-weight:900;cursor:pointer;transition:.25s;margin-top:4px}
+  .login-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(124,58,237,.4)}
+  .login-links{display:flex;justify-content:space-between;align-items:center;margin-top:20px}
+  .login-links a{color:#93c5fd;font-size:14px;text-decoration:none}
+  .login-links a:hover{color:#fff}
+  @keyframes loginAppear{from{opacity:0;transform:translateY(40px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @media(max-width:480px){.login-card{padding:28px 20px;border-radius:24px}.login-title{font-size:28px}}
   @media(max-width:920px){
     .nav{height:auto;min-height:76px;padding:12px 16px}.brand{font-size:26px}.menu{display:grid!important}.links{position:fixed;top:76px;left:12px;right:12px;background:rgba(255,255,255,.97);border:1px solid #dbe7ff;border-radius:24px;box-shadow:0 24px 70px rgba(20,37,83,.16);padding:14px;display:none;z-index:50}.open .links{display:grid;gap:10px}.links a,.links button{width:100%;justify-content:center;text-align:center}.hero,.pro-hero{grid-template-columns:1fr!important;padding:28px 18px!important}.hero h1{font-size:clamp(32px,8vw,48px)!important}.phone{display:none!important}.section,.page{padding:18px!important}.grid,.feature-grid,.steps-grid,.dash-grid,.dash-grid.two,.v20-main-grid{grid-template-columns:1fr!important}.admin-shell{display:block!important}.admin-sidebar{position:relative!important;inset:auto!important;width:100%!important;min-height:auto!important;border-radius:0 0 26px 26px!important;padding:18px!important}.admin-logo{font-size:28px!important}.admin-menu{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.admin-menu .sidebtn{min-height:56px!important;padding:12px!important}.admin-main{padding:16px!important}.admin-top{display:grid!important;grid-template-columns:1fr!important;gap:12px}.admin-search{width:100%!important}.admin-actions{justify-content:space-between!important}.dashboard-hero,.v6-hero{padding:22px!important;border-radius:26px!important}.stats-grid,.hero-stats{grid-template-columns:1fr 1fr!important}.stat-card{min-height:auto!important}.metric-card-sm{padding:8px 4px!important}.mc-icon{font-size:16px!important;margin-bottom:4px!important}.mc-val{font-size:16px!important}.mc-label{font-size:9px!important}.mc-badge{font-size:8px!important}.v20-live-strip{border-radius:24px!important;padding:16px!important}.v20-live-card{min-width:210px!important}.v20-search-grid,.v20-request-form,.form.two{grid-template-columns:1fr!important}.v20-tech-card{grid-template-columns:1fr!important;text-align:start}.v20-tech-actions{display:grid!important;grid-template-columns:1fr 1fr}.request-card,.v21-request-card,.v20-request-card{padding:16px!important}.request-head,.v20-request-head{display:block!important}.request-meta,.v21-details{grid-template-columns:1fr!important}.table-wrap{overflow:auto}.auth-shell,.v23-auth-shell{grid-template-columns:1fr!important;border-radius:26px!important}.auth-side,.v23-auth-side{display:none!important}.auth-card,.v23-auth-card{padding:28px 18px!important}.topbar{display:grid!important;gap:10px}.sidebar{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));position:relative!important;width:100%!important}.panel{grid-template-columns:1fr!important}.v22-grid{grid-template-columns:1fr!important}.v22-upload{min-height:112px!important}.problem-preview,.v22-preview{max-width:100%!important;width:100%!important}.chat-page .card{padding:14px!important}.chat-box{height:48vh!important}.chat-form{display:grid!important;grid-template-columns:1fr!important;gap:10px}.clean-logout,.v17-top-logout{font-size:14px!important;padding:10px 12px!important}
   }
