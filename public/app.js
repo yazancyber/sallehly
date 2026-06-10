@@ -82,10 +82,10 @@ async function doVerifyOtp(e) {
   e.preventDefault();
   const email = state._pendingOtpEmail;
   if(!email) return toast('حدث خطأ، أعد التسجيل');
-  const otp = clean($('#otpInput')?.value || '');
-  if(otp.length !== 6) return toast('أدخل الكود المكون من 6 أرقام');
+  const rawOtp = ($('#otpInput')?.value || '').trim().replace(/\s/g,'');
+  if(rawOtp.length !== 6) return toast('أدخل الكود المكون من 6 أرقام');
   try {
-    const j = await api('/api/auth/verify-otp', {method:'POST', body:JSON.stringify({email, otp})});
+    const j = await api('/api/auth/verify-otp', {method:'POST', body:JSON.stringify({email, otp: rawOtp})});
     state.user = j.user;
     state._pendingOtpEmail = null;
     toast('🎉 تم إنشاء الحساب بنجاح!');
