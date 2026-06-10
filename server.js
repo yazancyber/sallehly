@@ -11,18 +11,72 @@ const multer = require('multer');
 const validator = require('validator');
 const Database = require('better-sqlite3');
 const http = require('http');
+const crypto = require('crypto');
 const { Server } = require('socket.io');
+const { Resend } = require('resend');
 
 const app = express();
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'محاولات تسجيل دخول كثيرة، حاول بعد 15 دقيقة' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+const passwordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'محاولات تغيير كلمة السر كثيرة، حاول بعد 15 دقيقة' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  message: { error: 'تم تجاوز حد إنشاء الحسابات، حاول بعد ساعة' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+const requestsLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { error: 'تم تجاوز حد إنشاء الطلبات، حاول بعد ساعة' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+const messagesLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'أرسلت رسائل كثيرة جداً، انتظر دقيقة' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+const otpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 3,
+  message: { error: 'طلبت كوداً كثيراً، انتظر 10 دقائق' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // Render/Proxy fix: trust the first reverse proxy so express-rate-limit
 // can read X-Forwarded-For safely without throwing ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
 app.set('trust proxy', 1);
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: true, credentials: true } });
+const io = new Server(server, {
+  cors: {
+    origin: process.env.NODE_ENV === 'production'
+      ? ['https://sallehly.onrender.com']
+      : ['http://localhost:3000'],
+    credentials: true
+  }
+});
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (()=>{ throw new Error('JWT_SECRET is required in production'); })() : 'local_development_secret_change_me');
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const RESEND_FROM = process.env.RESEND_FROM || 'onboarding@resend.dev';
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 const BASE = __dirname;
 const DATA_DIR = path.join(BASE, 'data');
 const UPLOAD_DIR = path.join(BASE, 'public', 'uploads');
@@ -39,11 +93,17 @@ function hasSafeExt(file, allowedExts){
 }
 function safeUploadName(file){
   const ext = path.extname(file.originalname || '').toLowerCase();
-  return Date.now() + '-' + Math.random().toString(16).slice(2) + ext;
+  return Date.now() + '-' + crypto.randomBytes(8).toString('hex') + ext;
 }
 
 
 app.use(helmet({
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   contentSecurityPolicy: {
     useDefaults: true,
     directives: {
@@ -53,7 +113,7 @@ app.use(helmet({
       "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com"],
       "font-src": ["'self'", "https://fonts.gstatic.com", "data:"],
       "img-src": ["'self'", "data:", "blob:", "https://*.tile.openstreetmap.org", "https://tile.openstreetmap.org", "https://unpkg.com"],
-      "connect-src": ["'self'", "ws:", "wss:", "https://*.tile.openstreetmap.org", "https://tile.openstreetmap.org", "https://unpkg.com"],
+      "connect-src": ["'self'", "wss:", "https://*.tile.openstreetmap.org", "https://tile.openstreetmap.org", "https://unpkg.com"],
       "media-src": ["'self'", "blob:"],
       "frame-src": ["'self'", "https://www.openstreetmap.org", "https://maps.google.com", "https://www.google.com"]
     }
@@ -88,7 +148,7 @@ const audioStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(UPLOAD_DIR, 'audios')),
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase() || '.webm';
-    cb(null, Date.now() + '-' + Math.random().toString(16).slice(2) + ext);
+    cb(null, Date.now() + '-' + crypto.randomBytes(8).toString('hex') + ext);
   }
 });
 const uploadAudio = multer({
@@ -140,6 +200,16 @@ CREATE TABLE IF NOT EXISTS users(
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS service_categories(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, icon TEXT DEFAULT '🔧');
+CREATE TABLE IF NOT EXISTS pending_users(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  otp TEXT NOT NULL,
+  otp_expires INTEGER NOT NULL,
+  attempts INTEGER DEFAULT 0,
+  data TEXT NOT NULL,
+  avatar_filename TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS packages(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -306,23 +376,60 @@ if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
   console.warn('No admin account created/updated. Set ADMIN_EMAIL and ADMIN_PASSWORD in .env, then restart.');
 }
 
-// V9 demo technicians: visible for customer search and testing. Safe INSERT OR IGNORE by email.
-try {
-  const demoPass = bcrypt.hashSync('Tech@12345', 12);
-  const demoTechs = [
-    ['فني تكييف عمان - محمد', 'tech.ac.amman@sallehly.jo', '0791111101', 'عمان', 'فني تكييف,صيانة أجهزة كهربائية,صيانة عامة', 'القويسمة,الجبيهة,طبربور,صويلح,خلدا,تلاع العلي,مرج الحمام', 4.8, 37, 91, '/uploads/avatar-tech-1.png'],
-    ['كهربائي عمان - أحمد', 'tech.elec.amman@sallehly.jo', '0791111102', 'عمان', 'كهربائي,صيانة سخانات,صيانة غسالات', 'القويسمة,ماركا,النصر,الهاشمي الشمالي,عبدون,وادي السير', 4.7, 29, 75, '/uploads/avatar-tech-2.png'],
-    ['سباك عمان - خالد', 'tech.plumb.amman@sallehly.jo', '0791111103', 'عمان', 'سباك,تنظيف خزانات,صيانة مطابخ', 'الجبيهة,أبو نصير,شفا بدران,صويلح,خلدا,البيادر', 4.6, 22, 63, '/uploads/avatar-tech-3.png'],
-    ['فني تكييف الزرقاء - سامر', 'tech.ac.zarqa@sallehly.jo', '0791111104', 'الزرقاء', 'فني تكييف,صيانة ثلاجات,صيانة غسالات', 'الزرقاء الجديدة,الرصيفة,ياجوز,حي الأمير محمد', 4.5, 18, 52, '/uploads/avatar-tech-4.png'],
-    ['نجار وتركيب أثاث - عمر', 'tech.carp.amman@sallehly.jo', '0791111105', 'عمان', 'نجار,تركيب أثاث,صيانة أبواب,صيانة مطابخ', 'القويسمة,المقابلين,اليادودة,سحاب,مرج الحمام', 4.9, 41, 108, '/uploads/avatar-tech-5.png']
-  ];
-  const ins = db.prepare(`INSERT OR IGNORE INTO users(role,name,email,phone,password_hash,city,services,areas,avatar_url,rating_avg,rating_count,completed_jobs,balance,is_active) VALUES('technician',?,?,?,?,?,?,?,?,?,?,?,?,1)`);
-  demoTechs.forEach(t => ins.run(t[0], t[1], t[2], demoPass, t[3], t[4], t[5], t[9], t[6], t[7], t[8], 20));
-} catch(e) { console.warn('demo tech seed skipped', e.message); }
+// V9 demo technicians: ONLY in development. Never seeded in production.
+if(process.env.NODE_ENV !== 'production') {
+  try {
+    const demoPass = bcrypt.hashSync('Tech@12345', 12);
+    const demoTechs = [
+      ['فني تكييف عمان - محمد', 'tech.ac.amman@sallehly.jo', '0791111101', 'عمان', 'فني تكييف,صيانة أجهزة كهربائية,صيانة عامة', 'القويسمة,الجبيهة,طبربور,صويلح,خلدا,تلاع العلي,مرج الحمام', 4.8, 37, 91, '/uploads/avatar-tech-1.png'],
+      ['كهربائي عمان - أحمد', 'tech.elec.amman@sallehly.jo', '0791111102', 'عمان', 'كهربائي,صيانة سخانات,صيانة غسالات', 'القويسمة,ماركا,النصر,الهاشمي الشمالي,عبدون,وادي السير', 4.7, 29, 75, '/uploads/avatar-tech-2.png'],
+      ['سباك عمان - خالد', 'tech.plumb.amman@sallehly.jo', '0791111103', 'عمان', 'سباك,تنظيف خزانات,صيانة مطابخ', 'الجبيهة,أبو نصير,شفا بدران,صويلح,خلدا,البيادر', 4.6, 22, 63, '/uploads/avatar-tech-3.png'],
+      ['فني تكييف الزرقاء - سامر', 'tech.ac.zarqa@sallehly.jo', '0791111104', 'الزرقاء', 'فني تكييف,صيانة ثلاجات,صيانة غسالات', 'الزرقاء الجديدة,الرصيفة,ياجوز,حي الأمير محمد', 4.5, 18, 52, '/uploads/avatar-tech-4.png'],
+      ['نجار وتركيب أثاث - عمر', 'tech.carp.amman@sallehly.jo', '0791111105', 'عمان', 'نجار,تركيب أثاث,صيانة أبواب,صيانة مطابخ', 'القويسمة,المقابلين,اليادودة,سحاب,مرج الحمام', 4.9, 41, 108, '/uploads/avatar-tech-5.png']
+    ];
+    const ins = db.prepare(`INSERT OR IGNORE INTO users(role,name,email,phone,password_hash,city,services,areas,avatar_url,rating_avg,rating_count,completed_jobs,balance,is_active) VALUES('technician',?,?,?,?,?,?,?,?,?,?,?,?,1)`);
+    demoTechs.forEach(t => ins.run(t[0], t[1], t[2], demoPass, t[3], t[4], t[5], t[9], t[6], t[7], t[8], 20));
+  } catch(e) { console.warn('demo tech seed skipped', e.message); }
+}
 
 const IS_PROD = process.env.NODE_ENV === 'production';
-const COOKIE_OPTS = { httpOnly: true, sameSite: 'strict', secure: IS_PROD };
+const COOKIE_OPTS = { httpOnly: true, sameSite: 'strict', secure: IS_PROD, maxAge: 7 * 24 * 60 * 60 * 1000 };
 function sign(user){ return jwt.sign({ id:user.id, role:user.role, name:user.name }, JWT_SECRET, { expiresIn:'7d' }); }
+
+async function sendOtpEmail(toEmail, otp, name) {
+  if (!resend) {
+    // Development fallback: print to console
+    console.log(`\n📧 OTP for ${toEmail}: ${otp}\n`);
+    return true;
+  }
+  try {
+    await resend.emails.send({
+      from: RESEND_FROM,
+      to: toEmail,
+      subject: 'كود التحقق — صلّحلي',
+      html: `
+        <div dir="rtl" style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0d0d1a;color:#fff;border-radius:16px;padding:32px;">
+          <div style="text-align:center;margin-bottom:24px;">
+            <h1 style="color:#7c3aed;font-size:28px;margin:0;">صلّحلي</h1>
+            <p style="color:#aaa;font-size:13px;margin:4px 0 0;">منصة الصيانة في الأردن</p>
+          </div>
+          <p style="font-size:16px;">مرحباً <b>${name}</b>،</p>
+          <p style="color:#ccc;">استخدم الكود أدناه لتأكيد تسجيلك. صالح لمدة <b>10 دقائق</b>.</p>
+          <div style="text-align:center;margin:28px 0;">
+            <div style="display:inline-block;background:#1a1050;border:2px solid #7c3aed;border-radius:12px;padding:18px 40px;">
+              <span style="font-size:36px;font-weight:900;letter-spacing:10px;color:#fff;">${otp}</span>
+            </div>
+          </div>
+          <p style="color:#888;font-size:12px;text-align:center;">إذا لم تطلب هذا الكود، تجاهل هذا الإيميل.</p>
+        </div>
+      `
+    });
+    return true;
+  } catch(e) {
+    console.error('Resend error:', e.message);
+    return false;
+  }
+}
 function auth(req,res,next){
   const h = req.headers.authorization || '';
   const token = h.startsWith('Bearer ') ? h.slice(7) : req.cookies.token;
@@ -345,25 +452,41 @@ function markChatRead(requestId, userId){
   db.prepare(`INSERT INTO chat_reads(request_id,user_id,last_read_message_id,updated_at) VALUES(?,?,?,CURRENT_TIMESTAMP)
     ON CONFLICT(request_id,user_id) DO UPDATE SET last_read_message_id=excluded.last_read_message_id, updated_at=CURRENT_TIMESTAMP`).run(requestId, userId, last);
 }
-function unreadCountSql(alias='r'){
-  return `(SELECT COUNT(*) FROM messages m LEFT JOIN chat_reads cr ON cr.request_id=m.request_id AND cr.user_id=? WHERE m.request_id=${alias}.id AND m.sender_id<>? AND m.id>COALESCE(cr.last_read_message_id,0))`;
-}
-
+io.use((socket, next)=>{
+  try {
+    const token = socket.handshake.auth?.token || socket.handshake.headers?.cookie?.match(/token=([^;]+)/)?.[1];
+    if(!token) return next(new Error('غير مصرح'));
+    socket.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch { next(new Error('جلسة غير صالحة')); }
+});
 io.on('connection', (socket)=>{
-  socket.on('join-request', (requestId)=>{ if(requestId) socket.join(String(requestId)); });
+  socket.on('join-request', (requestId)=>{
+    if(!requestId) return;
+    // Only allow joining rooms for requests the user is part of
+    const r = db.prepare('SELECT * FROM requests WHERE id=?').get(requestId);
+    if(!r) return;
+    const isAllowed = socket.user.role==='admin' || r.customer_id===socket.user.id || r.technician_id===socket.user.id ||
+      (socket.user.role==='technician' && db.prepare('SELECT id FROM offers WHERE request_id=? AND technician_id=? LIMIT 1').get(requestId, socket.user.id));
+    if(isAllowed) socket.join(String(requestId));
+  });
   socket.on('leave-request', (requestId)=>{ if(requestId) socket.leave(String(requestId)); });
 });
 
 app.get('/api/meta', (req,res)=>{
   res.json({
     services: db.prepare('SELECT * FROM service_categories ORDER BY name').all(),
-    packages: db.prepare('SELECT * FROM packages WHERE is_active=1 ORDER BY amount').all(),
-    paymentMethods: db.prepare('SELECT * FROM payment_methods').all(),
+    packages: db.prepare('SELECT id,name,amount,bonus FROM packages WHERE is_active=1 ORDER BY amount').all(),
     cities: ['عمان','الزرقاء','إربد','البلقاء','المفرق','جرش','عجلون','مادبا','الكرك','الطفيلة','معان','العقبة']
   });
 });
+// Payment methods only returned to authenticated technicians
+app.get('/api/payment-methods', auth, requireRole('technician'), (req,res)=>{
+  res.json({paymentMethods: db.prepare('SELECT * FROM payment_methods').all()});
+});
 
-app.post('/api/auth/register', upload.single('avatar'), (req,res)=>{
+// ── STEP 1: تقبّل البيانات، تحقق منها، ابعث OTP ──────────────────────────
+app.post('/api/auth/register', registerLimiter, otpLimiter, upload.single('avatar'), async (req,res)=>{
   const role = clean(req.body.role);
   const name = clean(req.body.name || req.body.full_name || req.body.fullName || req.body.username);
   const email = clean(req.body.email).toLowerCase();
@@ -373,32 +496,92 @@ app.post('/api/auth/register', upload.single('avatar'), (req,res)=>{
   const city = clean(req.body.city);
   const services = Array.isArray(req.body.services) ? req.body.services.join(',') : clean(req.body.services);
   const areas = Array.isArray(req.body.areas) ? req.body.areas.join(',') : clean(req.body.areas);
-  const avatar_url = req.file ? '/uploads/avatars/' + req.file.filename : '';
+  const avatar_filename = req.file ? req.file.filename : '';
+
   if(!['customer','technician'].includes(role)) return res.status(400).json({error:'نوع الحساب غير صحيح'});
   if(name.length < 2) return res.status(400).json({error:'الرجاء إدخال الاسم الكامل'});
-  if(role==='technician' && !avatar_url) return res.status(400).json({error:'الصورة الشخصية مطلوبة للفني فقط'});
+  if(name.length > 60) return res.status(400).json({error:'الاسم طويل جداً، الحد الأقصى 60 حرف'});
+  if(role==='technician' && !avatar_filename) return res.status(400).json({error:'الصورة الشخصية مطلوبة للفني فقط'});
   if(!validator.isEmail(email)) return res.status(400).json({error:'البريد غير صحيح'});
+  if(email.length > 100) return res.status(400).json({error:'البريد الإلكتروني طويل جداً'});
   if(!/^07\d{8}$/.test(phone)) return res.status(400).json({error:'رقم الهاتف يجب أن يبدأ 07 ويتكون من 10 أرقام'});
   if(password.length < 8) return res.status(400).json({error:'كلمة السر يجب أن تكون 8 أحرف على الأقل'});
+  if(password.length > 72) return res.status(400).json({error:'كلمة السر طويلة جداً، الحد الأقصى 72 حرف'});
   if(role==='technician' && !/^\d{10}$/.test(national_number)) return res.status(400).json({error:'الرقم الوطني يجب أن يكون 10 أرقام'});
+  if(city.length > 50) return res.status(400).json({error:'اسم المدينة طويل جداً'});
+  if(services.length > 500) return res.status(400).json({error:'الخدمات طويلة جداً'});
+  if(areas.length > 500) return res.status(400).json({error:'المناطق طويلة جداً'});
+
+  if(db.prepare('SELECT id FROM users WHERE email=?').get(email))
+    return res.status(409).json({error:'البريد الإلكتروني مستخدم مسبقاً'});
+  if(db.prepare('SELECT id FROM users WHERE phone=?').get(phone))
+    return res.status(409).json({error:'رقم الهاتف مستخدم مسبقاً'});
+
+  const hash = bcrypt.hashSync(password, 12);
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const otp_expires = Date.now() + 10 * 60 * 1000;
+
+  db.prepare('DELETE FROM pending_users WHERE email=?').run(email);
+  db.prepare('INSERT INTO pending_users(email,otp,otp_expires,data,avatar_filename) VALUES(?,?,?,?,?)')
+    .run(email, otp, otp_expires, JSON.stringify({role,name,email,phone,hash,national_number,city,services,areas}), avatar_filename);
+
+  const sent = await sendOtpEmail(email, otp, name);
+  if(!sent) return res.status(500).json({error:'تعذر إرسال البريد، حاول مرة أخرى'});
+
+  res.json({ok:true, step:'verify', message:'تم إرسال كود التحقق إلى بريدك الإلكتروني', email});
+});
+
+// ── STEP 2: التحقق من OTP وإنشاء الحساب ─────────────────────────────────
+app.post('/api/auth/verify-otp', (req,res)=>{
+  const email = clean(req.body.email).toLowerCase();
+  const otp = clean(req.body.otp);
+
+  const pending = db.prepare('SELECT * FROM pending_users WHERE email=?').get(email);
+  if(!pending) return res.status(400).json({error:'لا يوجد طلب تسجيل لهذا البريد، أعد التسجيل'});
+
+  if(Date.now() > pending.otp_expires){
+    db.prepare('DELETE FROM pending_users WHERE email=?').run(email);
+    return res.status(400).json({error:'انتهت صلاحية الكود، أعد التسجيل'});
+  }
+
+  if(pending.attempts >= 5){
+    db.prepare('DELETE FROM pending_users WHERE email=?').run(email);
+    return res.status(400).json({error:'محاولات كثيرة، أعد التسجيل'});
+  }
+
+  if(pending.otp !== otp){
+    db.prepare('UPDATE pending_users SET attempts=attempts+1 WHERE email=?').run(email);
+    const left = 5 - (pending.attempts + 1);
+    return res.status(400).json({error:`الكود غير صحيح. تبقى لك ${left} محاولات`});
+  }
+
   try{
-    const hash = bcrypt.hashSync(password, 12);
-    const isActive = 1;
-    const info = db.prepare('INSERT INTO users(role,name,email,phone,password_hash,national_number,city,services,areas,avatar_url,is_active) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
-      .run(role,name,email,phone,hash, role==='technician'?national_number:null, city, services, areas, avatar_url, isActive);
+    const d = JSON.parse(pending.data);
+    const avatar_url = pending.avatar_filename ? '/uploads/avatars/' + pending.avatar_filename : '';
+    const info = db.prepare('INSERT INTO users(role,name,email,phone,password_hash,national_number,city,services,areas,avatar_url,is_active) VALUES(?,?,?,?,?,?,?,?,?,?,1)')
+      .run(d.role, d.name, d.email, d.phone, d.hash, d.role==='technician'?d.national_number:null, d.city, d.services, d.areas, avatar_url);
+    db.prepare('DELETE FROM pending_users WHERE email=?').run(email);
     const user = db.prepare('SELECT * FROM users WHERE id=?').get(info.lastInsertRowid);
-    const token = sign(user); res.cookie('token', token, COOKIE_OPTS); res.json({token,user:userPublic(user), message:'تم إنشاء الحساب بنجاح'});
+    const token = sign(user);
+    res.cookie('token', token, COOKIE_OPTS);
+    res.json({user:userPublic(user), message:'تم إنشاء الحساب بنجاح'});
   } catch(e){
-    if(String(e.message).includes('UNIQUE')) return res.status(409).json({error:'البريد أو رقم الهاتف أو الرقم الوطني مستخدم مسبقاً'});
+    if(String(e.message).includes('UNIQUE')) return res.status(409).json({error:'البريد أو رقم الهاتف مستخدم مسبقاً'});
     res.status(500).json({error:'تعذر إنشاء الحساب'});
   }
 });
-app.post('/api/auth/login', (req,res)=>{
-  const email = clean(req.body.email).toLowerCase(); const password = String(req.body.password||'');
+app.post('/api/auth/login', loginLimiter, (req,res)=>{
+  const email = clean(req.body.email).toLowerCase();
+  const password = String(req.body.password||'');
+  if(password.length > 72) return res.status(401).json({error:'بيانات الدخول غير صحيحة'});
+  const DUMMY_HASH = '$2a$12$dummyhashtopreventtimingattacksonnonexistentaccounts111';
   const user = db.prepare('SELECT * FROM users WHERE email=?').get(email);
-  if(!user || !bcrypt.compareSync(password, user.password_hash)) return res.status(401).json({error:'بيانات الدخول غير صحيحة'});
+  // Always run bcrypt to prevent user enumeration via timing difference
+  const hashToCheck = user ? user.password_hash : DUMMY_HASH;
+  const valid = bcrypt.compareSync(password, hashToCheck);
+  if(!user || !valid) return res.status(401).json({error:'بيانات الدخول غير صحيحة'});
   if(!user.is_active) return res.status(403).json({error:'الحساب موقوف'});
-  const token = sign(user); res.cookie('token', token, COOKIE_OPTS); res.json({token,user:userPublic(user)});
+  const token = sign(user); res.cookie('token', token, COOKIE_OPTS); res.json({user:userPublic(user)});
 });
 app.post('/api/auth/logout', (req,res)=>{ res.clearCookie('token'); res.json({ok:true}); });
 app.get('/api/me', auth, (req,res)=> {
@@ -413,7 +596,9 @@ app.get('/api/me', auth, (req,res)=> {
 
 app.get('/api/technicians', auth, (req,res)=>{
   const service=clean(req.query.service), city=clean(req.query.city), area=clean(req.query.area), q=clean(req.query.q);
-  let sql="SELECT id,name,phone,city,areas,services,avatar_url,rating_avg,rating_count,completed_jobs,balance,free_orders_used,is_active FROM users WHERE role='technician' AND is_active=1";
+  // phone only returned to admin — customers see all other public fields
+  const phoneField = req.user.role === 'admin' ? ', phone' : '';
+  let sql=`SELECT id,name${phoneField},city,areas,services,avatar_url,rating_avg,rating_count,completed_jobs,is_active FROM users WHERE role='technician' AND is_active=1`;
   const params=[];
   const wanted = service || q;
   if(wanted){ sql += " AND (services LIKE ? OR name LIKE ?)"; params.push('%'+wanted+'%', '%'+wanted+'%'); }
@@ -423,13 +608,20 @@ app.get('/api/technicians', auth, (req,res)=>{
   res.json({technicians: db.prepare(sql).all(...params)});
 });
 
-app.post('/api/requests', auth, requireRole('customer'), upload.single('problem_image'), (req,res)=>{
+app.post('/api/requests', auth, requireRole('customer'), requestsLimiter, upload.single('problem_image'), (req,res)=>{
   const {service,city,area,description,preferred_time} = req.body;
   const lat = req.body.lat ? Number(req.body.lat) : null;
   const lng = req.body.lng ? Number(req.body.lng) : null;
   const requestedTechId = req.body.technician_id ? Number(req.body.technician_id) : null;
   const problemImage = req.file ? '/uploads/requests/' + req.file.filename : '';
   if(!clean(service)||!clean(city)||clean(description).length<10) return res.status(400).json({error:'أكمل بيانات الطلب: الخدمة، المحافظة، ووصف لا يقل عن 10 أحرف'});
+  if(clean(description).length > 1000) return res.status(400).json({error:'الوصف طويل جداً، الحد الأقصى 1000 حرف'});
+  if(clean(service).length > 100) return res.status(400).json({error:'اسم الخدمة طويل جداً'});
+  if(clean(city).length > 50) return res.status(400).json({error:'اسم المحافظة طويل جداً'});
+  if(clean(area||'').length > 100) return res.status(400).json({error:'اسم المنطقة طويل جداً'});
+  if(lat !== null && (isNaN(lat) || lat < -90 || lat > 90)) return res.status(400).json({error:'إحداثيات غير صحيحة'});
+  if(lng !== null && (isNaN(lng) || lng < -180 || lng > 180)) return res.status(400).json({error:'إحداثيات غير صحيحة'});
+  if(clean(preferred_time||'').length > 100) return res.status(400).json({error:'وقت التفضيل طويل جداً'});
   if(requestedTechId){
     const tech = db.prepare("SELECT id FROM users WHERE id=? AND role='technician' AND is_active=1").get(requestedTechId);
     if(!tech) return res.status(400).json({error:'الفني غير متاح أو لم تتم موافقته من الإدارة'});
@@ -491,7 +683,10 @@ app.post('/api/requests/:id/offer', auth, requireRole('technician'), (req,res)=>
   const duration = clean(req.body.duration || req.body.arrival_time);
   const note = clean(req.body.note || '');
   if(!price || price<1) return res.status(400).json({error:'أدخل سعر صحيح'});
+  if(price > 99999) return res.status(400).json({error:'السعر مرتفع جداً، الحد الأقصى 99,999 د.أ'});
   if(!duration) return res.status(400).json({error:'أدخل مدة التنفيذ أو الوصول'});
+  if(duration.length > 100) return res.status(400).json({error:'مدة التنفيذ طويلة جداً'});
+  if(note.length > 500) return res.status(400).json({error:'الملاحظة طويلة جداً، الحد الأقصى 500 حرف'});
   db.prepare(`INSERT INTO offers(request_id,technician_id,price,duration,note,status) VALUES(?,?,?,?,?,'pending')
     ON CONFLICT(request_id,technician_id) DO UPDATE SET price=excluded.price,duration=excluded.duration,note=excluded.note,status='pending',updated_at=CURRENT_TIMESTAMP`)
     .run(r.id, req.user.id, price, duration, note);
@@ -507,6 +702,8 @@ app.get('/api/requests/:id/offers', auth, (req,res)=>{
   if(!r) return res.status(404).json({error:'الطلب غير موجود'});
   const allowed = req.user.role==='admin' || r.customer_id===req.user.id || r.technician_id===req.user.id || req.user.role==='technician';
   if(!allowed) return res.status(403).json({error:'غير مصرح'});
+  // Customer IDOR guard: customers only see their own requests' offers
+  if(req.user.role==='customer' && r.customer_id!==req.user.id) return res.status(403).json({error:'غير مصرح'});
   let rows = db.prepare(`SELECT o.*, u.name technician_name, u.city technician_city, u.areas technician_areas, u.avatar_url, u.rating_avg, u.rating_count, u.completed_jobs
     FROM offers o JOIN users u ON u.id=o.technician_id WHERE o.request_id=? ORDER BY CASE o.status WHEN 'accepted' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END, o.id DESC`).all(r.id);
   if(req.user.role==='technician' && r.customer_id!==req.user.id && r.technician_id!==req.user.id) rows = rows.filter(o=>o.technician_id===req.user.id);
@@ -543,16 +740,19 @@ app.post('/api/requests/:id/status', auth, (req,res)=>{
   const allowed=['قيد التنفيذ','بانتظار تأكيد الدفع','مكتمل','ملغي'];
   if(!allowed.includes(status)) return res.status(400).json({error:'حالة غير صحيحة'});
   if(req.user.role!=='admin' && req.user.id!==r.customer_id && req.user.id!==r.technician_id) return res.status(403).json({error:'لا تملك صلاحية'});
+  if(status==='ملغي' && req.user.role!=='admin' && req.user.id!==r.customer_id) return res.status(403).json({error:'إلغاء الطلب يكون من العميل أو الإدارة فقط'});
   if(status==='مكتمل' && req.user.role!=='admin' && req.user.id!==r.customer_id) return res.status(403).json({error:'إكمال الطلب يكون من العميل فقط'});
   if(status==='مكتمل' && r.technician_id && r.commission_charged === null){
     const doComplete = db.transaction(()=>{
       const tech = db.prepare('SELECT * FROM users WHERE id=?').get(r.technician_id);
+      const commRow = db.prepare('SELECT commission_per_order FROM packages WHERE is_active=1 ORDER BY amount ASC LIMIT 1').get();
+      const COMMISSION = Number(commRow?.commission_per_order || 2);
       let charge = 0;
       if(tech.free_orders_used < 2){
         db.prepare('UPDATE users SET free_orders_used=free_orders_used+1, completed_jobs=completed_jobs+1 WHERE id=?').run(tech.id);
         db.prepare('INSERT INTO ledger(user_id,type,amount,balance_after,note) VALUES(?,?,?,?,?)').run(tech.id,'طلب مجاني',0,tech.balance,'تم احتساب الطلب ضمن أول طلبين مجانيين');
       } else {
-        charge = 2;
+        charge = COMMISSION;
         if(tech.balance < charge) throw Object.assign(new Error('رصيد الفني غير كافٍ لإكمال الطلب. يجب شحن الرصيد أولاً.'), {status:400});
         const after = Number((tech.balance - charge).toFixed(2));
         db.prepare('UPDATE users SET balance=?, completed_jobs=completed_jobs+1 WHERE id=?').run(after, tech.id);
@@ -616,12 +816,14 @@ function rejectBlockedChat(req,res,r,body){
   return res.status(400).json({error:'⚠️ الرسائل العادية مسموحة. الممنوع فقط مشاركة رقم هاتف أو واتساب أو تيليجرام أو إيميل أو روابط تواصل خارجية.'});
 }
 
-app.post('/api/requests/:id/messages', auth, (req,res)=>{
+app.post('/api/requests/:id/messages', auth, messagesLimiter, (req,res)=>{
   const r=db.prepare('SELECT * FROM requests WHERE id=?').get(req.params.id);
   if(!r) return res.status(404).json({error:'الطلب غير موجود'});
   const hasOffer = req.user.role==='technician' ? db.prepare('SELECT id FROM offers WHERE request_id=? AND technician_id=? LIMIT 1').get(r.id, req.user.id) : null;
   if(req.user.role!=='admin' && req.user.id!==r.customer_id && req.user.id!==r.technician_id && !hasOffer) return res.status(403).json({error:'لا تملك صلاحية'});
+  if(['مكتمل','ملغي'].includes(r.status) && req.user.role!=='admin') return res.status(400).json({error:'لا يمكن إرسال رسائل على طلب مغلق'});
   const body=clean(req.body.body); if(body.length<1) return res.status(400).json({error:'الرسالة فارغة'});
+  if(body.length > 1000) return res.status(400).json({error:'الرسالة طويلة جداً، الحد الأقصى 1000 حرف'});
   if(rejectBlockedChat(req,res,r,body)) return;
   db.prepare('INSERT INTO messages(request_id,sender_id,body) VALUES(?,?,?)').run(r.id,req.user.id,body);
   markChatRead(r.id, req.user.id);
@@ -631,11 +833,12 @@ app.post('/api/requests/:id/messages', auth, (req,res)=>{
   res.json({messages});
 });
 
-app.post('/api/requests/:id/audio', auth, uploadAudio.single('audio'), (req,res)=>{
+app.post('/api/requests/:id/audio', auth, messagesLimiter, uploadAudio.single('audio'), (req,res)=>{
   const r=db.prepare('SELECT * FROM requests WHERE id=?').get(req.params.id);
   if(!r) return res.status(404).json({error:'الطلب غير موجود'});
   const hasOffer = req.user.role==='technician' ? db.prepare('SELECT id FROM offers WHERE request_id=? AND technician_id=? LIMIT 1').get(r.id, req.user.id) : null;
   if(req.user.role!=='admin' && req.user.id!==r.customer_id && req.user.id!==r.technician_id && !hasOffer) return res.status(403).json({error:'لا تملك صلاحية'});
+  if(['مكتمل','ملغي'].includes(r.status) && req.user.role!=='admin') return res.status(400).json({error:'لا يمكن إرسال رسائل على طلب مغلق'});
   if(!req.file) return res.status(400).json({error:'لم يتم استقبال التسجيل الصوتي'});
   const url='/uploads/audios/'+req.file.filename;
   const body='[audio]'+url;
@@ -660,13 +863,18 @@ app.post('/api/requests/:id/rate', auth, requireRole('customer'), (req,res)=>{
   const r=db.prepare('SELECT * FROM requests WHERE id=? AND customer_id=? AND status=?').get(req.params.id, req.user.id, 'مكتمل');
   if(!r || !r.technician_id) return res.status(400).json({error:'لا يمكن تقييم هذا الطلب'});
   const stars=Number(req.body.stars); if(stars<1||stars>5) return res.status(400).json({error:'اختر تقييم من 1 إلى 5'});
-  try{ db.prepare('INSERT INTO ratings(request_id,technician_id,customer_id,stars,comment) VALUES(?,?,?,?,?)').run(r.id,r.technician_id,req.user.id,stars,clean(req.body.comment)); calcRating(r.technician_id); safeEmit(r.id, 'rated', {requestId:r.id, stars}); res.json({ok:true}); }
+  const comment = clean(req.body.comment||'');
+  if(comment.length > 500) return res.status(400).json({error:'التعليق طويل جداً، الحد الأقصى 500 حرف'});
+  try{ db.prepare('INSERT INTO ratings(request_id,technician_id,customer_id,stars,comment) VALUES(?,?,?,?,?)').run(r.id,r.technician_id,req.user.id,stars,comment); calcRating(r.technician_id); safeEmit(r.id, 'rated', {requestId:r.id, stars}); res.json({ok:true}); }
   catch{ res.status(409).json({error:'تم تقييم هذا الطلب مسبقاً'}); }
 });
 
 app.post('/api/topups', auth, requireRole('technician'), upload.single('receipt'), (req,res)=>{
   const pkg = db.prepare('SELECT * FROM packages WHERE id=? AND is_active=1').get(req.body.package_id);
   if(!pkg) return res.status(404).json({error:'الباقة غير موجودة'});
+  // منع إرسال أكثر من طلب شحن معلق في نفس الوقت
+  const pendingCount = db.prepare("SELECT COUNT(*) c FROM topups WHERE technician_id=? AND status='pending'").get(req.user.id).c;
+  if(pendingCount >= 2) return res.status(429).json({error:'لديك طلبات شحن قيد المراجعة. انتظر موافقة الإدارة أولاً'});
   if(!req.file) return res.status(400).json({error:'يجب رفع صورة إثبات الدفع'});
   const receipt_url='/uploads/payments/'+req.file.filename;
   const info=db.prepare('INSERT INTO topups(technician_id,package_id,amount,bonus,receipt_url) VALUES(?,?,?,?,?)').run(req.user.id,pkg.id,pkg.amount,pkg.bonus,receipt_url);
@@ -681,6 +889,8 @@ app.post('/api/admin/topups/:id/review', auth, requireRole('admin'), (req,res)=>
   if(!t || t.status!=='pending') return res.status(400).json({error:'طلب الشحن غير صالح'});
   const status=clean(req.body.status);
   if(!['approved','rejected'].includes(status)) return res.status(400).json({error:'قرار غير صحيح'});
+  const adminNote = clean(req.body.admin_note || '');
+  if(adminNote.length > 500) return res.status(400).json({error:'ملاحظة المراجعة طويلة جداً'});
   const doReview = db.transaction(()=>{
     if(status==='approved'){
       const tech=db.prepare('SELECT * FROM users WHERE id=?').get(t.technician_id);
@@ -688,14 +898,19 @@ app.post('/api/admin/topups/:id/review', auth, requireRole('admin'), (req,res)=>
       db.prepare('UPDATE users SET balance=? WHERE id=?').run(after, tech.id);
       db.prepare('INSERT INTO ledger(user_id,type,amount,balance_after,note) VALUES(?,?,?,?,?)').run(tech.id,'شحن رصيد',add,after,`موافقة على طلب شحن رقم ${t.id}`);
     }
-    db.prepare('UPDATE topups SET status=?, admin_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?').run(status, clean(req.body.admin_note), t.id);
+    db.prepare('UPDATE topups SET status=?, admin_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?').run(status, adminNote, t.id);
   });
   doReview();
   res.json({topup: db.prepare('SELECT * FROM topups WHERE id=?').get(t.id)});
 });
 
 app.get('/api/ledger', auth, (req,res)=>{
-  const id = req.user.role==='admin' && req.query.user_id ? req.query.user_id : req.user.id;
+  let id = req.user.id;
+  if(req.user.role==='admin' && req.query.user_id){
+    const parsed = parseInt(req.query.user_id, 10);
+    if(isNaN(parsed) || parsed <= 0) return res.status(400).json({error:'معرّف المستخدم غير صحيح'});
+    id = parsed;
+  }
   res.json({ledger: db.prepare('SELECT * FROM ledger WHERE user_id=? ORDER BY id DESC').all(id)});
 });
 app.post('/api/me/profile', auth, (req,res)=>{
@@ -705,6 +920,10 @@ app.post('/api/me/profile', auth, (req,res)=>{
   const areas = clean(req.body.areas || req.body.area);
   const services = req.body.services ? (Array.isArray(req.body.services) ? req.body.services.join(',') : clean(req.body.services)) : null;
   if(name.length < 2) return res.status(400).json({error:'الاسم قصير'});
+  if(name.length > 60) return res.status(400).json({error:'الاسم طويل جداً، الحد الأقصى 60 حرف'});
+  if(city.length > 50) return res.status(400).json({error:'اسم المدينة طويل جداً'});
+  if(areas.length > 500) return res.status(400).json({error:'المناطق طويلة جداً، الحد الأقصى 500 حرف'});
+  if(services && services.length > 500) return res.status(400).json({error:'الخدمات طويلة جداً، الحد الأقصى 500 حرف'});
   if(!/^07\d{8}$/.test(phone)) return res.status(400).json({error:'رقم الهاتف يجب أن يبدأ 07 ويتكون من 10 أرقام'});
   if(req.user.role === 'technician' && services !== null){
     db.prepare('UPDATE users SET name=?, phone=?, city=?, areas=?, services=? WHERE id=?').run(name, phone, city, areas, services, req.user.id);
@@ -714,12 +933,13 @@ app.post('/api/me/profile', auth, (req,res)=>{
   res.json({user:userPublic(db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id))});
 });
 
-app.post('/api/me/password', auth, (req,res)=>{
+app.post('/api/me/password', auth, passwordLimiter, (req,res)=>{
   const current = String(req.body.current_password || '');
   const next = String(req.body.new_password || '');
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
   if(!bcrypt.compareSync(current, user.password_hash)) return res.status(400).json({error:'كلمة السر الحالية غير صحيحة'});
   if(next.length < 8) return res.status(400).json({error:'كلمة السر الجديدة يجب أن تكون 8 أحرف على الأقل'});
+  if(next.length > 72) return res.status(400).json({error:'كلمة السر طويلة جداً، الحد الأقصى 72 حرف'});
   db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(bcrypt.hashSync(next, 12), req.user.id);
   res.json({ok:true});
 });
@@ -735,12 +955,20 @@ app.get('/api/admin/stats', auth, requireRole('admin'), (req,res)=>{
   res.json({stats:{customers:one("SELECT COUNT(*) c FROM users WHERE role='customer'"), technicians:one("SELECT COUNT(*) c FROM users WHERE role='technician'"), requests:one('SELECT COUNT(*) c FROM requests'), pendingTopups:one("SELECT COUNT(*) c FROM topups WHERE status='pending'"), completed:one("SELECT COUNT(*) c FROM requests WHERE status='مكتمل'")}});
 });
 app.get('/api/admin/users', auth, requireRole('admin'), (req,res)=> res.json({users: db.prepare('SELECT id,role,name,email,phone,national_number,city,areas,services,is_active,balance,free_orders_used,rating_avg,rating_count,completed_jobs,created_at FROM users ORDER BY id DESC').all()}));
-app.post('/api/admin/users/:id/toggle', auth, requireRole('admin'), (req,res)=>{ const u=db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id); if(!u) return res.status(404).json({error:'المستخدم غير موجود'}); db.prepare('UPDATE users SET is_active=? WHERE id=?').run(u.is_active?0:1,u.id); res.json({ok:true}); });
+app.post('/api/admin/users/:id/toggle', auth, requireRole('admin'), (req,res)=>{
+  if(Number(req.params.id) === req.user.id) return res.status(400).json({error:'لا يمكنك إيقاف حسابك الخاص'});
+  const u=db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
+  if(!u) return res.status(404).json({error:'المستخدم غير موجود'});
+  db.prepare('UPDATE users SET is_active=? WHERE id=?').run(u.is_active?0:1,u.id);
+  res.json({ok:true});
+});
 
 app.post('/api/admin/services', auth, requireRole('admin'), (req,res)=>{
   const name = clean(req.body.name);
   const icon = clean(req.body.icon) || '🔧';
   if(name.length < 2) return res.status(400).json({error:'اسم المهنة قصير'});
+  if(name.length > 50) return res.status(400).json({error:'اسم المهنة طويل جداً، الحد الأقصى 50 حرف'});
+  if(icon.length > 10) return res.status(400).json({error:'رمز المهنة طويل جداً'});
   try{
     const info = db.prepare('INSERT INTO service_categories(name,icon) VALUES(?,?)').run(name, icon);
     res.json({service: db.prepare('SELECT * FROM service_categories WHERE id=?').get(info.lastInsertRowid)});
@@ -750,7 +978,18 @@ app.post('/api/admin/services', auth, requireRole('admin'), (req,res)=>{
   }
 });
 
-app.post('/api/admin/packages', auth, requireRole('admin'), (req,res)=>{ const {name,amount,bonus,commission_per_order}=req.body; const info=db.prepare('INSERT INTO packages(name,amount,bonus,commission_per_order) VALUES(?,?,?,?)').run(clean(name),Number(amount),Number(bonus||0),Number(commission_per_order||2)); res.json({package:db.prepare('SELECT * FROM packages WHERE id=?').get(info.lastInsertRowid)}); });
+app.post('/api/admin/packages', auth, requireRole('admin'), (req,res)=>{
+  const {name,bonus,commission_per_order}=req.body;
+  const amount=Number(req.body.amount);
+  const bonusVal=Number(bonus||0);
+  const commission=Number(commission_per_order||2);
+  if(!clean(name) || clean(name).length < 2) return res.status(400).json({error:'اسم الباقة مطلوب'});
+  if(!amount || amount <= 0) return res.status(400).json({error:'قيمة الباقة يجب أن تكون أكبر من صفر'});
+  if(bonusVal < 0) return res.status(400).json({error:'البونص لا يمكن أن يكون سالباً'});
+  if(commission < 0) return res.status(400).json({error:'العمولة لا يمكن أن تكون سالبة'});
+  const info=db.prepare('INSERT INTO packages(name,amount,bonus,commission_per_order) VALUES(?,?,?,?)').run(clean(name),amount,bonusVal,commission);
+  res.json({package:db.prepare('SELECT * FROM packages WHERE id=?').get(info.lastInsertRowid)});
+});
 
 
 
@@ -786,7 +1025,10 @@ app.get('/api/chats', auth, (req,res)=>{
 app.post('/api/support', auth, (req,res)=>{
   const {type,title,body}=req.body||{};
   if(clean(title).length<3 || clean(body).length<10 || clean(title).length>120 || clean(body).length>2000) return res.status(400).json({error:'اكتب عنوان وتفاصيل واضحة للدعم'});
-  const info=db.prepare('INSERT INTO support_tickets(user_id,type,title,body) VALUES(?,?,?,?)').run(req.user.id, clean(type||'عام'), clean(title), clean(body));
+  const allowedTypes = ['عام','شكوى','استفسار','مشكلة تقنية'];
+  const ticketType = clean(type||'عام');
+  if(!allowedTypes.includes(ticketType)) return res.status(400).json({error:'نوع التذكرة غير صحيح'});
+  const info=db.prepare('INSERT INTO support_tickets(user_id,type,title,body) VALUES(?,?,?,?)').run(req.user.id, ticketType, clean(title), clean(body));
   res.json({ticket:db.prepare('SELECT * FROM support_tickets WHERE id=?').get(info.lastInsertRowid)});
 });
 app.get('/api/support', auth, requireRole('admin'), (req,res)=>{
@@ -806,6 +1048,9 @@ app.use((err, req, res, next)=>{
   if(err){
     const msg = err.message || 'حدث خطأ في الخادم';
     if(String(msg).includes('File too large')) return res.status(400).json({error:'حجم الصورة كبير، الحد الأقصى 3MB'});
+    if(String(msg).includes('نوع الملف') || String(msg).includes('نوع التسجيل')) return res.status(400).json({error:msg});
+    // In production, don't leak internal error details
+    if(process.env.NODE_ENV === 'production') return res.status(400).json({error:'حدث خطأ في الطلب'});
     return res.status(400).json({error:msg});
   }
   next();

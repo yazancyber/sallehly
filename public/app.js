@@ -1,4 +1,4 @@
-let state={user:null,token:localStorage.token||'',meta:{services:[],packages:[],paymentMethods:[],cities:[]},tab:'dash',gps:null};
+let state={user:null,meta:{services:[],packages:[],paymentMethods:[],cities:[]},tab:'dash',gps:null};
 let chatTimer=null, activeChatId=null;
 let socket=null;
 function setupSocket(){
@@ -11,7 +11,7 @@ function setupSocket(){
 }
 let recorder=null,audioChunks=[],recordingId=null;
 const $=s=>document.querySelector(s), app=$('#app');
-async function api(url,opt={}){opt.headers={...(opt.body instanceof FormData?{}:{'Content-Type':'application/json'}),...(state.token?{Authorization:'Bearer '+state.token}:{})};let r=await fetch(url,opt),j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||'حدث خطأ');return j}
+async function api(url,opt={}){opt.headers={...(opt.body instanceof FormData?{}:{'Content-Type':'application/json'})};opt.credentials='include';let r=await fetch(url,opt),j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||'حدث خطأ');return j}
 function toast(t){let d=document.createElement('div');d.className='toast';d.textContent=t;$('#toast').appendChild(d);setTimeout(()=>d.remove(),3500)}
 function stars(n=0){let x=Math.round(Number(n)||0);return `<span class="stars">${'★'.repeat(x)}${'☆'.repeat(5-x)}</span>`}
 
@@ -24,7 +24,28 @@ window.esc = window.esc || function(v){
     .replaceAll('"','&quot;')
     .replaceAll("'","&#039;");
 };
-async function init(){setupSocket();state.meta=await api('/api/meta');try{let m=await api('/api/me');state.user=m.user;return dashboard()}catch{};go('home')}
+async function init(){
+  // Hide only the app content, not the loader
+  const appEl = document.getElementById('app');
+  const nav = document.querySelector('.nav');
+  const foot = document.querySelector('footer');
+  if(appEl) appEl.style.visibility='hidden';
+  if(nav) nav.style.visibility='hidden';
+  if(foot) foot.style.visibility='hidden';
+  setupSocket();
+  try{ state.meta=await api('/api/meta'); }catch(e){ state.meta={services:[],packages:[]}; }
+  let landed = false;
+  try{
+    let m=await api('/api/me');
+    state.user=m.user;
+    await dashboard();
+    landed=true;
+  }catch(e){ }
+  if(!landed){ go('home'); }
+  // Reveal content and hide loader
+  if(appEl) appEl.style.visibility='';
+  if(window._hideLoader) window._hideLoader();
+}
 function go(p){document.body.classList.remove('open'); if(p==='home') {home(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='services'){servicesPage(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='how'){howPage(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='tech'){techPage(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='contact'){contact(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='login'){login(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='register'){register(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='dashboard'){dashboard(); window.scrollTo({top:0,behavior:'smooth'}); return;} home();}
 window.go = go;
 function home(){app.innerHTML=`<section class="hero pro-hero"><div class="hero-copy"><span class="badge glow-badge"><span class="live-dot"></span> منصة صيانة احترافية في الأردن • فنيين موثوقين • دفع كاش</span><h1>صلّحلي — وصّل العميل بالفني الأقرب بشكل أسرع وأرتب</h1><p class="hero-lead">واجهة احترافية تعرض الخدمات، الفنيين، الطلبات، التقييمات، الرصيد، والدردشة بمظهر حديث يناسب إطلاق مشروع حقيقي.</p><div class="hero-actions"><button class="btn big" onclick="go('${state.user?'dashboard':'register'}')">اطلب خدمة الآن</button><button class="btn ghost big" onclick="register('technician')">انضم كفني</button></div><div class="trust-strip"><div><b>+12</b><span>خدمة صيانة</span></div><div><b>GPS</b><span>تحديد موقع</span></div><div><b>⭐ 4.8</b><span>تقييمات فنيين</span></div></div></div><div class="phone pro-phone"><div class="phone-top"><span></span><b>فنيين مقترحين</b><em>Live</em></div><div class="screen pro-screen">${['فني تكييف','كهربائي','سباك'].map((x,i)=>`<div class="screen-row pro-row"><div style="display:flex;gap:10px;align-items:center"><div class="avatar">${['❄️','⚡','🚰'][i]}</div><div><b>${x}</b><div>${stars(5-i/2)} <small>${20-i*4} عمل مكتمل</small></div></div></div><button class="btn ghost mini">اختيار</button></div>`).join('')}<div class="mini-map"><span>📍</span><div><b>الأقرب لموقعك</b><small>ترتيب حسب المنطقة والتقييم</small></div></div></div></div></section><section class="section services-section" id="services"><div class="section-head"><span class="eyebrow">خدمات جاهزة</span><h2>كل ما يحتاجه البيت بمكان واحد</h2><p class="muted">اختر الخدمة، انشر الطلب، وشاهد الفنيين المناسبين حسب منطقتك.</p></div><div class="grid feature-grid">${state.meta.services.slice(0,12).map(s=>`<div class="card service-card"><div class="icon">${s.icon}</div><h3>${s.name}</h3><p class="muted">طلب سريع، فنيين قريبين، وتقييم واضح قبل الاختيار.</p></div>`).join('')}</div></section><section class="section"><div class="section-head"><span class="eyebrow">كيف يعمل؟</span><h2>خطوات بسيطة من الطلب إلى الإنجاز</h2></div><div class="grid steps-grid"><div class="card step-card"><span>01</span><h3>أنشئ طلب</h3><p class="muted">اختر الخدمة، اكتب وصف المشكلة، وحدد المحافظة والمنطقة.</p></div><div class="card step-card"><span>02</span><h3>اختر الفني</h3><p class="muted">يعرض النظام الفنيين المناسبين مع التقييم وعدد الأعمال.</p></div><div class="card step-card"><span>03</span><h3>ادفع وقيّم</h3><p class="muted">بعد الإنجاز يتم الدفع كاش وتقييم الفني بالنجوم.</p></div></div></section><section class="section cta-section"><div class="cta-card"><div><span class="eyebrow">جاهز للإطلاق</span><h2>ابدأ بتحويل طلبات الصيانة إلى تجربة مرتبة وموثوقة</h2><p>تصميم حديث، أزرار واضحة، كروت احترافية، وتجربة مناسبة للموبايل والكمبيوتر.</p></div><button class="btn light big" onclick="go('${state.user?'dashboard':'register'}')">ابدأ الآن</button></div></section>`}
@@ -33,13 +54,53 @@ function howPage(){app.innerHTML=`<div class="page"><h1>آلية العمل</h1>
 function techPage(){app.innerHTML=`<div class="page"><h1>نظام الفنيين</h1><div class="cards2">${state.meta.packages.map(p=>`<div class="card package"><h3>${p.name}</h3><strong>${p.amount} د.أ</strong><p>رصيد إضافي: ${p.bonus} د.أ</p><p>خصم كل طلب مكتمل: ${p.commission_per_order} د.أ</p></div>`).join('')}</div><br><button class="btn" onclick="register('technician')">سجل كفني الآن</button></div>`}
 function contact(){app.innerHTML=`<div class="page"><div class="card"><h1>تواصل معنا</h1><p class="muted">للاستفسار أو شحن رصيد الفنيين: 0790000000</p></div></div>`}
 function login(){app.innerHTML=`<div class="page"><div class="card" style="max-width:520px;margin:auto"><h1>تسجيل الدخول</h1><form class="form" onsubmit="doLogin(event)"><div class="field"><label>البريد الإلكتروني</label><input id="email" type="email" required></div><div class="field"><label>كلمة السر</label><input id="password" type="password" required></div><button class="btn">دخول</button><p class="muted">حساب الإدارة لا يظهر للعامة. اطلب بيانات الدخول من مالك المنصة.</p></form></div></div>`}
-async function doLogin(e){e.preventDefault();try{let j=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:email.value,password:password.value})});state.user=j.user;state.token=j.token;localStorage.token=j.token;toast('تم تسجيل الدخول');dashboard()}catch(err){toast(err.message)}}
+async function doLogin(e){e.preventDefault();try{let j=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:email.value,password:password.value})});state.user=j.user;toast('تم تسجيل الدخول');dashboard()}catch(err){toast(err.message)}}
 function register(role='customer'){app.innerHTML=`<div class="page"><div class="card" style="max-width:760px;margin:auto"><h1>إنشاء حساب</h1><form class="form two" onsubmit="doRegister(event)"><div class="field"><label>نوع الحساب</label><select id="role" onchange="toggleTech()"><option value="customer">عميل</option><option value="technician">فني</option></select></div><div class="field"><label>الاسم الكامل</label><input id="name" placeholder="مثال: أحمد محمد" required minlength="2"></div><div class="field techOnly"><label>الصورة الشخصية للفني</label><input id="avatar" type="file" accept="image/png,image/jpeg,image/webp"><small class="muted">مطلوبة للفني فقط حتى يظهر للعميل بشكل موثوق.</small></div><div class="field"><label>البريد الإلكتروني</label><input id="remail" type="email" required></div><div class="field"><label>رقم الهاتف</label><input id="phone" placeholder="0791234567" required></div><div class="field"><label>كلمة السر</label><input id="rpassword" type="password" required minlength="8"></div><div class="field"><label>المحافظة</label><select id="city">${state.meta.cities.map(c=>`<option>${c}</option>`).join('')}</select></div><div class="field techOnly"><label>الرقم الوطني</label><input id="national" placeholder="10 أرقام"></div><div class="field techOnly"><label>الخدمات</label><select id="srv" multiple size="5">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field techOnly"><label>مناطق العمل</label><select id="areas" multiple size="5">${state.meta.cities.map(c=>`<option>${c}</option>`).join('')}</select></div><div></div><button class="btn">إنشاء الحساب</button></form></div></div>`;$('#role').value=role;toggleTech()}
 function toggleTech(){document.querySelectorAll('.techOnly').forEach(x=>x.style.display=$('#role').value==='technician'?'block':'none')}
 function vals(sel){return Array.from($(sel).selectedOptions||[]).map(o=>o.value)}
-async function doRegister(e){e.preventDefault();try{const role=$('#role').value;const fd=new FormData();fd.append('role',role);fd.append('name',$('#name').value.trim());fd.append('email',$('#remail').value.trim());fd.append('phone',$('#phone').value.trim());fd.append('password',$('#rpassword').value);fd.append('city',$('#city').value);fd.append('national_number',$('#national')?$('#national').value.trim():'');fd.append('services',vals('#srv').join(','));fd.append('areas',vals('#areas').join(','));if(role==='technician'&&!$('#avatar').files[0]) throw new Error('الرجاء اختيار صورة شخصية للفني');if($('#avatar')&&$('#avatar').files[0])fd.append('avatar',$('#avatar').files[0]);let j=await api('/api/auth/register',{method:'POST',body:fd});state.user=j.user;state.token=j.token;localStorage.token=j.token;toast('تم إنشاء الحساب');dashboard(); if(localStorage.pendingService){ const ps=localStorage.pendingService; localStorage.removeItem('pendingService'); setTimeout(()=>{ if(state.user?.role==='customer'){ state.tab='near'; dashboard(); setTimeout(()=>{ if($('#searchTechQ')) $('#searchTechQ').value=ps; if($('#searchService')) $('#searchService').value=ps; searchTechnicians(); },180); } },250); }}catch(err){toast(err.message)}}
-async function logout(){await api('/api/auth/logout',{method:'POST'}).catch(()=>{});localStorage.removeItem('token');state.user=null;state.token='';home()}
-function dashboard(){if(!state.user)return login(); if(state.user.role==='admin')return admin(); if(state.user.role==='technician')return techDash(); return custDash()}
+async function doRegister(e){e.preventDefault();try{const role=$('#role').value;const fd=new FormData();fd.append('role',role);fd.append('name',$('#name').value.trim());fd.append('email',$('#remail').value.trim());fd.append('phone',$('#phone').value.trim());fd.append('password',$('#rpassword').value);fd.append('city',$('#city').value);fd.append('national_number',$('#national')?$('#national').value.trim():'');fd.append('services',vals('#srv').join(','));fd.append('areas',vals('#areas').join(','));if(role==='technician'&&!$('#avatar').files[0]) throw new Error('الرجاء اختيار صورة شخصية للفني');if($('#avatar')&&$('#avatar').files[0])fd.append('avatar',$('#avatar').files[0]);const j=await api('/api/auth/register',{method:'POST',body:fd});if(j.step==='verify'){showOtpScreen(j.email);}else{state.user=j.user;toast('تم إنشاء الحساب');dashboard();}}catch(err){toast(err.message)}}
+// ── OTP Verification Screen ───────────────────────────────────────────────
+function showOtpScreen(email) {
+  app.innerHTML = `<div class="page"><div class="card" style="max-width:440px;margin:auto;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">📧</div>
+    <h1 style="margin-bottom:8px">تحقق من بريدك</h1>
+    <p class="muted" style="margin-bottom:24px">أرسلنا كود مكون من 6 أرقام إلى<br><b>${email}</b></p>
+    <form class="form" onsubmit="doVerifyOtp(event,'${email}')">
+      <div class="field">
+        <input id="otpInput" type="text" inputmode="numeric" maxlength="6" placeholder="أدخل الكود" required
+          style="text-align:center;font-size:28px;font-weight:900;letter-spacing:10px;padding:16px">
+      </div>
+      <button class="btn" style="width:100%">تأكيد الحساب</button>
+    </form>
+    <p class="muted" style="margin-top:16px;font-size:13px">لم يصلك الكود؟ <a href="#" onclick="go('register');return false" style="color:#7c3aed">أعد التسجيل</a></p>
+  </div></div>`;
+  setTimeout(()=>{ const i=$('#otpInput'); if(i) i.focus(); }, 100);
+}
+
+async function doVerifyOtp(e, email) {
+  e.preventDefault();
+  const otp = clean($('#otpInput')?.value || '');
+  if(otp.length !== 6) return toast('أدخل الكود المكون من 6 أرقام');
+  try {
+    const j = await api('/api/auth/verify-otp', {method:'POST', body:JSON.stringify({email, otp})});
+    state.user = j.user;
+    toast('🎉 تم إنشاء الحساب بنجاح!');
+    dashboard();
+    if(localStorage.pendingService){
+      const ps = localStorage.pendingService;
+      localStorage.removeItem('pendingService');
+      setTimeout(()=>{
+        if(state.user?.role==='customer'){
+          state.tab='near'; dashboard();
+          setTimeout(()=>{ if($('#searchTechQ')) $('#searchTechQ').value=ps; searchTechnicians(); },180);
+        }
+      },250);
+    }
+  } catch(err){ toast(err.message); }
+}
+
+async function logout(){await api('/api/auth/logout',{method:'POST'}).catch(()=>{});state.user=null;home()}
+async function dashboard(){if(!state.user)return login(); if(state.user.role==='admin')return admin(); if(state.user.role==='technician')return techDash(); return custDash();}
 function layout(title,menu,content){app.innerHTML=`<div class="page"><div class="topbar"><h1>${title}</h1><button class="btn ghost" onclick="logout()">تسجيل خروج</button></div><div class="panel"><aside class="sidebar">${menu.map(m=>`<button class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)">${m[1]}</button>`).join('')}</aside><section>${content}</section></div></div>`}
 async function custDash(){let menu=[['dash','طلب جديد'],['near','الفنيين الأقرب'],['orders','طلباتي']];let c=''; if(state.tab==='orders'){let j=await api('/api/requests');c=`<div class="card"><h2>طلباتي</h2>${reqTable(j.requests)}</div>`}else if(state.tab==='near'){c=nearbyPage()}else c=requestForm();layout('لوحة العميل',menu,c); if(state.tab==='near') loadNearby();}
 function mapBox(lat,lng){if(!lat||!lng)return `<div class="mapbox empty">لم يتم تحديد الموقع بعد</div>`;return `<iframe class="mapbox" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=${Number(lng)-0.01}%2C${Number(lat)-0.01}%2C${Number(lng)+0.01}%2C${Number(lat)+0.01}&layer=mapnik&marker=${lat}%2C${lng}"></iframe><a class="maplink" target="_blank" href="https://www.google.com/maps?q=${lat},${lng}">فتح الموقع على خرائط Google</a>`}
@@ -50,14 +111,14 @@ async function createReq(e){e.preventDefault();try{let fd=new FormData();fd.appe
 function nearbyPage(){return `<div class="card bluehint"><h2>الفنيين الأقرب لك</h2><p class="muted">استخدم GPS لتحديد موقعك، ثم اختر الخدمة. تظهر الخريطة الصغيرة لمنطقتك ويتم ترتيب الفنيين حسب المحافظة ومناطق العمل والتقييم.</p><div class="form two"><div class="field"><label>الخدمة</label><select id="nservice" onchange="loadNearby()">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field"><label>المحافظة</label><select id="ncity" onchange="loadNearby()">${state.meta.cities.map(c=>`<option>${c}</option>`).join('')}</select></div><button class="btn ghost" onclick="useGPS('near')">📍 تحديد موقعي GPS</button></div><div id="nearMap">${mapBox(state.gps?.lat,state.gps?.lng)}</div></div><br><div id="nearList" class="grid"></div>`}
 function cityFromGPS(lat,lng){ if(lat>=31.72&&lat<=32.15&&lng>=35.65&&lng<=36.15)return 'عمان'; if(lat>=32.0&&lat<=32.25&&lng>=35.8&&lng<=36.2)return 'الزرقاء'; if(lat>=32.45&&lat<=32.7)return 'إربد'; if(lat<29.8)return 'العقبة'; if(lat<30.4)return 'معان'; if(lat<30.95)return 'الطفيلة'; if(lat<31.35)return 'الكرك'; return 'عمان';}
 function useGPS(mode='near'){ if(!navigator.geolocation)return toast('المتصفح لا يدعم GPS'); navigator.geolocation.getCurrentPosition(pos=>{state.gps={lat:pos.coords.latitude.toFixed(6),lng:pos.coords.longitude.toFixed(6)};let c=cityFromGPS(pos.coords.latitude,pos.coords.longitude); if($('#ncity'))$('#ncity').value=c; if($('#qcity'))$('#qcity').value=c; if($('#nearMap'))$('#nearMap').innerHTML=mapBox(state.gps.lat,state.gps.lng); if($('#requestMap'))$('#requestMap').innerHTML=mapBox(state.gps.lat,state.gps.lng); toast('تم تحديد موقعك: '+c); if(mode==='near')loadNearby();},()=>toast('لم يتم السماح بالوصول للموقع'),{enableHighAccuracy:true,timeout:10000});}
-async function loadNearby(){try{let service=$('#nservice')?.value||state.meta.services[0]?.name, city=$('#ncity')?.value||state.user.city||'عمان';let j=await api(`/api/technicians?service=${encodeURIComponent(service)}&city=${encodeURIComponent(city)}&lat=${state.gps?.lat||''}&lng=${state.gps?.lng||''}`);let box=$('#nearList'); if(!box)return; box.innerHTML=j.technicians.length?j.technicians.map(t=>`<div class="card techcard"><div class="techhead">${t.avatar_url?`<img class="techAvatar" src="${t.avatar_url}">`:`<div class="techAvatar fallback">ف</div>`}<div><h3>${t.name}</h3><div>${stars(t.rating_avg)} <small class="muted">(${t.rating_count||0} تقييم)</small></div></div></div><p><b>الخدمات:</b> ${t.services||'-'}</p><p><b>المناطق:</b> ${t.areas||t.city||'-'}</p><p><b>أعمال مكتملة:</b> ${t.completed_jobs||0}</p><span class="status">قريب منك في ${city}</span></div>`).join(''):`<div class="card empty">لا يوجد فنيين مناسبين حالياً لهذه الخدمة والمنطقة.</div>`}catch(e){toast(e.message)}}
+async function loadNearby(){try{let service=$('#nservice')?.value||state.meta.services[0]?.name, city=$('#ncity')?.value||state.user.city||'عمان';let j=await api(`/api/technicians?service=${encodeURIComponent(service)}&city=${encodeURIComponent(city)}&lat=${state.gps?.lat||''}&lng=${state.gps?.lng||''}`);let box=$('#nearList'); if(!box)return; box.innerHTML=j.technicians.length?j.technicians.map(t=>`<div class="card techcard"><div class="techhead">${t.avatar_url?`<img class="techAvatar" src="${_safeSrc(t.avatar_url)}" onerror="this.outerHTML='<div class=\'techAvatar fallback\'>ف</div>'">`:`<div class="techAvatar fallback">ف</div>`}<div><h3>${_x(t.name||'-')}</h3><div>${stars(t.rating_avg)} <small class="muted">(${t.rating_count||0} تقييم)</small></div></div></div><p><b>الخدمات:</b> ${_x(t.services||'-')}</p><p><b>المناطق:</b> ${_x(t.areas||t.city||'-')}</p><p><b>أعمال مكتملة:</b> ${t.completed_jobs||0}</p><span class="status">قريب منك في ${_x(city)}</span></div>`).join(''):`<div class="card empty">لا يوجد فنيين مناسبين حالياً لهذه الخدمة والمنطقة.</div>`}catch(e){toast(e.message)}}
 
-function reqTable(rows){if(!rows.length)return '<div class="empty">لا توجد طلبات</div>';return `<div class="request-list">${rows.map(r=>`<div class="request-card"><div class="request-head"><div><b>#${r.id} - ${r.service}</b><p class="muted">${r.city}${r.area?' - '+r.area:''} • ${r.preferred_time||'بدون وقت محدد'}</p></div><span class="status">${r.status}</span></div>${r.problem_image_url?`<img class="problem-img" src="${r.problem_image_url}" alt="صورة المشكلة">`:''}<p>${r.description||''}</p>${r.lat&&r.lng?`<details><summary>📍 عرض موقع العميل على الخريطة</summary>${mapBox(r.lat,r.lng)}</details>`:''}<div class="request-meta"><span>الفني: ${r.technician_name||'-'}</span><span>العميل: ${r.customer_name||'-'}</span><span>السعر المقبول: ${r.offer_price? r.offer_price+' د.أ':'-'}</span><span>المدة: ${r.arrival_time||'-'}</span></div><div class="actions">${actions(r)}</div><div id="offers-${r.id}" class="offers-box"></div></div>`).join('')}</div>`}
+function reqTable(rows){if(!rows.length)return '<div class="empty">لا توجد طلبات</div>';return `<div class="request-list">${rows.map(r=>`<div class="request-card"><div class="request-head"><div><b>#${r.id} - ${_x(r.service)}</b><p class="muted">${_x(r.city)}${r.area?' - '+_x(r.area):''} • ${_x(r.preferred_time||'بدون وقت محدد')}</p></div><span class="status">${_x(r.status)}</span></div>${r.problem_image_url?`<img class="problem-img" src="${_safeSrc(r.problem_image_url)}" alt="صورة المشكلة">`:''}<p>${_x(r.description||'')}</p>${r.lat&&r.lng?`<details><summary>📍 عرض موقع العميل على الخريطة</summary>${mapBox(r.lat,r.lng)}</details>`:''}<div class="request-meta"><span>الفني: ${_x(r.technician_name||'-')}</span><span>العميل: ${_x(r.customer_name||'-')}</span><span>السعر المقبول: ${r.offer_price? _x(String(r.offer_price))+' د.أ':'-'}</span><span>المدة: ${_x(r.arrival_time||'-')}</span></div><div class="actions">${actions(r)}</div><div id="offers-${r.id}" class="offers-box"></div></div>`).join('')}</div>`}
 function actions(r){let a=''; if(state.user.role==='customer')a+=`<button class="btn ghost" onclick="loadOffers(${r.id})">عروض الفنيين</button> `; if(r.technician_id||state.user.role==='admin')a+=`<button class="btn ghost" onclick="chat(${r.id})">محادثة</button> `; if(state.user.role==='technician'&&['بانتظار العروض','وصلت عروض'].includes(r.status))a+=`<button class="btn" onclick="offerForm(${r.id},'${(r.service||'').replaceAll("'",'')}')">تقديم عرض سعر</button>`; if(state.user.role==='customer'&&['تم اختيار عرض','قيد التنفيذ','بانتظار تأكيد الدفع'].includes(r.status))a+=`<button class="btn green" onclick="setStatus(${r.id},'مكتمل')">تم إنجاز الطلب</button>`; if(state.user.role==='customer'&&r.status==='مكتمل')a+=`<button class="btn" onclick="rate(${r.id})">تقييم الفني</button>`; return a}
 function offerForm(id,service=''){app.innerHTML=`<div class="page"><button class="btn ghost" onclick="dashboard()">رجوع</button><div class="card offer-panel" style="max-width:760px;margin:auto"><h2>تقديم عرض سعر</h2><p class="muted">الفني يرسل السعر والمدة فقط. الطلب لا يصبح قيد التنفيذ إلا بعد موافقة العميل.</p><form class="form two" onsubmit="sendOffer(event,${id})"><div class="field"><label>السعر بالدينار</label><input id="offerPrice" type="number" min="1" step="0.5" placeholder="مثال: 15" required></div><div class="field"><label>مدة التنفيذ / الوصول</label><input id="arrivalTime" placeholder="مثال: خلال 45 دقيقة / خلال ساعتين" required></div><div class="field" style="grid-column:1/-1"><label>ملاحظة اختيارية للعميل</label><textarea id="offerNote" placeholder="مثال: السعر يشمل الكشف والصيانة البسيطة ولا يشمل قطع الغيار"></textarea></div><button class="btn">إرسال العرض للعميل</button></form></div></div>`}
 async function sendOffer(e,id){e.preventDefault();try{await api(`/api/requests/${id}/offer`,{method:'POST',body:JSON.stringify({offer_price:offerPrice.value,duration:arrivalTime.value,note:offerNote.value||''})});toast('تم إرسال العرض، بانتظار موافقة العميل');state.tab='orders';dashboard()}catch(e){toast(e.message)}}
 async function loadOffers(id){try{let j=await api(`/api/requests/${id}/offers`);let box=$(`#offers-${id}`); if(!box)return; box.innerHTML=offerCards(j.offers,j.request)}catch(e){toast(e.message)}}
-function offerCards(offers,req){if(!offers.length)return '<div class="empty small">لا توجد عروض بعد</div>';return `<div class="offers-list"><h3>العروض المستلمة</h3>${offers.map(o=>`<div class="offer-card ${o.status}">${o.avatar_url?`<img class="miniAvatar" src="${o.avatar_url}">`:'<div class="miniAvatar fallback">ف</div>'}<div class="offer-info"><b>${o.technician_name}</b><small>${o.technician_city||''} • ${o.technician_areas||''}</small><span>${stars(o.rating_avg)} (${o.rating_count||0}) • ${o.completed_jobs||0} عمل</span><p>${o.note||'لا توجد ملاحظة'}</p></div><div class="offer-price"><b>${o.price} د.أ</b><span>${o.duration}</span><em>${o.status==='accepted'?'مقبول':o.status==='rejected'?'مرفوض':'بانتظار قرارك'}</em>${state.user.role==='customer'&&o.status==='pending'&&req.customer_id===state.user.id?`<button class="btn green mini" onclick="decideOffer(${o.id},'accepted',${req.id})">موافق</button><button class="btn red mini" onclick="decideOffer(${o.id},'rejected',${req.id})">رفض</button>`:''}</div></div>`).join('')}</div>`}
+function offerCards(offers,req){if(!offers.length)return '<div class="empty small">لا توجد عروض بعد</div>';return `<div class="offers-list"><h3>العروض المستلمة</h3>${offers.map(o=>`<div class="offer-card ${_x(o.status)}">${o.avatar_url?`<img class="miniAvatar" src="${_safeSrc(o.avatar_url)}" onerror="this.outerHTML='<div class=\'miniAvatar fallback\'>ف</div>'">`:'<div class="miniAvatar fallback">ف</div>'}<div class="offer-info"><b>${_x(o.technician_name||'-')}</b><small>${_x(o.technician_city||'')} • ${_x(o.technician_areas||'')}</small><span>${stars(o.rating_avg)} (${o.rating_count||0}) • ${o.completed_jobs||0} عمل</span><p>${_x(o.note||'لا توجد ملاحظة')}</p></div><div class="offer-price"><b>${_x(String(o.price||0))} د.أ</b><span>${_x(o.duration||'')}</span><em>${o.status==='accepted'?'مقبول':o.status==='rejected'?'مرفوض':'بانتظار قرارك'}</em>${state.user.role==='customer'&&o.status==='pending'&&req.customer_id===state.user.id?`<button class="btn green mini" onclick="decideOffer(${o.id},'accepted',${req.id})">موافق</button><button class="btn red mini" onclick="decideOffer(${o.id},'rejected',${req.id})">رفض</button>`:''}</div></div>`).join('')}</div>`}
 async function decideOffer(id,decision,requestId){try{await api(`/api/offers/${id}/decision`,{method:'POST',body:JSON.stringify({decision})});toast(decision==='accepted'?'تم قبول العرض وفتح الشات':'تم رفض العرض والطلب ما زال مطروحاً');state.tab='orders';dashboard()}catch(e){toast(e.message)}}
 async function setStatus(id,s){try{await api(`/api/requests/${id}/status`,{method:'POST',body:JSON.stringify({status:s})});toast(s==='مكتمل'?'تم إكمال الطلب وخصم عمولة الفني حسب النظام':'تم تحديث الحالة');dashboard()}catch(e){toast(e.message)}}
 function rate(id){
@@ -80,8 +141,55 @@ async function submitRating(id){
   if(!st)return toast('اختر عدد النجوم أولاً');
   try{await api(`/api/requests/${id}/rate`,{method:'POST',body:JSON.stringify({stars:st,comment:$('#ratingComment').value||''})});toast('تم إرسال التقييم');dashboard()}catch(e){toast(e.message)}
 }
-function messageBody(body){body=String(body||'');if(body.startsWith('[audio]')){let u=body.replace('[audio]','');return `<audio controls src="${u}"></audio>`}if(body.startsWith('[location]')){let p=body.replace('[location]','').split(',');let lat=p[0],lng=p[1];return `📍 <a target="_blank" href="https://www.google.com/maps?q=${lat},${lng}">فتح الموقع على الخريطة</a><div>${mapBox(lat,lng)}</div>`}return body.replace(/(https?:\/\/\S+)/g,'<a target="_blank" href="$1">$1</a>')}
-function renderMessages(messages){let box=$('#chatbox'); if(!box)return; box.innerHTML=messages.map(m=>`<div class="msg ${m.sender_id===state.user.id?'me':''}"><b>${m.sender_name}</b><br>${messageBody(m.body)}<br><small>${m.created_at}</small></div>`).join(''); box.scrollTop=box.scrollHeight;}
+function escapeHtml(str){
+  return String(str || '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+// Short alias used throughout to escape ALL user-supplied data before innerHTML injection
+const _x = escapeHtml;
+// Safe src: only allow relative /uploads/ paths and nothing else (prevents javascript: and data: XSS)
+function _safeSrc(url){ const s=String(url||''); return (s.startsWith('/uploads/')||s.startsWith('https://')||s.startsWith('http://'))&&!s.includes('"')&&!s.includes("'")&&!s.includes('<')&&!s.includes('>')&&!s.includes(' ')?s:''; }
+
+function messageBody(body){
+  body = String(body || '');
+
+  if(body.startsWith('[audio]')){
+    let u = escapeHtml(body.replace('[audio]',''));
+    return `<audio controls src="${u}"></audio>`;
+  }
+
+  if(body.startsWith('[location]')){
+    let p = body.replace('[location]','').split(',');
+    let lat = encodeURIComponent(p[0] || '');
+    let lng = encodeURIComponent(p[1] || '');
+    return `📍 <a target="_blank" rel="noopener noreferrer" href="https://www.google.com/maps?q=${lat},${lng}">فتح الموقع على الخريطة</a>`;
+  }
+
+  return escapeHtml(body).replace(
+    /(https?:\/\/[^\s]{1,500})/g,
+    (_, url) => {
+      try { const u=new URL(url); if(u.protocol!=='https:'&&u.protocol!=='http:') return escapeHtml(url); }
+      catch(e){ return escapeHtml(url); }
+      return `<a target="_blank" rel="noopener noreferrer" href="${escapeHtml(url)}">${escapeHtml(url)}</a>`;
+    }
+  );
+}
+
+function renderMessages(messages){
+  let box=$('#chatbox');
+  if(!box)return;
+  box.innerHTML=messages.map(m=>`
+    <div class="msg ${m.sender_id===state.user.id?'me':''}">
+      <b>${escapeHtml(m.sender_name)}</b><br>
+      ${messageBody(m.body)}
+      <br><small>${escapeHtml(m.created_at)}</small>
+    </div>
+  `).join('');
+}
 async function refreshChat(){if(!activeChatId)return; try{let j=await api(`/api/requests/${activeChatId}/messages`);renderMessages(j.messages)}catch(e){}}
 async function chat(id){activeChatId=id; setupSocket(); if(socket) socket.emit('join-request', id); if(chatTimer)clearInterval(chatTimer);let j=await api(`/api/requests/${id}/messages`);app.innerHTML=`<div class="page chat-page"><button class="btn ghost" onclick="if(socket&&activeChatId)socket.emit('leave-request',activeChatId);activeChatId=null;if(chatTimer)clearInterval(chatTimer);dashboard()">رجوع</button><div class="card chat-card"><h2>المحادثة للطلب #${id}</h2><div class="chat" id="chatbox"></div><form class="chat-input-row" onsubmit="sendMsg(event,${id})"><input id="msg" autocomplete="off" placeholder="اكتب رسالة"><button class="btn send-text-btn">إرسال</button></form><div class="chat-icon-tools"><button class="round-action location-action" onclick="sendLocation(${id})" title="إرسال الموقع">📍</button><button id="micBtn" class="round-action mic-action" onclick="toggleRec(${id})" title="تسجيل صوت">🎙️</button><button id="sendVoiceBtn" class="round-action send-voice-action hide" onclick="stopRec(${id})" title="إرسال الصوت">➤</button><span id="recordingLabel" class="recording-label hide">● جاري التسجيل...</span></div><small class="muted">المحادثة تتحدث تلقائياً، ويمكنك إرسال صوت أو موقعك بضغطة زر.</small></div></div>`;renderMessages(j.messages);chatTimer=setInterval(refreshChat,5000)}
 async function sendMsg(e,id){e.preventDefault();try{let text=msg.value.trim();if(!text)return;msg.value='';let j=await api(`/api/requests/${id}/messages`,{method:'POST',body:JSON.stringify({body:text})});renderMessages(j.messages)}catch(err){toast(err.message)}}
@@ -98,11 +206,11 @@ async function techDash(){let me=(await api('/api/me')).user;state.user=me;let m
 function balancePage(me){let pm=state.meta.paymentMethods[0];return `<div class="card"><h2>رصيدك: ${me.balance} د.أ</h2><p class="muted">اختر باقة، حول المبلغ على الحساب البنكي، ثم ارفع صورة الدفع. الإدارة تراجع الطلب وتضيف الرصيد فقط إذا كان المبلغ صحيح.</p></div><br><div class="cards2">${state.meta.packages.map(p=>`<div class="card package"><h3>${p.name}</h3><strong>${p.amount} د.أ</strong><p>بونص: ${p.bonus} د.أ</p><button class="btn" onclick="topupForm(${p.id})">اختيار الباقة</button></div>`).join('')}</div><br><div class="card"><h3>بيانات الدفع</h3><p><b>البنك:</b> ${pm.bank_name}</p><p><b>اسم الحساب:</b> ${pm.account_name}</p><p><b>رقم الحساب / IBAN:</b> ${pm.account_number}</p><p><b>رقم التواصل:</b> ${pm.phone}</p><p class="muted">${pm.instructions}</p></div>`}
 function topupForm(pid){let p=state.meta.packages.find(x=>x.id==pid),pm=state.meta.paymentMethods[0];app.innerHTML=`<div class="page"><button class="btn ghost" onclick="dashboard()">رجوع</button><div class="card"><h2>شحن ${p.name} - ${p.amount} د.أ</h2><p><b>البنك:</b> ${pm.bank_name}</p><p><b>اسم الحساب:</b> ${pm.account_name}</p><p><b>رقم الحساب:</b> ${pm.account_number}</p><form class="form" onsubmit="sendTopup(event,${p.id})"><div class="field"><label>صورة إثبات الدفع</label><input id="receipt" type="file" accept="image/png,image/jpeg,image/webp" required></div><button class="btn">إرسال للمراجعة</button></form></div></div>`}
 async function sendTopup(e,pid){e.preventDefault();let fd=new FormData();fd.append('package_id',pid);fd.append('receipt',receipt.files[0]);try{await api('/api/topups',{method:'POST',body:fd});toast('تم إرسال طلب الشحن للإدارة');state.tab='topups';dashboard()}catch(err){toast(err.message)}}
-function topupTable(rows){return `<div class="card"><h2>طلبات الشحن</h2>${!rows.length?'<div class="empty">لا يوجد</div>':`<table class="table"><tr><th>#</th><th>الفني</th><th>الباقة</th><th>المبلغ</th><th>الصورة</th><th>الحالة</th><th>إجراء</th></tr>${rows.map(t=>`<tr><td>${t.id}</td><td>${t.technician_name||'-'}</td><td>${t.package_name}</td><td>${t.amount}</td><td><a target="_blank" href="${t.receipt_url}">فتح</a></td><td><span class="status ${t.status}">${t.status}</span></td><td>${state.user.role==='admin'&&t.status==='pending'?`<button class="btn green" onclick="reviewTopup(${t.id},'approved')">موافقة</button> <button class="btn red" onclick="reviewTopup(${t.id},'rejected')">رفض</button>`:''}</td></tr>`).join('')}</table>`}</div>`}
+function topupTable(rows){return `<div class="card"><h2>طلبات الشحن</h2>${!rows.length?'<div class="empty">لا يوجد</div>':`<table class="table"><tr><th>#</th><th>الفني</th><th>الباقة</th><th>المبلغ</th><th>الصورة</th><th>الحالة</th><th>إجراء</th></tr>${rows.map(t=>`<tr><td>${t.id}</td><td>${_x(t.technician_name||'-')}</td><td>${_x(t.package_name||'-')}</td><td>${_x(String(t.amount||0))}</td><td>${_safeSrc(t.receipt_url)?`<a target="_blank" rel="noopener noreferrer" href="${_safeSrc(t.receipt_url)}">فتح</a>`:'—'}</td><td><span class="status ${_x(t.status)}">${_x(t.status||'')}</span></td><td>${state.user.role==='admin'&&t.status==='pending'?`<button class="btn green" onclick="reviewTopup(${t.id},'approved')">موافقة</button> <button class="btn red" onclick="reviewTopup(${t.id},'rejected')">رفض</button>`:''}</td></tr>`).join('')}</table>`}</div>`}
 async function reviewTopup(id,status){let note=prompt('ملاحظة الإدارة','تمت المراجعة');try{await api(`/api/admin/topups/${id}/review`,{method:'POST',body:JSON.stringify({status,admin_note:note})});toast('تمت المراجعة');admin()}catch(e){toast(e.message)}}
 function ledgerTable(rows){return `<div class="card"><h2>سجل الرصيد</h2>${!rows.length?'<div class="empty">لا يوجد</div>':`<table class="table"><tr><th>النوع</th><th>المبلغ</th><th>الرصيد بعد العملية</th><th>ملاحظة</th><th>التاريخ</th></tr>${rows.map(l=>`<tr><td>${l.type}</td><td>${l.amount}</td><td>${l.balance_after}</td><td>${l.note||''}</td><td>${l.created_at}</td></tr>`).join('')}</table>`}</div>`}
 async function admin(){let menu=[['dash','الإحصائيات'],['users','المستخدمين'],['orders','الطلبات'],['topups','شحن الفنيين'],['services','المهن والخدمات'],['packages','الباقات']];let c='';if(state.tab==='users'){let j=await api('/api/admin/users');c=usersTable(j.users)}else if(state.tab==='orders'){let j=await api('/api/requests');c=`<div class="card"><h2>كل الطلبات</h2>${reqTable(j.requests)}</div>`}else if(state.tab==='topups'){let j=await api('/api/topups');c=topupTable(j.topups)}else if(state.tab==='services')c=servicesAdmin();else if(state.tab==='packages')c=packagesAdmin();else{let j=await api('/api/admin/stats');let s=j.stats;c=`<div class="cards4"><div class="stat"><span>العملاء</span><br><b>${s.customers}</b></div><div class="stat"><span>الفنيين</span><br><b>${s.technicians}</b></div><div class="stat"><span>الطلبات</span><br><b>${s.requests}</b></div><div class="stat"><span>شحن بانتظار</span><br><b>${s.pendingTopups}</b></div></div>`}layout('لوحة الإدارة',menu,c)}
-function usersTable(rows){return `<div class="card"><h2>المستخدمين</h2><table class="table"><tr><th>#</th><th>الصورة</th><th>الدور</th><th>الاسم</th><th>الهاتف</th><th>الرقم الوطني</th><th>الرصيد</th><th>التقييم</th><th>حالة</th><th></th></tr>${rows.map(u=>`<tr><td>${u.id}</td><td>${u.avatar_url?`<img src="${u.avatar_url}" class="miniAvatar">`:'-'}</td><td>${u.role}</td><td>${u.name}</td><td>${u.phone}</td><td>${u.national_number||'-'}</td><td>${u.balance}</td><td>${u.role==='technician'?stars(u.rating_avg):'-'}</td><td>${u.is_active?'فعال':'موقوف'}</td><td>${u.role!=='admin'?`<button class="btn ghost" onclick="toggleUser(${u.id})">تفعيل/إيقاف</button>`:''}</td></tr>`).join('')}</table></div>`}
+function usersTable(rows){return `<div class="card"><h2>المستخدمين</h2><table class="table"><tr><th>#</th><th>الصورة</th><th>الدور</th><th>الاسم</th><th>الهاتف</th><th>الرقم الوطني</th><th>الرصيد</th><th>التقييم</th><th>حالة</th><th></th></tr>${rows.map(u=>`<tr><td>${u.id}</td><td>${u.avatar_url?`<img src="${u.avatar_url}" class="miniAvatar">`:'-'}</td><td>${v15EscapeHtml(u.role||"")}</td><td>${v15EscapeHtml(u.name||"")}</td><td>${v15EscapeHtml(u.phone||"")}</td><td>${v15EscapeHtml(u.national_number||"-")}</td><td>${u.balance}</td><td>${u.role==='technician'?stars(u.rating_avg):'-'}</td><td>${u.is_active?'فعال':'موقوف'}</td><td>${u.role!=='admin'?`<button class="btn ghost" onclick="toggleUser(${u.id})">تفعيل/إيقاف</button>`:''}</td></tr>`).join('')}</table></div>`}
 async function toggleUser(id){await api(`/api/admin/users/${id}/toggle`,{method:'POST'});admin()}
 
 function servicesAdmin(){return `<div class="card"><h2>إضافة مهنة / خدمة جديدة</h2><form class="form two" onsubmit="addService(event)"><div class="field"><label>اسم المهنة</label><input id="sname" placeholder="مثال: فني طاقة شمسية" required></div><div class="field"><label>أيقونة اختيارية</label><input id="sicon" placeholder="🔧"></div><button class="btn">إضافة</button></form></div><br><div class="grid">${state.meta.services.map(s=>`<div class="card"><div class="icon">${s.icon||'🔧'}</div><h3>${s.name}</h3></div>`).join('')}</div>`}
@@ -138,7 +246,7 @@ function showWelcomeModal(){
   document.body.appendChild(el);
 }
 function closeWelcome(){const el=document.getElementById('welcomeOverlay'); if(el){el.style.opacity='0';setTimeout(()=>el.remove(),220)}}
-const __oldInit=init; init=async function(){await __oldInit(); setTimeout(showWelcomeModal,450)}
+
 function serviceMarquee(){
  const list=(state.meta.services||[]).slice(0,16); const data=[...list,...list];
  return `<section class="service-marquee-wrap"><div class="service-marquee-head"><div><h2>الخدمات الأكثر طلباً</h2><span>تتحرك تلقائياً — اختر الخدمة المناسبة بسرعة</span></div><button class="btn ghost mini" onclick="go('services')">كل الخدمات</button></div><div class="service-marquee">${data.map(s=>`<div class="service-pill" onclick="go('${state.user?'dashboard':'register'}')"><div class="icon">${s.icon||'🔧'}</div><div><h3>${s.name}</h3><p>طلب سريع، فنيين قريبين، وتقييم واضح قبل الاختيار.</p></div></div>`).join('')}</div></section>`
@@ -202,14 +310,14 @@ function showWelcomeModalForce(){
   </div>`;
   document.body.appendChild(el);
 }
-setTimeout(()=>{ if(!state.user) showWelcomeModalForce(); }, 900);
+
 
 requestForm=function(){return `<div class="card bluehint"><h2>طلب خدمة جديد</h2><p class="muted">حدد المحافظة ثم اختر المنطقة من القائمة حتى تظهر لك نتائج أدق للفنيين القريبين.</p><form class="form two" onsubmit="createReq(event)"><div class="field"><label>الخدمة</label><select id="qservice">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field"><label>المحافظة</label><select id="qcity">${governorateOptions(state.user?.city||'عمان')}</select></div><div class="field"><label>منطقة السكن</label><select id="qarea"></select></div><div class="field hide" id="qareaOtherWrap"><label>اكتب المنطقة</label><input id="qareaOther" placeholder="اكتب اسم المنطقة"></div><div class="field"><label>الوقت المطلوب</label><input id="qtime" placeholder="اليوم مساءً"></div><div class="field" style="grid-column:1/-1"><label>وصف المشكلة</label><textarea id="qdesc" required placeholder="مثال: المكيف لا يبرد وأحتاج فني اليوم"></textarea></div><div class="field" style="grid-column:1/-1"><button type="button" class="btn ghost" onclick="useGPS('request')">📍 حدد موقعي الآن</button><small class="muted">الموقع يساعد الفنيين على معرفة قربك قبل قبول الطلب.</small><div id="requestMap">${mapBox(state.gps?.lat,state.gps?.lng)}</div></div><button class="btn">نشر الطلب</button></form></div><br><div id="techs"></div>`}
 createReq=async function(e){e.preventDefault();try{await api('/api/requests',{method:'POST',body:JSON.stringify({service:qservice.value,city:qcity.value,area:selectedArea('qarea','qareaOther'),preferred_time:qtime.value,description:qdesc.value,lat:state.gps?.lat||'',lng:state.gps?.lng||''})});toast('تم نشر الطلب');state.tab='orders';dashboard()}catch(err){toast(err.message)}}
 nearbyPage=function(){return `<div class="card bluehint"><h2>الفنيين الأقرب لك</h2><p class="muted">اختر المحافظة والمنطقة، ثم الخدمة المطلوبة. النظام يطابق الفنيين حسب مناطق عملهم وتقييمهم.</p><div class="form three"><div class="field"><label>الخدمة</label><select id="nservice" onchange="loadNearby()">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field"><label>المحافظة</label><select id="ncity" onchange="bindAreaSelect('ncity','narea');loadNearby()">${governorateOptions(state.user?.city||'عمان')}</select></div><div class="field"><label>المنطقة</label><select id="narea" onchange="loadNearby()"></select></div><button class="btn ghost" onclick="useGPS('near')">📍 تحديد موقعي GPS</button></div><div id="nearMap">${mapBox(state.gps?.lat,state.gps?.lng)}</div></div><br><div id="nearList" class="grid"></div>`}
-loadNearby=async function(){try{let service=$('#nservice')?.value||state.meta.services[0]?.name, city=$('#ncity')?.value||state.user.city||'عمان', area=$('#narea')?.value||'';let j=await api(`/api/technicians?service=${encodeURIComponent(service)}&city=${encodeURIComponent(city)}&lat=${state.gps?.lat||''}&lng=${state.gps?.lng||''}`);let techs=(j.technicians||[]).filter(t=>!area||area==='أخرى'||String(t.areas||'').includes(area)||String(t.city||'').includes(city));let box=$('#nearList'); if(!box)return; box.innerHTML=techs.length?techs.map(t=>`<div class="card techcard"><div class="techhead">${t.avatar_url?`<img class="techAvatar" src="${t.avatar_url}">`:`<div class="techAvatar fallback">ف</div>`}<div><h3>${t.name}</h3><div>${stars(t.rating_avg)} <small class="muted">(${t.rating_count||0} تقييم)</small></div></div></div><p><b>الخدمات:</b> ${t.services||'-'}</p><p><b>المحافظة:</b> ${t.city||'-'}</p><p><b>المناطق:</b> ${t.areas||'-'}</p><p><b>أعمال مكتملة:</b> ${t.completed_jobs||0}</p><span class="status">مناسب لـ ${city}${area?' - '+area:''}</span></div>`).join(''):`<div class="card empty">لا يوجد فنيين مناسبين حالياً لهذه الخدمة والمنطقة.</div>`}catch(e){toast(e.message)}}
+loadNearby=async function(){try{let service=$('#nservice')?.value||state.meta.services[0]?.name, city=$('#ncity')?.value||state.user.city||'عمان', area=$('#narea')?.value||'';let j=await api(`/api/technicians?service=${encodeURIComponent(service)}&city=${encodeURIComponent(city)}&lat=${state.gps?.lat||''}&lng=${state.gps?.lng||''}`);let techs=(j.technicians||[]).filter(t=>!area||area==='أخرى'||String(t.areas||'').includes(area)||String(t.city||'').includes(city));let box=$('#nearList'); if(!box)return; box.innerHTML=techs.length?techs.map(t=>`<div class="card techcard"><div class="techhead">${t.avatar_url?`<img class="techAvatar" src="${_safeSrc(t.avatar_url)}" onerror="this.outerHTML='<div class=\'techAvatar fallback\'>ف</div>'">`:`<div class="techAvatar fallback">ف</div>`}<div><h3>${_x(t.name||'-')}</h3><div>${stars(t.rating_avg)} <small class="muted">(${t.rating_count||0} تقييم)</small></div></div></div><p><b>الخدمات:</b> ${_x(t.services||'-')}</p><p><b>المحافظة:</b> ${_x(t.city||'-')}</p><p><b>المناطق:</b> ${_x(t.areas||'-')}</p><p><b>أعمال مكتملة:</b> ${t.completed_jobs||0}</p><span class="status">مناسب لـ ${_x(city)}${area?' - '+_x(area):''}</span></div>`).join(''):`<div class="card empty">لا يوجد فنيين مناسبين حالياً لهذه الخدمة والمنطقة.</div>`}catch(e){toast(e.message)}}
 register=function(role='customer'){app.innerHTML=`<div class="page"><div class="card" style="max-width:860px;margin:auto"><h1>إنشاء حساب</h1><form class="form two" onsubmit="doRegister(event)"><div class="field"><label>نوع الحساب</label><select id="role" onchange="toggleTech()"><option value="customer">عميل</option><option value="technician">فني</option></select></div><div class="field"><label>الاسم الكامل</label><input id="name" placeholder="مثال: أحمد محمد" required minlength="2"></div><div class="field techOnly"><label>الصورة الشخصية للفني</label><input id="avatar" type="file" accept="image/png,image/jpeg,image/webp"><small class="muted">مطلوبة للفني فقط حتى يظهر للعميل بشكل موثوق.</small></div><div class="field"><label>البريد الإلكتروني</label><input id="remail" type="email" required></div><div class="field"><label>رقم الهاتف</label><input id="phone" placeholder="0791234567" required></div><div class="field"><label>كلمة السر</label><input id="rpassword" type="password" required minlength="8"></div><div class="field"><label>المحافظة</label><select id="city">${governorateOptions('عمان')}</select></div><div class="field"><label>منطقة السكن</label><select id="customerArea"></select></div><div class="field techOnly"><label>الرقم الوطني</label><input id="national" placeholder="10 أرقام"></div><div class="field techOnly"><label>الخدمات</label><select id="srv" multiple size="5">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field techOnly"><label>مناطق العمل</label><select id="areas" multiple size="7"></select><small class="muted">اختر أكثر من منطقة بزر Ctrl. تتغير حسب المحافظة.</small></div><button class="btn">إنشاء الحساب</button></form></div></div>`;$('#role').value=role;toggleTech();bindAreaSelect('city','customerArea');const city=$('#city'), areas=$('#areas');function refreshWorkAreas(){areas.innerHTML=areaOptions(city.value).replace('<option value="أخرى">أخرى</option>','')}city.addEventListener('change',refreshWorkAreas);refreshWorkAreas();}
-doRegister=async function(e){e.preventDefault();try{const role=$('#role').value;const fd=new FormData();fd.append('role',role);fd.append('name',$('#name').value.trim());fd.append('email',$('#remail').value.trim());fd.append('phone',$('#phone').value.trim());fd.append('password',$('#rpassword').value);fd.append('city',$('#city').value);fd.append('national_number',$('#national')?$('#national').value.trim():'');fd.append('services',vals('#srv').join(','));fd.append('areas', role==='technician' ? vals('#areas').join(',') : (selectedArea('regArea','regAreaOther') || $('#regArea')?.value || ''));if(role==='technician'&&!$('#avatar').files[0]) throw new Error('الرجاء اختيار صورة شخصية للفني');if($('#avatar')&&$('#avatar').files[0])fd.append('avatar',$('#avatar').files[0]);let j=await api('/api/auth/register',{method:'POST',body:fd});state.user=j.user;state.token=j.token;localStorage.token=j.token;toast('تم إنشاء الحساب');dashboard(); if(localStorage.pendingService){ const ps=localStorage.pendingService; localStorage.removeItem('pendingService'); setTimeout(()=>{ if(state.user?.role==='customer'){ state.tab='near'; dashboard(); setTimeout(()=>{ if($('#searchTechQ')) $('#searchTechQ').value=ps; if($('#searchService')) $('#searchService').value=ps; searchTechnicians(); },180); } },250); }}catch(err){toast(err.message)}}
+doRegister=async function(e){e.preventDefault();try{const role=$('#role').value;const fd=new FormData();fd.append('role',role);fd.append('name',$('#name').value.trim());fd.append('email',$('#remail').value.trim());fd.append('phone',$('#phone').value.trim());fd.append('password',$('#rpassword').value);fd.append('city',$('#city').value);fd.append('national_number',$('#national')?$('#national').value.trim():'');fd.append('services',vals('#srv').join(','));fd.append('areas', role==='technician' ? vals('#areas').join(',') : (selectedArea('regArea','regAreaOther') || $('#regArea')?.value || ''));if(role==='technician'&&!$('#avatar').files[0]) throw new Error('الرجاء اختيار صورة شخصية للفني');if($('#avatar')&&$('#avatar').files[0])fd.append('avatar',$('#avatar').files[0]);const j=await api('/api/auth/register',{method:'POST',body:fd});if(j.step==='verify'){showOtpScreen(j.email);}else{state.user=j.user;toast('تم إنشاء الحساب');dashboard();}}catch(err){toast(err.message)}}
 const __v8OldCustDash=custDash; custDash=async function(){await __v8OldCustDash(); if(state.tab==='dash') bindAreaSelect('qcity','qarea','qareaOtherWrap'); if(state.tab==='near'){bindAreaSelect('ncity','narea'); loadNearby();}}
 const __v8OldUseGPS=useGPS; useGPS=function(mode='near'){ if(!navigator.geolocation)return toast('المتصفح لا يدعم GPS'); navigator.geolocation.getCurrentPosition(pos=>{state.gps={lat:pos.coords.latitude.toFixed(6),lng:pos.coords.longitude.toFixed(6)};let c=cityFromGPS(pos.coords.latitude,pos.coords.longitude); if($('#ncity')){$('#ncity').value=c; bindAreaSelect('ncity','narea');} if($('#qcity')){$('#qcity').value=c; bindAreaSelect('qcity','qarea','qareaOtherWrap');} if($('#nearMap'))$('#nearMap').innerHTML=mapBox(state.gps.lat,state.gps.lng); if($('#requestMap'))$('#requestMap').innerHTML=mapBox(state.gps.lat,state.gps.lng); toast('تم تحديد موقعك: '+c); if(mode==='near')loadNearby();},()=>toast('لم يتم السماح بالوصول للموقع'),{enableHighAccuracy:true,timeout:10000});}
 
@@ -248,19 +356,21 @@ async function searchTechnicians(){
   }catch(e){toast(e.message)}
 }
 function techCard(t, service, city, area){
-  const av=t.avatar_url?`<img class="techAvatar" src="${t.avatar_url}" onerror="this.outerHTML='<div class=\'techAvatar fallback\'>ف</div>'">`:`<div class="techAvatar fallback">ف</div>`;
+  const _esc=typeof v20SafeTxt==='function'?v20SafeTxt:(typeof escapeHtml==='function'?escapeHtml:function(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));});
+  const av=t.avatar_url?`<img class="techAvatar" src="${_esc(t.avatar_url)}" onerror="this.outerHTML='<div class=\'techAvatar fallback\'>\u0641</div>'">`:`<div class="techAvatar fallback">\u0641</div>`;
   return `<div class="dash-card tech-card-pro">
-    <div class="tech-card-top">${av}<div><h3>${t.name}</h3><div>${stars(t.rating_avg)} <small class="muted">${t.rating_count||0} تقييم</small></div></div></div>
-    <div class="tech-tags"><span>${t.city||city}</span><span>${area||'كل المناطق'}</span><span>${t.completed_jobs||0} عمل</span></div>
-    <p><b>الخدمات:</b> ${t.services||'-'}</p><p><b>مناطق العمل:</b> ${t.areas||'-'}</p>
-    <div class="actions"><button class="btn ghost" onclick='openTechDetails(${JSON.stringify(t).replace(/'/g,"&#39;")}, ${JSON.stringify(service)}, ${JSON.stringify(city)}, ${JSON.stringify(area)})'>عرض التفاصيل</button><button class="btn" onclick="directRequest(${t.id},'${String(service).replaceAll("'",'')}','${String(city).replaceAll("'",'')}','${String(area).replaceAll("'",'')}')">إنشاء طلب</button></div>
+    <div class="tech-card-top">${av}<div><h3>${_esc(t.name||'-')}</h3><div>${stars(t.rating_avg)} <small class="muted">${_esc(String(t.rating_count||0))} \u062a\u0642\u064a\u064a\u0645</small></div></div></div>
+    <div class="tech-tags"><span>${_esc(t.city||city||'')}</span><span>${_esc(area||'\u0643\u0644 \u0627\u0644\u0645\u0646\u0627\u0637\u0642')}</span><span>${_esc(String(t.completed_jobs||0))} \u0639\u0645\u0644</span></div>
+    <p><b>\u0627\u0644\u062e\u062f\u0645\u0627\u062a:</b> ${_esc(t.services||'-')}</p><p><b>\u0645\u0646\u0627\u0637\u0642 \u0627\u0644\u0639\u0645\u0644:</b> ${_esc(t.areas||'-')}</p>
+    <div class="actions"><button class="btn ghost" onclick='openTechDetails(${JSON.stringify(t).replace(/'/g,"&#39;")}, ${JSON.stringify(service)}, ${JSON.stringify(city)}, ${JSON.stringify(area)})'>عرض التفاصيل</button><button class="btn" onclick="directRequest(${t.id},${JSON.stringify(String(service))},${JSON.stringify(String(city))},${JSON.stringify(String(area))})">إنشاء طلب</button></div>
   </div>`;
 }
 function openTechDetails(t, service, city, area){
+  const _esc=typeof v20SafeTxt==='function'?v20SafeTxt:(typeof escapeHtml==='function'?escapeHtml:function(s){return String(s??''). replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));});
   const old=document.getElementById('techDetailsOverlay'); if(old)old.remove();
-  const av=t.avatar_url?`<img class="tech-modal-avatar" src="${t.avatar_url}" onerror="this.outerHTML='<div class=\'tech-modal-avatar fallback\'>ف</div>'">`:`<div class="tech-modal-avatar fallback">ف</div>`;
+  const av=t.avatar_url?`<img class="tech-modal-avatar" src="${_safeSrc(t.avatar_url)}" onerror="this.outerHTML='<div class=\'tech-modal-avatar fallback\'>ف</div>'">`:`<div class="tech-modal-avatar fallback">ف</div>`;
   const el=document.createElement('div'); el.className='welcome-overlay'; el.id='techDetailsOverlay';
-  el.innerHTML=`<div class="welcome-card tech-details-modal"><button class="welcome-close" onclick="document.getElementById('techDetailsOverlay').remove()">×</button>${av}<h2>${t.name}</h2><p class="muted">${stars(t.rating_avg)} — ${t.rating_count||0} تقييم — ${t.completed_jobs||0} عمل مكتمل</p><div class="mini-list"><div class="mini-list-row"><span>المحافظة</span><b>${t.city||'-'}</b></div><div class="mini-list-row"><span>الخدمات</span><b>${t.services||'-'}</b></div><div class="mini-list-row"><span>المناطق</span><b>${t.areas||'-'}</b></div></div><div class="welcome-actions"><button class="btn" onclick="document.getElementById('techDetailsOverlay').remove();directRequest(${t.id},'${String(service).replaceAll("'",'')}','${String(city).replaceAll("'",'')}','${String(area).replaceAll("'",'')}')">إنشاء طلب مع هذا الفني</button><button class="btn ghost" onclick="document.getElementById('techDetailsOverlay').remove()">إغلاق</button></div></div>`;
+  el.innerHTML=`<div class="welcome-card tech-details-modal"><button class="welcome-close" onclick="document.getElementById('techDetailsOverlay').remove()">×</button>${av}<h2>${_esc(t.name||"-")}</h2><p class="muted">${stars(t.rating_avg)} — ${t.rating_count||0} تقييم — ${t.completed_jobs||0} عمل مكتمل</p><div class="mini-list"><div class="mini-list-row"><span>المحافظة</span><b>${_esc(t.city||"-")}</b></div><div class="mini-list-row"><span>الخدمات</span><b>${_esc(t.services||"-")}</b></div><div class="mini-list-row"><span>المناطق</span><b>${_esc(t.areas||"-")}</b></div></div><div class="welcome-actions"><button class="btn" onclick="document.getElementById('techDetailsOverlay').remove();directRequest(${t.id},'${String(service).replaceAll("'",'')}','${String(city).replaceAll("'",'')}','${String(area).replaceAll("'",'')}')">إنشاء طلب مع هذا الفني</button><button class="btn ghost" onclick="document.getElementById('techDetailsOverlay').remove()">إغلاق</button></div></div>`;
   document.body.appendChild(el);
 }
 async function directRequest(techId, service, city, area){
@@ -305,7 +415,7 @@ function syncSearchFromRequest(){ if($('#searchService')&&$('#qservice')) $('#se
 nearbyPage=function(){return techSearchBox()}
 loadNearby=searchTechnicians;
 // Force welcome every browser session once and show for logged-in too if not seen
-setTimeout(()=>{ if(!sessionStorage.sallehlyV9Welcome){sessionStorage.sallehlyV9Welcome='1'; showWelcomeModalForce();}},700);
+
 
 
 /* ===== Sallehly V10 Professional Functional Layer ===== */
@@ -334,7 +444,7 @@ custDash=async function(){let menu=[['dash','طلب جديد'],['near','البح
 const __v10AdminBase=admin; admin=async function(){ if(state.tab==='settings'){layout('لوحة الإدارة',[['dash','لوحة الإدارة'],['users','المستخدمين'],['orders','الطلبات'],['topups','شحن الفنيين'],['services','المهن والخدمات'],['packages','الباقات']], v10Hero('الإعدادات','إدارة حساب المدير')+settingsPage()); bindAreaSelect('setCity','setArea'); return;} await __v10AdminBase(); }
 const __v10TechBase=techDash; techDash=async function(){ if(state.tab==='settings'){layout('لوحة الفني',[['dash','الرئيسية'],['orders','الطلبات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']], v10Hero('الإعدادات','عدّل حسابك وكلمة السر')+settingsPage()); bindAreaSelect('setCity','setArea'); return;} await __v10TechBase(); }
 function showWelcomeModalForce(){ const old=document.getElementById('welcomeOverlay'); if(old) old.remove(); const el=document.createElement('div'); el.className='welcome-overlay v8-welcome'; el.id='welcomeOverlay'; el.innerHTML=`<div class="welcome-card v8-welcome-card"><button class="welcome-close" onclick="closeWelcome()">×</button><div class="welcome-logo big-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img"></div><h2>صلّحلي</h2><p>مرحباً بك في منصة صلّحلي — اطلب الخدمة، تابع الطلب، وتواصل مع الفني من مكان واحد.</p><div class="welcome-features"><div><b>ملف مرتب</b><small>إدارة حسابك بسهولة</small></div><div><b>منع التداخل</b><small>الفني لا يأخذ طلب ثاني قبل إنهاء الحالي</small></div><div><b>بحث سريع</b><small>خدمة + محافظة + منطقة</small></div></div><div class="welcome-actions"><button class="btn" onclick="closeWelcome();go('${state.user?'dashboard':'register'}')">متابعة</button><button class="btn ghost" onclick="closeWelcome()">إغلاق</button></div></div>`; document.body.appendChild(el);}
-const __v10Init=init; init=async function(){v10ApplyTheme(); await __v10Init(); setTimeout(()=>{showWelcomeModalForce()},500)}
+
 
 /* ===== Sallehly V11 Slider + Marketplace Layer ===== */
 let v11ServiceIndex=0, v11SliderTimer=null;
@@ -417,9 +527,39 @@ layout=function(title,menu,content){
   app.innerHTML=`<div class="admin-shell"><aside class="admin-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${menu.map(m=>`<button class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${m[1]} ${m[0]==='chats'?v13Badge(state.chatCount):''}</b><span class="mi">${menuIconV13(m[0])}</span></button>`).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu"><button class="sidebtn ${state.tab==='settings'?'active':''}" onclick="state.tab='settings';dashboard();setTimeout(v35ScrollToContent,80)"><b>الإعدادات</b><span class="mi">⚙️</span></button><button class="sidebtn ${state.tab==='support'?'active':''}" onclick="state.tab='support';dashboard();setTimeout(v35ScrollToContent,80)"><b>الدعم الفني</b><span class="mi">🎧</span></button><button class="sidebtn logout-side" onclick="v13LogoutConfirm()"><b>تسجيل خروج</b><span class="mi">🚪</span></button></div><div class="admin-profile"><div class="avatar-sm">${(user.name||'ص').slice(0,1)}</div><div><b>${user.name||roleName()}</b><small>${user.email||roleName()}</small></div></div></aside><main class="admin-main"><div class="admin-top"><div class="admin-search">🔎 <input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();setTimeout(()=>{if(document.getElementById('searchTechQ')){document.getElementById('searchTechQ').value=this.value;searchTechnicians()}},100)}"></div><div class="admin-actions"><button class="admin-icon-btn bell-btn" title="التنبيهات" onclick="v10Notify('صوت التنبيه يعمل', 'notify')">🔔 ${v13Badge(state.chatCount)}</button><button class="admin-icon-btn" title="دارك مود" onclick="v10ToggleTheme()">🌙</button><button class="admin-icon-btn logout clean-logout" onclick="v13LogoutConfirm()">تسجيل خروج</button></div></div>${contentWithTicker}</main></div>`;v10ApplyTheme();
 }
 async function chatsPage(){
-  let j=await api('/api/chats'); state.chatCount=j.total_unread||0;
+  let j=await api('/api/chats'); 
+  state.chatCount=j.total_unread||0;
   const rows=j.chats||[];
-  return v11Hero('الدردشات','كل محادثاتك مع العملاء والفنيين في مكان واحد')+`<div class="dash-card"><div class="v13-card-head"><h2>كل الدردشات ${v13Badge(state.chatCount)}</h2><p class="muted">الرقم الأحمر يعني رسائل جديدة لم تفتحها بعد.</p></div>${rows.length?`<div class="v13-chat-list">${rows.map(c=>`<button class="v13-chat-item" onclick="chat(${c.request_id})"><div class="v13-chat-avatar">${(c.other_name||'ص').slice(0,1)}</div><div><b>${c.other_name||'محادثة طلب'} ${Number(c.unread_count||0)>0?`<em class="chat-badge inline">${c.unread_count}</em>`:''}</b><small>#${c.request_id} • ${c.service||'-'} • ${c.status||''}</small><p>${c.last_body||'لا توجد رسائل بعد'}</p></div><span>فتح المحادثة ←</span></button>`).join('')}</div>`:'<div class="empty">لا توجد دردشات حالياً. تظهر الدردشة بعد قبول عرض الفني أو بدء محادثة على طلب.</div>'}</div>`;
+
+  return v11Hero('الدردشات','كل محادثاتك مع العملاء والفنيين في مكان واحد')+
+  `<div class="dash-card">
+    <div class="v13-card-head">
+      <h2>كل الدردشات ${v13Badge(Number(state.chatCount||0))}</h2>
+      <p class="muted">الرقم الأحمر يعني رسائل جديدة لم تفتحها بعد.</p>
+    </div>
+    ${rows.length?`
+      <div class="v13-chat-list">
+        ${rows.map(c=>`
+          <button class="v13-chat-item" onclick="chat(${Number(c.request_id||0)})">
+            <div class="v13-chat-avatar">${escapeHtml((c.other_name||'ص').slice(0,1))}</div>
+            <div>
+              <b>
+                ${escapeHtml(c.other_name||'محادثة طلب')}
+                ${Number(c.unread_count||0)>0?`<em class="chat-badge inline">${Number(c.unread_count||0)}</em>`:''}
+              </b>
+              <small>
+                #${Number(c.request_id||0)} • 
+                ${escapeHtml(c.service||'-')} • 
+                ${escapeHtml(c.status||'')}
+              </small>
+              <p>${escapeHtml(c.last_body||'لا توجد رسائل بعد')}</p>
+            </div>
+            <span>فتح المحادثة ←</span>
+          </button>
+        `).join('')}
+      </div>
+    `:'<div class="empty">لا توجد دردشات حالياً. تظهر الدردشة بعد قبول عرض الفني أو بدء محادثة على طلب.</div>'}
+  </div>`;
 }
 function supportPage(){
   return v11Hero('الدعم الفني','مركز مساعدة قوي للعميل والفني')+`<div class="support-grid"><div class="dash-card support-card"><h2>تواصل مع الدعم</h2><p class="muted">اكتب المشكلة وسيتم حفظها داخل النظام ليراجعها الأدمن.</p><form class="form" onsubmit="sendSupport(event)"><div class="field"><label>نوع المشكلة</label><select id="supportType"><option>مشكلة طلب</option><option>مشكلة دفع أو رصيد</option><option>مشكلة حساب</option><option>اقتراح تحسين</option></select></div><div class="field"><label>عنوان مختصر</label><input id="supportTitle" required placeholder="مثال: لم يصلني رد من الفني"></div><div class="field"><label>التفاصيل</label><textarea id="supportBody" required minlength="10" placeholder="اكتب التفاصيل هنا..."></textarea></div><button class="btn">إرسال للدعم</button></form></div><div class="dash-card"><h2>مساعدة سريعة</h2><div class="faq-list"><details open><summary>متى يفتح الشات؟</summary><p>بعد قبول العميل لعرض الفني يظهر الشات للطرفين.</p></details><details><summary>هل يستطيع الفني أخذ أكثر من طلب؟</summary><p>لا، إذا عنده طلب قيد التنفيذ يجب إنهاؤه أولاً.</p></details><details><summary>ماذا لو رفض العميل السعر؟</summary><p>يبقى الطلب مطروحاً، ويمكن لفنيين آخرين إرسال عروض.</p></details><details><summary>كيف تظهر المهنة بالشريط؟</summary><p>أي مهنة يضيفها الأدمن تظهر تلقائياً في شريط المهن المباشر.</p></details></div></div></div>`;
@@ -512,7 +652,7 @@ async function v15DoLogout(){
   try{ if(socket) socket.disconnect(); }catch(e){}
   try{ if(chatTimer) clearInterval(chatTimer); }catch(e){}
   localStorage.removeItem('token');
-  state.user=null; state.token=''; state.tab='dash'; state.chatCount=0;
+  state.user=null; state.tab='dash'; state.chatCount=0;
   document.getElementById('logoutConfirm')?.remove();
   document.body.classList.remove('dashboard-mode','open');
   toast('تم تسجيل الخروج بنجاح');
@@ -960,7 +1100,7 @@ function v20Timeline(r){
 
 reqTable=function(rows){
   if(!rows||!rows.length) return '<div class="empty">لا توجد طلبات في هذا القسم</div>';
-  return `<div class="v20-request-list">${rows.map(r=>`<article class="v20-request-card ${v20StatusClass(r.status)}"><div class="v20-request-head"><div><h3>${v20ServiceIcon(r.service)} #${r.id} - ${v20SafeTxt(r.service)}</h3><p>${v20SafeTxt(r.city)}${r.area?' - '+v20SafeTxt(r.area):''} • ${v20SafeTxt(r.preferred_time||'وقت غير محدد')}</p></div><span class="v20-status ${v20StatusClass(r.status)}">${v20SafeTxt(r.status)}</span></div>${v20Timeline(r)}<div class="v20-request-body">${r.problem_image_url?`<img class="v20-problem-img" src="${r.problem_image_url}" alt="صورة المشكلة">`:''}<p>${v20SafeTxt(r.description||'')}</p></div>${r.lat&&r.lng?`<details class="v20-map-details"><summary>📍 عرض موقع العميل</summary>${typeof mapBox==='function'?mapBox(r.lat,r.lng):''}</details>`:''}<div class="v20-request-meta"><span>👤 العميل: ${v20SafeTxt(r.customer_name||state.user?.name||'-')}</span><span>👨‍🔧 الفني: ${v20SafeTxt(r.technician_name||'-')}</span><span>💰 السعر: ${r.offer_price? r.offer_price+' د.أ':'بانتظار عرض'}</span><span>⏱️ المدة: ${v20SafeTxt(r.arrival_time||'-')}</span></div><div class="actions v20-actions">${actions(r)}</div><div id="offers-${r.id}" class="offers-box v20-offers-box"></div></article>`).join('')}</div>`;
+  return `<div class="v20-request-list">${rows.map(r=>`<article class="v20-request-card ${v20StatusClass(r.status)}"><div class="v20-request-head"><div><h3>${v20ServiceIcon(r.service)} #${r.id} - ${v20SafeTxt(r.service)}</h3><p>${v20SafeTxt(r.city)}${r.area?' - '+v20SafeTxt(r.area):''} • ${v20SafeTxt(r.preferred_time||'وقت غير محدد')}</p></div><span class="v20-status ${v20StatusClass(r.status)}">${v20SafeTxt(r.status)}</span></div>${v20Timeline(r)}<div class="v20-request-body">${r.problem_image_url?`<img class="v20-problem-img" src="${_safeSrc(r.problem_image_url)}" alt="صورة المشكلة">`:''}<p>${v20SafeTxt(r.description||'')}</p></div>${r.lat&&r.lng?`<details class="v20-map-details"><summary>📍 عرض موقع العميل</summary>${typeof mapBox==='function'?mapBox(r.lat,r.lng):''}</details>`:''}<div class="v20-request-meta"><span>👤 العميل: ${v20SafeTxt(r.customer_name||state.user?.name||'-')}</span><span>👨‍🔧 الفني: ${v20SafeTxt(r.technician_name||'-')}</span><span>💰 السعر: ${r.offer_price? r.offer_price+' د.أ':'بانتظار عرض'}</span><span>⏱️ المدة: ${v20SafeTxt(r.arrival_time||'-')}</span></div><div class="actions v20-actions">${actions(r)}</div><div id="offers-${r.id}" class="offers-box v20-offers-box"></div></article>`).join('')}</div>`;
 };
 
 offerCards=function(offers,req){
@@ -1025,8 +1165,8 @@ const __v20DashboardBase=dashboard; dashboard=function(){v20BindRealtime(); retu
 const __v20InitBase=init; init=async function(){await __v20InitBase(); v20BindRealtime(); setInterval(()=>{ if(state.user && !activeChatId) v20LiveRefresh(false); },3000); setInterval(()=>{ if(state.user && !activeChatId && ['orders','chats'].includes(state.tab) && !isUiModalOpen()) dashboard(); },30000);};
 
 /* ===== Sallehly V21 Login/Admin Full Fix ===== */
-function v21ResetSessionForRole(user, token){
-  state.user=user; state.token=token; localStorage.token=token; state.tab='dash'; activeChatId=null;
+function v21ResetSessionForRole(user){
+  state.user=user; state.tab='dash'; activeChatId=null;
   if(chatTimer){ clearInterval(chatTimer); chatTimer=null; }
 }
 function v21El(id){ return document.getElementById(id); }
@@ -1055,7 +1195,7 @@ doLogin=async function(e){
   const emailInput=v21El('email'), passInput=v21El('password');
   try{
     const j=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:emailInput.value.trim(),password:passInput.value})});
-    v21ResetSessionForRole(j.user,j.token);
+    v21ResetSessionForRole(j.user);
     toast('تم تسجيل الدخول بنجاح');
     dashboard();
   }catch(err){ toast(err.message || 'تعذر تسجيل الدخول'); }
@@ -1121,9 +1261,13 @@ doRegister=async function(e){
       fd.append('avatar',avatar.files[0]);
     }
     const j=await api('/api/auth/register',{method:'POST',body:fd});
-    v21ResetSessionForRole(j.user,j.token);
-    toast('تم إنشاء الحساب بنجاح');
-    dashboard();
+    if(j.step==='verify'){
+      showOtpScreen(j.email);
+    } else {
+      v21ResetSessionForRole(j.user);
+      toast('تم إنشاء الحساب بنجاح');
+      dashboard();
+    }
   }catch(err){ toast(err.message || 'تعذر إنشاء الحساب'); }
 }
 
@@ -1151,7 +1295,7 @@ function v21RequestDetails(id){
         <span>السعر: <b>${r.offer_price? v15EscapeHtml(r.offer_price)+' د.أ':'-'}</b></span>
         <span>المدة: <b>${v15EscapeHtml(r.arrival_time||'-')}</b></span>
       </div>
-      ${r.problem_image_url?`<img class="problem-img big-preview" src="${r.problem_image_url}" alt="صورة المشكلة">`:''}
+      ${r.problem_image_url?`<img class="problem-img big-preview" src="${_safeSrc(r.problem_image_url)}" alt="صورة المشكلة">`:''}
       <p class="v21-desc">${v15EscapeHtml(r.description||'لا يوجد وصف')}</p>
       <div class="actions"><button class="btn ghost" onclick="loadOffers(${r.id});this.closest('.v21-modal').remove();state.tab='orders';dashboard();setTimeout(()=>loadOffers(${r.id}),250)">عرض عروض الفنيين</button><button class="btn" onclick="chat(${r.id})">فتح المحادثة</button></div>
     </div></div>`;
@@ -1178,7 +1322,7 @@ reqTable=function(rows){
   if(!rows || !rows.length) return '<div class="empty">لا توجد طلبات</div>';
   return `<div class="request-list v21-request-list">${rows.map(r=>`<div class="request-card v21-request-card">
     <div class="request-head"><div><b>#${r.id} - ${v15EscapeHtml(r.service||'-')}</b><p class="muted">${v15EscapeHtml(r.city||'-')}${r.area?' - '+v15EscapeHtml(r.area):''} • ${v15EscapeHtml(r.preferred_time||'بدون وقت محدد')}</p></div><span class="status">${v15EscapeHtml(r.status||'-')}</span></div>
-    ${r.problem_image_url?`<img class="problem-img" src="${r.problem_image_url}" alt="صورة المشكلة">`:''}
+    ${r.problem_image_url?`<img class="problem-img" src="${_safeSrc(r.problem_image_url)}" alt="صورة المشكلة">`:''}
     <p>${v15EscapeHtml(r.description||'')}</p>
     <div class="request-meta"><span>الفني: ${v15EscapeHtml(r.technician_name||'-')}</span><span>العميل: ${v15EscapeHtml(r.customer_name||'-')}</span><span>السعر: ${r.offer_price? v15EscapeHtml(r.offer_price)+' د.أ':'-'}</span><span>المدة: ${v15EscapeHtml(r.arrival_time||'-')}</span></div>
     <div class="actions">${actions(r)}</div><div id="offers-${r.id}" class="offers-box"></div>
@@ -1219,7 +1363,7 @@ admin=async function(){
 
 logout=async function(){
   try{ await api('/api/auth/logout',{method:'POST'}); }catch(e){}
-  localStorage.removeItem('token'); delete localStorage.token; state.user=null; state.token=''; state.tab='dash'; activeChatId=null;
+  localStorage.removeItem('pendingService'); delete localStorage.token; state.user=null; state.tab='dash'; activeChatId=null;
   if(chatTimer){ clearInterval(chatTimer); chatTimer=null; }
   toast('تم تسجيل الخروج');
   login();
@@ -3029,119 +3173,6 @@ const css = `
 
 const st = document.createElement('style');
 st.textContent = css;
-document.head.appendChild(st);
-
-})();
-
-
-/* ===== Sallehly V51 - Splash Screen ===== */
-;(function(){
-
-// Override showWelcomeModalForce with splash screen
-showWelcomeModalForce = function(){
-  const old = document.getElementById('welcomeOverlay');
-  if(old) old.remove();
-
-  const el = document.createElement('div');
-  el.id = 'splashScreen';
-  el.innerHTML = `
-    <div class="splash-inner">
-      <div class="splash-logo"><img src="/logo.png" alt="صلّحلي" style="width:70px;height:70px;border-radius:20px;object-fit:cover;"></div>
-      <div class="splash-name">صلّحلي</div>
-      <div class="splash-tagline">الفني الأقرب بضغطة زر</div>
-      <div class="splash-dots">
-        <span></span><span></span><span></span>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(el);
-
-  // Auto dismiss after 2.5 seconds
-  setTimeout(()=>{
-    el.style.opacity = '0';
-    el.style.transform = 'scale(1.05)';
-    setTimeout(()=> el.remove(), 400);
-  }, 2500);
-};
-
-const splashCSS = `
-#splashScreen {
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(160deg, #0d0d1a 0%, #1a1050 50%, #0d0d1a 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 99999;
-  transition: opacity 0.4s ease, transform 0.4s ease;
-}
-.splash-inner {
-  text-align: center;
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-.splash-logo {
-  width: 80px;
-  height: 80px;
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
-  border-radius: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  font-weight: 900;
-  box-shadow: 0 20px 50px rgba(124,58,237,0.5);
-  animation: splashPop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
-}
-.splash-name {
-  font-size: 32px;
-  font-weight: 900;
-  letter-spacing: -1px;
-  animation: splashFade 0.5s 0.2s ease forwards;
-  opacity: 0;
-}
-.splash-tagline {
-  font-size: 14px;
-  color: rgba(255,255,255,0.5);
-  animation: splashFade 0.5s 0.4s ease forwards;
-  opacity: 0;
-}
-.splash-dots {
-  display: flex;
-  gap: 8px;
-  margin-top: 24px;
-  animation: splashFade 0.5s 0.6s ease forwards;
-  opacity: 0;
-}
-.splash-dots span {
-  width: 8px;
-  height: 8px;
-  background: #7c3aed;
-  border-radius: 50%;
-  animation: splashDot 1.2s infinite ease-in-out;
-}
-.splash-dots span:nth-child(2) { animation-delay: 0.2s; }
-.splash-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes splashPop {
-  from { transform: scale(0.5); opacity: 0; }
-  to   { transform: scale(1);   opacity: 1; }
-}
-@keyframes splashFade {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0);   }
-}
-@keyframes splashDot {
-  0%,80%,100% { transform: scale(0.6); opacity: 0.4; }
-  40%         { transform: scale(1.2); opacity: 1;   }
-}
-`;
-
-const st = document.createElement('style');
-st.textContent = splashCSS;
 document.head.appendChild(st);
 
 })();
