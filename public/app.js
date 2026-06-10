@@ -61,11 +61,12 @@ function vals(sel){return Array.from($(sel).selectedOptions||[]).map(o=>o.value)
 async function doRegister(e){e.preventDefault();try{const role=$('#role').value;const fd=new FormData();fd.append('role',role);fd.append('name',$('#name').value.trim());fd.append('email',$('#remail').value.trim());fd.append('phone',$('#phone').value.trim());fd.append('password',$('#rpassword').value);fd.append('city',$('#city').value);fd.append('national_number',$('#national')?$('#national').value.trim():'');fd.append('services',vals('#srv').join(','));fd.append('areas',vals('#areas').join(','));if(role==='technician'&&!$('#avatar').files[0]) throw new Error('الرجاء اختيار صورة شخصية للفني');if($('#avatar')&&$('#avatar').files[0])fd.append('avatar',$('#avatar').files[0]);const j=await api('/api/auth/register',{method:'POST',body:fd});if(j.step==='verify'){showOtpScreen(j.email);}else{state.user=j.user;toast('تم إنشاء الحساب');dashboard();}}catch(err){toast(err.message)}}
 // ── OTP Verification Screen ───────────────────────────────────────────────
 function showOtpScreen(email) {
+  state._pendingOtpEmail = email;
   app.innerHTML = `<div class="page"><div class="card" style="max-width:440px;margin:auto;text-align:center">
     <div style="font-size:48px;margin-bottom:12px">📧</div>
     <h1 style="margin-bottom:8px">تحقق من بريدك</h1>
     <p class="muted" style="margin-bottom:24px">أرسلنا كود مكون من 6 أرقام إلى<br><b>${email}</b></p>
-    <form class="form" onsubmit="doVerifyOtp(event,'${email}')">
+    <form class="form" onsubmit="doVerifyOtp(event)">
       <div class="field">
         <input id="otpInput" type="text" inputmode="numeric" maxlength="6" placeholder="أدخل الكود" required
           style="text-align:center;font-size:28px;font-weight:900;letter-spacing:10px;padding:16px">
@@ -77,13 +78,16 @@ function showOtpScreen(email) {
   setTimeout(()=>{ const i=$('#otpInput'); if(i) i.focus(); }, 100);
 }
 
-async function doVerifyOtp(e, email) {
+async function doVerifyOtp(e) {
   e.preventDefault();
+  const email = state._pendingOtpEmail;
+  if(!email) return toast('حدث خطأ، أعد التسجيل');
   const otp = clean($('#otpInput')?.value || '');
   if(otp.length !== 6) return toast('أدخل الكود المكون من 6 أرقام');
   try {
     const j = await api('/api/auth/verify-otp', {method:'POST', body:JSON.stringify({email, otp})});
     state.user = j.user;
+    state._pendingOtpEmail = null;
     toast('🎉 تم إنشاء الحساب بنجاح!');
     dashboard();
     if(localStorage.pendingService){
