@@ -1,11 +1,109 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>صلّحلي | منصة الصيانة في الأردن</title><style>html,body{margin:0;padding:0;background:#0d0d1a;}.nav,footer{visibility:hidden;opacity:0;}#initial-loader{position:fixed;inset:0;background:linear-gradient(160deg,#0d0d1a 0%,#1a1050 50%,#0d0d1a 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:999999;gap:14px;}#initial-loader img{width:80px;height:80px;border-radius:24px;object-fit:cover;box-shadow:0 20px 50px rgba(124,58,237,0.5);}#initial-loader h2{color:#fff;font-size:28px;font-weight:900;margin:0;font-family:sans-serif;}#initial-loader p{color:rgba(255,255,255,0.5);font-size:13px;margin:0;font-family:sans-serif;}.ld{display:flex;gap:8px;margin-top:8px;}.ld span{width:8px;height:8px;background:#7c3aed;border-radius:50%;animation:sd 1.2s infinite ease-in-out;}.ld span:nth-child(2){animation-delay:0.2s}.ld span:nth-child(3){animation-delay:0.4s}@keyframes sd{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1.2);opacity:1}}</style><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet"></head><body><div id="initial-loader"><img src="/logo.png" alt="صلّحلي"><h2>صلّحلي</h2><p>الفني الأقرب بضغطة زر</p><div class="ld"><span></span><span></span><span></span></div></div><div id="toast"></div><nav class="nav"><a class="brand" href="#home" data-route="home"><img src="/logo.png" alt="صلّحلي" style="width:32px;height:32px;border-radius:10px;object-fit:cover;margin-left:6px;">صلّحلي</a><button class="menu" onclick="document.body.classList.toggle('open')">☰</button><div class="links"><a href="#home" data-route="home">الرئيسية</a><a href="#services" data-route="services">الخدمات</a><a href="#how" data-route="how">طريقة الاستخدام</a><a href="#tech" data-route="tech">للفنيين</a><a href="#contact" data-route="contact">تواصل معنا</a><button class="btn ghost" data-route="login">دخول</button><button class="btn" data-route="register">إنشاء حساب</button></div></nav><main id="app"></main><footer><b>صلّحلي</b><p>منصة أردنية تربط العميل بالفني الموثوق. الدفع كاش، ورصيد الفني يدار من الإدارة.</p></footer><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="/socket.io/socket.io.js"></script><script src="/app.js?v=40-otp-fix"></script><script>window.addEventListener('load',function(){
-  // Don't hide loader here - let init() hide it after auth check
-});
-window._hideLoader = function(){
-  var l=document.getElementById('initial-loader');
-  if(l){l.style.opacity='0';l.style.transition='opacity 0.3s ease';setTimeout(function(){if(l.parentNode)l.remove();},300);}
-  var nav=document.querySelector('.nav');
-  var foot=document.querySelector('footer');
-  if(nav)nav.style.cssText='visibility:visible;opacity:1;';
-  if(foot)foot.style.cssText='visibility:visible;opacity:1;';
-};</script></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>صلّحلي | منصة الصيانة في الأردن</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+
+  <!-- SEO Meta -->
+  <meta name="description" content="صلّحلي - منصة أردنية تربطك بأفضل الفنيين لصيانة المنزل. سباكة، كهرباء، نجارة وأكثر. الفني الأقرب بضغطة زر.">
+  <meta name="keywords" content="صلحلي, صيانة منزلية, فني, سباك, كهربائي, الأردن, عمان">
+  <meta name="author" content="صلّحلي">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="صلّحلي | منصة الصيانة في الأردن">
+  <meta property="og:description" content="الفني الأقرب بضغطة زر. سباكة، كهرباء، نجارة وأكثر.">
+  <meta property="og:image" content="https://sallehly.com/logo.png">
+  <meta property="og:url" content="https://sallehly.com">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ar_JO">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://sallehly.com/logo.png">
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://sallehly.com/">
+
+  <style>
+    html,body{margin:0;padding:0;background:#0d0d1a;}
+    .nav,footer{visibility:hidden;opacity:0;}
+    #initial-loader{position:fixed;inset:0;background:linear-gradient(160deg,#0d0d1a 0%,#1a1050 50%,#0d0d1a 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:999999;gap:14px;}
+    #initial-loader img{width:80px;height:80px;border-radius:24px;object-fit:cover;box-shadow:0 20px 50px rgba(124,58,237,0.5);}
+    #initial-loader h2{color:#fff;font-size:28px;font-weight:900;margin:0;font-family:sans-serif;}
+    #initial-loader p{color:rgba(255,255,255,0.5);font-size:13px;margin:0;font-family:sans-serif;}
+    .ld{display:flex;gap:8px;margin-top:8px;}
+    .ld span{width:8px;height:8px;background:#7c3aed;border-radius:50%;animation:sd 1.2s infinite ease-in-out;}
+    .ld span:nth-child(2){animation-delay:0.2s}
+    .ld span:nth-child(3){animation-delay:0.4s}
+    @keyframes sd{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1.2);opacity:1}}
+  </style>
+
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div id="initial-loader">
+  <img src="/logo.png" alt="صلّحلي">
+  <h2>صلّحلي</h2>
+  <p>الفني الأقرب بضغطة زر</p>
+  <div class="ld"><span></span><span></span><span></span></div>
+</div>
+
+<div id="toast"></div>
+
+<nav class="nav">
+  <a class="brand" href="#home" data-route="home">
+    <img src="/logo.png" alt="صلّحلي" style="width:32px;height:32px;border-radius:10px;object-fit:cover;margin-left:6px;">
+    صلّحلي
+  </a>
+  <button class="menu" onclick="document.body.classList.toggle('open')">☰</button>
+  <div class="links">
+    <a href="#home" data-route="home">الرئيسية</a>
+    <a href="#services" data-route="services">الخدمات</a>
+    <a href="#how" data-route="how">طريقة الاستخدام</a>
+    <a href="#tech" data-route="tech">للفنيين</a>
+    <a href="#contact" data-route="contact">تواصل معنا</a>
+    <button class="btn ghost" data-route="login">دخول</button>
+    <button class="btn" data-route="register">إنشاء حساب</button>
+  </div>
+</nav>
+
+<main id="app"></main>
+
+<footer>
+  <b>صلّحلي</b>
+  <p>منصة أردنية تربط العميل بالفني الموثوق. الدفع كاش، ورصيد الفني يدار من الإدارة.</p>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/app.js?v=40-otp-fix"></script>
+<script>
+  window.addEventListener('load', function() {
+    // Don't hide loader here - let init() hide it after auth check
+  });
+  window._hideLoader = function() {
+    var l = document.getElementById('initial-loader');
+    if (l) {
+      l.style.opacity = '0';
+      l.style.transition = 'opacity 0.3s ease';
+      setTimeout(function() { if (l.parentNode) l.remove(); }, 300);
+    }
+    var nav = document.querySelector('.nav');
+    var foot = document.querySelector('footer');
+    if (nav) nav.style.cssText = 'visibility:visible;opacity:1;';
+    if (foot) foot.style.cssText = 'visibility:visible;opacity:1;';
+  };
+</script>
+
+</body>
+</html>
