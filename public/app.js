@@ -69,10 +69,267 @@ async function init(){
 function go(p){document.body.classList.remove('open'); if(p==='home') {home(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='services'){servicesPage(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='how'){howPage(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='tech'){techPage(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='contact'){contact(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='login'){login(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='register'){register(); window.scrollTo({top:0,behavior:'smooth'}); return;} if(p==='dashboard'){dashboard(); window.scrollTo({top:0,behavior:'smooth'}); return;} home();}
 window.go = go;
 function home(){app.innerHTML=`<section class="hero pro-hero"><div class="hero-copy"><span class="badge glow-badge"><span class="live-dot"></span> منصة صيانة احترافية في الأردن • فنيين موثوقين • دفع كاش</span><h1>صلّحلي — وصّل العميل بالفني الأقرب بشكل أسرع وأرتب</h1><p class="hero-lead">واجهة احترافية تعرض الخدمات، الفنيين، الطلبات، التقييمات، الرصيد، والدردشة بمظهر حديث يناسب إطلاق مشروع حقيقي.</p><div class="hero-actions"><button class="btn big" onclick="go('${state.user?'dashboard':'register'}')">اطلب خدمة الآن</button><button class="btn ghost big" onclick="register('technician')">انضم كفني</button></div><div class="trust-strip"><div><b>+12</b><span>خدمة صيانة</span></div><div><b>GPS</b><span>تحديد موقع</span></div><div><b>⭐ 4.8</b><span>تقييمات فنيين</span></div></div></div><div class="phone pro-phone"><div class="phone-top"><span></span><b>فنيين مقترحين</b><em>Live</em></div><div class="screen pro-screen">${['فني تكييف','كهربائي','سباك'].map((x,i)=>`<div class="screen-row pro-row"><div style="display:flex;gap:10px;align-items:center"><div class="avatar">${['❄️','⚡','🚰'][i]}</div><div><b>${x}</b><div>${stars(5-i/2)} <small>${20-i*4} عمل مكتمل</small></div></div></div><button class="btn ghost mini">اختيار</button></div>`).join('')}<div class="mini-map"><span>📍</span><div><b>الأقرب لموقعك</b><small>ترتيب حسب المنطقة والتقييم</small></div></div></div></div></section><section class="section services-section" id="services"><div class="section-head"><span class="eyebrow">خدمات جاهزة</span><h2>كل ما يحتاجه البيت بمكان واحد</h2><p class="muted">اختر الخدمة، انشر الطلب، وشاهد الفنيين المناسبين حسب منطقتك.</p></div><div class="grid feature-grid">${state.meta.services.slice(0,12).map(s=>`<div class="card service-card"><div class="icon">${s.icon}</div><h3>${s.name}</h3><p class="muted">طلب سريع، فنيين قريبين، وتقييم واضح قبل الاختيار.</p></div>`).join('')}</div></section><section class="section"><div class="section-head"><span class="eyebrow">كيف يعمل؟</span><h2>خطوات بسيطة من الطلب إلى الإنجاز</h2></div><div class="grid steps-grid"><div class="card step-card"><span>01</span><h3>أنشئ طلب</h3><p class="muted">اختر الخدمة، اكتب وصف المشكلة، وحدد المحافظة والمنطقة.</p></div><div class="card step-card"><span>02</span><h3>اختر الفني</h3><p class="muted">يعرض النظام الفنيين المناسبين مع التقييم وعدد الأعمال.</p></div><div class="card step-card"><span>03</span><h3>ادفع وقيّم</h3><p class="muted">بعد الإنجاز يتم الدفع كاش وتقييم الفني بالنجوم.</p></div></div></section><section class="section cta-section"><div class="cta-card"><div><span class="eyebrow">جاهز للإطلاق</span><h2>ابدأ بتحويل طلبات الصيانة إلى تجربة مرتبة وموثوقة</h2><p>تصميم حديث، أزرار واضحة، كروت احترافية، وتجربة مناسبة للموبايل والكمبيوتر.</p></div><button class="btn light big" onclick="go('${state.user?'dashboard':'register'}')">ابدأ الآن</button></div></section>`}
-function servicesPage(){app.innerHTML=`<div class="page"><h1>كل خدمات صلّحلي</h1><div class="grid">${state.meta.services.map(s=>`<div class="card"><div class="icon">${s.icon}</div><h3>${s.name}</h3><button class="btn" onclick="go('${state.user?'dashboard':'register'}')">اطلب الآن</button></div>`).join('')}</div></div>`}
-function howPage(){app.innerHTML=`<div class="page"><h1>آلية العمل</h1><div class="grid"><div class="card"><h3>للعميل</h3><p class="muted">طلب خدمة، مشاهدة الفنيين، اختيار الفني، محادثة داخلية، تأكيد الدفع كاش، تقييم.</p></div><div class="card"><h3>للفني</h3><p class="muted">أول طلبين مجاناً، ثم يحتاج رصيد. يختار باقة، يدفع للبنك، يرفع صورة التحويل، والأدمن يوافق.</p></div><div class="card"><h3>للإدارة</h3><p class="muted">إدارة المستخدمين، الفنيين، الطلبات، الشحن، الشكاوى، والتقارير.</p></div></div></div>`}
-function techPage(){app.innerHTML=`<div class="page"><h1>نظام الفنيين</h1><div class="cards2">${state.meta.packages.map(p=>`<div class="card package"><h3>${p.name}</h3><strong>${p.amount} د.أ</strong><p>رصيد إضافي: ${p.bonus} د.أ</p><p>خصم كل طلب مكتمل: ${p.commission_per_order} د.أ</p></div>`).join('')}</div><br><button class="btn" onclick="register('technician')">سجل كفني الآن</button></div>`}
-function contact(){app.innerHTML=`<div class="page"><div class="card"><h1>تواصل معنا</h1><p class="muted">للاستفسار أو شحن رصيد الفنيين: 0790000000</p></div></div>`}
+// ── V61: Premium Public Pages ──
+;(function(){
+
+  // expose to global scope immediately
+  window.servicesPage = servicesPage;
+  window.howPage = howPage;
+  window.techPage = techPage;
+  window.contact = contact;
+
+function servicesPage(){
+  window.servicesPage = servicesPage;
+  window.howPage = howPage;
+  window.techPage = techPage;
+  window.contact = contact;
+  document.body.classList.remove('open','sidebar-open','v37-menu-open','dashboard-mode','v37-dashboard');
+  const safe = window.esc || (v=>String(v??''));
+  const cards = (state.meta.services||[]).map(s=>`
+    <button class="v61-service-card" onclick="v40ChooseService('${String(s.name||'').replace(/'/g,"\\'")}')">
+      <div class="v61-service-icon">${safe(s.icon||'🛠️')}</div>
+      <h3>${safe(s.name)}</h3>
+      <p>فنيين متاحين قريبين منك</p>
+      <span class="v61-service-cta">اطلب الآن ←</span>
+    </button>`).join('');
+
+  app.innerHTML = `
+  <div class="v61-home">
+    <canvas class="v60-canvas" id="v61SvCanvas"></canvas>
+    <div class="v61-bg-gradient"></div>
+    <section class="v61-inner-hero">
+      <span class="v61-eyebrow">خدماتنا</span>
+      <h1>كل ما يحتاجه <span class="v61-gradient-text">بيتك</span></h1>
+      <p>اختر الخدمة وابدأ الطلب — فنيون موثوقون حسب منطقتك</p>
+    </section>
+    <section style="position:relative;z-index:1;padding:0 6% 80px;max-width:1200px;margin:0 auto">
+      <div class="v61-services-grid">${cards}</div>
+    </section>
+  </div>`;
+  v61MiniParticles('v61SvCanvas');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function howPage(){
+  document.body.classList.remove('open','sidebar-open','v37-menu-open','dashboard-mode','v37-dashboard');
+  app.innerHTML = `
+  <div class="v61-home">
+    <canvas class="v60-canvas" id="v61HwCanvas"></canvas>
+    <div class="v61-bg-gradient"></div>
+    <section class="v61-inner-hero">
+      <span class="v61-eyebrow">طريقة الاستخدام</span>
+      <h1>كيف <span class="v61-gradient-text">تعمل صلّحلي؟</span></h1>
+      <p>ثلاث خطوات بسيطة تفصلك عن الفني المناسب</p>
+    </section>
+    <section style="position:relative;z-index:1;padding:0 6% 80px;max-width:1000px;margin:0 auto">
+
+      <div class="v61-how-grid">
+        <div class="v61-how-card">
+          <div class="v61-how-num">01</div>
+          <div class="v61-how-icon">👤</div>
+          <h3>للعميل</h3>
+          <ul class="v61-how-list">
+            <li>أنشئ حساباً مجاناً</li>
+            <li>انشر طلب الخدمة مع وصف المشكلة</li>
+            <li>استقبل عروض الفنيين وشاهد تقييماتهم</li>
+            <li>اختر الفني الأنسب وتواصل معه</li>
+            <li>ادفع كاش بعد الإنجاز وقيّم الفني</li>
+          </ul>
+        </div>
+        <div class="v61-how-card">
+          <div class="v61-how-num">02</div>
+          <div class="v61-how-icon">🔧</div>
+          <h3>للفني</h3>
+          <ul class="v61-how-list">
+            <li>سجّل وارفع صورتك وخبرتك</li>
+            <li>أول طلبين مجاناً بدون رصيد</li>
+            <li>اشحن رصيدك لاستقبال المزيد من الطلبات</li>
+            <li>قدّم عرض سعر وانتظر موافقة العميل</li>
+            <li>أنجز العمل واستلم الدفع مباشرة</li>
+          </ul>
+        </div>
+        <div class="v61-how-card">
+          <div class="v61-how-num">03</div>
+          <div class="v61-how-icon">⚙️</div>
+          <h3>للإدارة</h3>
+          <ul class="v61-how-list">
+            <li>إدارة المستخدمين والفنيين</li>
+            <li>مراجعة طلبات الشحن والموافقة عليها</li>
+            <li>متابعة الطلبات والشكاوى</li>
+            <li>إدارة الخدمات والباقات</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-top:48px">
+        <button class="v61-btn-primary" onclick="go('${state.user?'dashboard':'register'}')">
+          ابدأ الآن مجاناً
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </section>
+  </div>`;
+  v61MiniParticles('v61HwCanvas');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function techPage(){
+  document.body.classList.remove('open','sidebar-open','v37-menu-open','dashboard-mode','v37-dashboard');
+  const pkgs = (state.meta.packages||[]).map(p=>`
+    <div class="v61-pkg-card">
+      <div class="v61-pkg-badge">باقة</div>
+      <h3>${String(p.name||'')}</h3>
+      <div class="v61-pkg-price">${p.amount} <span>د.أ</span></div>
+      <ul class="v61-how-list">
+        <li>رصيد إضافي: <b>${p.bonus} د.أ</b></li>
+        <li>خصم كل طلب: <b>${p.commission_per_order} د.أ</b></li>
+      </ul>
+      <button class="v61-btn-primary" onclick="register('technician')">اختر هذه الباقة</button>
+    </div>`).join('');
+
+  app.innerHTML = `
+  <div class="v61-home">
+    <canvas class="v60-canvas" id="v61TkCanvas"></canvas>
+    <div class="v61-bg-gradient"></div>
+    <section class="v61-inner-hero">
+      <span class="v61-eyebrow">للفنيين</span>
+      <h1>انضم كفني <span class="v61-gradient-text">واكسب أكثر</span></h1>
+      <p>سجّل حسابك، اشحن رصيدك، واستقبل طلبات من عملاء في منطقتك</p>
+    </section>
+    <section style="position:relative;z-index:1;padding:0 6% 40px;max-width:1000px;margin:0 auto">
+
+      <div class="v61-feat-grid">
+        <div class="v61-feat"><span>🆓</span><h4>أول طلبين مجاناً</h4><p>ابدأ بدون رصيد وجرّب المنصة</p></div>
+        <div class="v61-feat"><span>💰</span><h4>دفع كاش مباشر</h4><p>تستلم مبلغ الطلب مباشرة من العميل</p></div>
+        <div class="v61-feat"><span>📍</span><h4>طلبات قريبة منك</h4><p>فلترة الطلبات حسب منطقتك وخبرتك</p></div>
+        <div class="v61-feat"><span>⭐</span><h4>بناء سمعتك</h4><p>تقييمات العملاء ترفع ظهورك في النتائج</p></div>
+      </div>
+
+      <div class="v61-section-head" style="margin-top:60px">
+        <span class="v61-eyebrow">باقات الشحن</span>
+        <h2>اختر الباقة المناسبة</h2>
+      </div>
+      <div class="v61-pkgs-grid">${pkgs}</div>
+
+      <div style="text-align:center;margin-top:40px">
+        <button class="v61-btn-primary" onclick="register('technician')" style="font-size:18px;height:58px;padding:0 36px">
+          سجّل كفني الآن 🔧
+        </button>
+      </div>
+    </section>
+  </div>`;
+  v61MiniParticles('v61TkCanvas');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function contact(){
+  document.body.classList.remove('open','sidebar-open','v37-menu-open','dashboard-mode','v37-dashboard');
+  app.innerHTML = `
+  <div class="v61-home">
+    <canvas class="v60-canvas" id="v61CtCanvas"></canvas>
+    <div class="v61-bg-gradient"></div>
+    <section class="v61-inner-hero">
+      <span class="v61-eyebrow">تواصل معنا</span>
+      <h1>نحن هنا <span class="v61-gradient-text">لمساعدتك</span></h1>
+      <p>تواصل معنا لأي استفسار أو دعم تقني</p>
+    </section>
+    <section style="position:relative;z-index:1;padding:0 6% 80px;max-width:700px;margin:0 auto">
+
+      <div class="v61-contact-grid">
+        <a class="v61-contact-card" href="tel:0790000000">
+          <span>📞</span>
+          <h3>الهاتف</h3>
+          <p>0790000000</p>
+          <small>السبت - الخميس | 9ص - 9م</small>
+        </a>
+        <a class="v61-contact-card" href="https://wa.me/962790000000" target="_blank">
+          <span>💬</span>
+          <h3>واتساب</h3>
+          <p>تواصل فوري</p>
+          <small>رد خلال دقائق</small>
+        </a>
+        <a class="v61-contact-card" href="mailto:info@sallehly.jo">
+          <span>✉️</span>
+          <h3>البريد الإلكتروني</h3>
+          <p>info@sallehly.jo</p>
+          <small>رد خلال 24 ساعة</small>
+        </a>
+      </div>
+
+      <div class="v61-cta-card" style="margin-top:40px">
+        <div class="v61-cta-glow"></div>
+        <h3 style="font-size:22px;margin:0 0 10px">هل أنت فني وتريد الانضمام؟</h3>
+        <p style="color:rgba(255,255,255,0.5);margin:0 0 20px">سجّل حسابك الآن وابدأ باستقبال الطلبات</p>
+        <button class="v61-btn-primary" onclick="register('technician')">سجّل كفني 🔧</button>
+      </div>
+    </section>
+  </div>`;
+  v61MiniParticles('v61CtCanvas');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function v61MiniParticles(id){
+  const canvas = document.getElementById(id);
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, P = [];
+  function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+  resize();
+  function Pt(){ this.x=Math.random()*W; this.y=Math.random()*H; this.r=Math.random()*1.5+0.3; this.dx=(Math.random()-0.5)*0.3; this.dy=(Math.random()-0.5)*0.3; this.a=Math.random()*0.3+0.05; this.c=Math.random()>0.5?'124,58,237':'37,99,235'; }
+  for(let i=0;i<50;i++) P.push(new Pt());
+  let aid;
+  function draw(){
+    if(!document.getElementById(id)){ cancelAnimationFrame(aid); return; }
+    ctx.clearRect(0,0,W,H);
+    P.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fillStyle=`rgba(${p.c},${p.a})`; ctx.fill(); p.x+=p.dx; p.y+=p.dy; if(p.x<0||p.x>W)p.dx*=-1; if(p.y<0||p.y>H)p.dy*=-1; });
+    aid=requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// CSS for pages
+const s = document.createElement('style');
+s.id = 'v61-pages-css';
+if(!document.getElementById('v61-pages-css')) document.head.appendChild(s);
+s.textContent = `
+.v61-inner-hero{position:relative;z-index:1;text-align:center;padding:120px 6% 48px;max-width:700px;margin:0 auto}
+.v61-inner-hero h1{font-size:clamp(32px,5vw,52px);font-weight:900;margin:12px 0 16px}
+.v61-inner-hero p{color:rgba(255,255,255,0.5);font-size:16px;margin:0}
+.v61-how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.v61-how-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:32px 24px;position:relative;overflow:hidden;transition:all 0.25s}
+.v61-how-card:hover{background:rgba(124,58,237,0.1);border-color:rgba(124,58,237,0.3);transform:translateY(-4px)}
+.v61-how-num{font-size:48px;font-weight:900;background:linear-gradient(135deg,#7c3aed,#2563eb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px;line-height:1}
+.v61-how-icon{font-size:36px;margin-bottom:12px}
+.v61-how-card h3{font-size:20px;font-weight:800;margin:0 0 16px;color:#fff}
+.v61-how-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.v61-how-list li{color:rgba(255,255,255,0.6);font-size:14px;padding-right:20px;position:relative;line-height:1.5}
+.v61-how-list li::before{content:'✓';position:absolute;right:0;color:#7c3aed;font-weight:900}
+.v61-how-list li b{color:#fff}
+.v61-feat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.v61-feat{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:24px 20px;text-align:center;transition:all 0.25s}
+.v61-feat:hover{background:rgba(124,58,237,0.1);border-color:rgba(124,58,237,0.3);transform:translateY(-3px)}
+.v61-feat span{font-size:36px;display:block;margin-bottom:12px}
+.v61-feat h4{font-size:15px;font-weight:700;margin:0 0 8px;color:#fff}
+.v61-feat p{color:rgba(255,255,255,0.4);font-size:13px;margin:0;line-height:1.5}
+.v61-pkgs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;margin-top:24px}
+.v61-pkg-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:28px 24px;display:flex;flex-direction:column;gap:16px;transition:all 0.25s;position:relative}
+.v61-pkg-card:hover{background:rgba(124,58,237,0.12);border-color:rgba(124,58,237,0.35);transform:translateY(-4px);box-shadow:0 16px 40px rgba(124,58,237,0.2)}
+.v61-pkg-badge{display:inline-block;background:linear-gradient(135deg,rgba(124,58,237,0.3),rgba(37,99,235,0.3));border:1px solid rgba(124,58,237,0.3);color:#a78bfa;padding:3px 12px;border-radius:999px;font-size:11px;font-weight:700;width:fit-content}
+.v61-pkg-card h3{font-size:20px;font-weight:800;margin:0;color:#fff}
+.v61-pkg-price{font-size:40px;font-weight:900;color:#fff;line-height:1}.v61-pkg-price span{font-size:16px;color:rgba(255,255,255,0.5)}
+.v61-pkg-card .v61-btn-primary{margin-top:auto;justify-content:center}
+.v61-contact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.v61-contact-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:32px 24px;text-align:center;text-decoration:none;color:#fff;transition:all 0.25s;display:flex;flex-direction:column;align-items:center;gap:8px}
+.v61-contact-card:hover{background:rgba(124,58,237,0.12);border-color:rgba(124,58,237,0.3);transform:translateY(-4px)}
+.v61-contact-card span{font-size:40px}
+.v61-contact-card h3{font-size:17px;font-weight:700;margin:0}
+.v61-contact-card p{color:#60a5fa;font-size:16px;font-weight:600;margin:0}
+.v61-contact-card small{color:rgba(255,255,255,0.3);font-size:12px}
+@media(max-width:768px){.v61-how-grid,.v61-feat-grid,.v61-contact-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.v61-pkgs-grid{grid-template-columns:1fr}}
+`;
+
+})();
 function login(){app.innerHTML=`<div class="page"><div class="card" style="max-width:520px;margin:auto"><h1>تسجيل الدخول</h1><form class="form" onsubmit="doLogin(event)"><div class="field"><label>البريد الإلكتروني</label><input id="email" type="email" required></div><div class="field"><label>كلمة السر</label><input id="password" type="password" required></div><button class="btn">دخول</button><p class="muted">حساب الإدارة لا يظهر للعامة. اطلب بيانات الدخول من مالك المنصة.</p></form></div></div>`}
 async function doLogin(e){
   e.preventDefault();
