@@ -24,6 +24,26 @@ window.esc = window.esc || function(v){
     .replaceAll('"','&quot;')
     .replaceAll("'","&#039;");
 };
+function v10ApplyTheme(){ if(localStorage.sallehlyTheme==='dark') document.body.classList.add('dark-dash'); else document.body.classList.remove('dark-dash'); }
+function v10ToggleTheme(){ localStorage.sallehlyTheme = document.body.classList.contains('dark-dash') ? 'light' : 'dark'; v10ApplyTheme(); toast(localStorage.sallehlyTheme==='dark'?'تم تفعيل الدارك مود':'تم تفعيل الوضع الفاتح'); }
+function v10Sound(type='notify'){
+  try{ const AudioCtx=window.AudioContext||window.webkitAudioContext; const ctx=new AudioCtx(); const o=ctx.createOscillator(); const g=ctx.createGain(); const map={notify:[660,.08],request:[880,.12],message:[520,.09],done:[740,.16],logout:[330,.1]}; const [f,d]=map[type]||map.notify; o.frequency.value=f; o.type='sine'; g.gain.setValueAtTime(.0001,ctx.currentTime); g.gain.exponentialRampToValueAtTime(.16,ctx.currentTime+.01); g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+d); o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+d+.02); }catch(e){}
+}
+function v10Notify(text='تنبيه جديد',type='notify'){ v10Sound(type); const b=document.querySelector('.bell-btn'); if(b){b.classList.add('sound-on'); setTimeout(()=>b.classList.remove('sound-on'),700)} toast(text); }
+
+function v11SelectService(service){
+  if(!state.user){ localStorage.pendingService=service; go('register'); return; }
+  if(state.user.role==='customer'){
+    state.tab='near'; dashboard();
+    setTimeout(()=>{ if($('#searchTechQ')) $('#searchTechQ').value=service; if($('#searchService')) $('#searchService').value=service; searchTechnicians(); },180);
+  }else{ toast('هذه الخدمة للعميل. يمكنك إدارة الطلبات من لوحتك.'); }
+}
+function v11Hero(title, sub){return `<div class="dh-slim"><div class="dh-slim-top"><span class="dh-slim-title">👋 ${title}</span>${sub?`<span class="dh-slim-sub">${sub}</span>`:''}</div></div>`;}
+
+function v11Hero(title, sub){return `<div class="dh-slim"><div class="dh-slim-top"><span class="dh-slim-title">👋 ${title}</span>${sub?`<span class="dh-slim-sub">${sub}</span>`:''}</div></div>`;}
+function v11Improvements(){return `<div class="v11-improve-grid"><div><b>📌 طلبات بدون تداخل</b><small>الفني لا يقبل طلب جديد قبل إنهاء الطلب النشط.</small></div><div><b>🧾 سجل عمليات</b><small>كل طلب وشحن ورصيد محفوظ للنظام.</small></div><div><b>💬 شات بعد القبول</b><small>المحادثة بين العميل والفني مرتبطة بالطلب.</small></div><div><b>📍 محافظة ومنطقة</b><small>بحث حسب عمان، الزرقاء، إربد وباقي المحافظات.</small></div></div>`;}
+
+
 async function init(){
   // Hide only the app content, not the loader
   const appEl = document.getElementById('app');
@@ -75,7 +95,333 @@ async function doLogin(e){
     if(btn){ btn.disabled=false; btn.querySelector('.btn-text').style.display='inline'; btn.querySelector('.btn-spinner').style.display='none'; }
   }
 }
-function register(role='customer'){app.innerHTML=`<div class="page"><div class="card" style="max-width:760px;margin:auto"><h1>إنشاء حساب</h1><form class="form two" onsubmit="doRegister(event)"><div class="field"><label>نوع الحساب</label><select id="role" onchange="toggleTech()"><option value="customer">عميل</option><option value="technician">فني</option></select></div><div class="field"><label>الاسم الكامل</label><input id="name" placeholder="مثال: أحمد محمد" required minlength="2"></div><div class="field techOnly"><label>الصورة الشخصية للفني</label><input id="avatar" type="file" accept="image/png,image/jpeg,image/webp"><small class="muted">مطلوبة للفني فقط حتى يظهر للعميل بشكل موثوق.</small></div><div class="field"><label>البريد الإلكتروني</label><input id="remail" type="email" required></div><div class="field"><label>رقم الهاتف</label><input id="phone" placeholder="0791234567" required></div><div class="field"><label>كلمة السر</label><input id="rpassword" type="password" required minlength="8"></div><div class="field"><label>المحافظة</label><select id="city">${state.meta.cities.map(c=>`<option>${c}</option>`).join('')}</select></div><div class="field techOnly"><label>الرقم الوطني</label><input id="national" placeholder="10 أرقام"></div><div class="field techOnly"><label>الخدمات</label><select id="srv" multiple size="5">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field techOnly"><label>مناطق العمل</label><select id="areas" multiple size="5">${state.meta.cities.map(c=>`<option>${c}</option>`).join('')}</select></div><div></div><button class="btn">إنشاء الحساب</button></form></div></div>`;$('#role').value=role;toggleTech()}
+// ── V60: Premium Register Page ──
+;(function(){
+
+register = window.register = function(role='customer'){
+  state.tab = 'dash';
+  document.body.classList.remove('dashboard-mode','v37-dashboard','sidebar-open','open');
+
+  const cities = typeof governorateOptions === 'function'
+    ? governorateOptions('عمان')
+    : (state.meta.cities||[]).map(c=>`<option>${c}</option>`).join('');
+  const services = (state.meta.services||[]).map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
+
+  app.innerHTML = `
+  <div class="v60-page" id="v60RegPage">
+    <canvas class="v60-canvas" id="v60RegCanvas"></canvas>
+    <video class="v60-video" autoplay muted loop playsinline>
+      <source src="/videos/login.mp4" type="video/mp4">
+    </video>
+    <div class="v60-overlay"></div>
+
+    <div class="v60r-wrap">
+
+      <!-- Logo -->
+      <div class="v60-brand" style="margin-bottom:4px">
+        <div class="v60-brand-icon">
+          <img src="/logo.png" alt="صلّحلي" onerror="this.parentNode.innerHTML='🔧'">
+        </div>
+        <span class="v60-brand-name">صلّحلي</span>
+      </div>
+
+      <!-- Card -->
+      <div class="v60r-card" id="v60RegCard">
+        <div class="v60-glow"></div>
+
+        <div class="v60-head">
+          <h1 class="v60-title">إنشاء حساب جديد</h1>
+          <p class="v60-sub">انضم لمنصة صلّحلي للخدمات والصيانة المنزلية</p>
+        </div>
+
+        <!-- Error -->
+        <div class="v60-error" id="v60RegError" style="display:none">
+          <span class="v60-error-icon">⚠️</span>
+          <span id="v60RegErrorMsg"></span>
+        </div>
+
+        <!-- Role tabs -->
+        <div class="v60r-tabs">
+          <button type="button" class="v60r-tab active" id="v60TabCust" onclick="v60SwitchRole('customer')">
+            👤 عميل
+          </button>
+          <button type="button" class="v60r-tab" id="v60TabTech" onclick="v60SwitchRole('technician')">
+            🔧 فني
+          </button>
+        </div>
+
+        <form class="v60r-form" id="v60RegForm" onsubmit="v60DoRegister(event)" novalidate>
+          <input type="hidden" id="role" value="${role}">
+
+          <!-- Row 1: Name + Email -->
+          <div class="v60r-grid">
+            <div class="v60-field">
+              <label class="v60-label">الاسم الكامل</label>
+              <div class="v60-input-wrap">
+                <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+                <input id="name" class="v60-input" type="text" placeholder="مثال: أحمد محمد" required minlength="2" oninput="v60ClearRegError()">
+              </div>
+            </div>
+            <div class="v60-field">
+              <label class="v60-label">البريد الإلكتروني</label>
+              <div class="v60-input-wrap">
+                <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>
+                <input id="remail" class="v60-input" type="email" autocomplete="email" placeholder="example@email.com" required oninput="v60ClearRegError()">
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 2: Phone + Password -->
+          <div class="v60r-grid">
+            <div class="v60-field">
+              <label class="v60-label">رقم الهاتف</label>
+              <div class="v60-input-wrap">
+                <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 2.09 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                <input id="phone" class="v60-input" type="tel" placeholder="0791234567" required oninput="v60ClearRegError()">
+              </div>
+            </div>
+            <div class="v60-field">
+              <label class="v60-label">كلمة السر</label>
+              <div class="v60-input-wrap">
+                <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input id="rpassword" class="v60-input" type="password" autocomplete="new-password" placeholder="8 أحرف على الأقل" required minlength="8" oninput="v60ClearRegError()">
+                <button type="button" class="v60-eye" onclick="v60ToggleRegPass()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 3: City -->
+          <div class="v60r-grid">
+            <div class="v60-field">
+              <label class="v60-label">المحافظة</label>
+              <div class="v60-input-wrap">
+                <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                <select id="city" class="v60-input v60-select">${cities}</select>
+              </div>
+            </div>
+            <div class="v60-field">
+              <label class="v60-label">المنطقة</label>
+              <div class="v60-input-wrap">
+                <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                <select id="regArea" class="v60-input v60-select"></select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Technician only fields -->
+          <div class="v60r-tech-section techOnly" style="display:none">
+            <div class="v60r-tech-label">حقول الفني</div>
+
+            <div class="v60-field">
+              <label class="v60-label">الصورة الشخصية <span class="v60r-required">مطلوبة</span></label>
+              <label class="v60r-upload" for="avatar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span id="v60AvatarLabel">اختر صورة أو اسحبها هنا</span>
+                <small>JPG / PNG / WEBP</small>
+                <input id="avatar" type="file" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="v60PreviewAvatar(this)">
+              </label>
+            </div>
+
+            <div class="v60r-grid">
+              <div class="v60-field">
+                <label class="v60-label">الرقم الوطني</label>
+                <div class="v60-input-wrap">
+                  <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+                  <input id="national" class="v60-input" placeholder="10 أرقام" oninput="v60ClearRegError()">
+                </div>
+              </div>
+              <div class="v60-field">
+                <label class="v60-label">مناطق العمل</label>
+                <div class="v60-input-wrap">
+                  <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                  <select id="areas" class="v60-input v60-select" multiple size="3"></select>
+                </div>
+              </div>
+            </div>
+
+            <div class="v60-field">
+              <label class="v60-label">الخدمات</label>
+              <select id="srv" class="v60-input v60-select" multiple size="4">${services}</select>
+              <small style="color:rgba(255,255,255,0.3);font-size:12px;margin-top:4px">اضغط Ctrl لاختيار أكثر من خدمة</small>
+            </div>
+          </div>
+
+          <!-- Submit -->
+          <button class="v60-btn" type="submit" id="v60RegBtn" style="margin-top:8px">
+            <span id="v60RegBtnText">إنشاء الحساب</span>
+            <svg id="v60RegSpinner" class="v60-spinner" style="display:none" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" stroke-width="3"/>
+              <path d="M12 2a10 10 0 0 1 10 10" stroke="white" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+
+        </form>
+
+        <div class="v60-divider"><span>عندك حساب؟</span></div>
+        <button class="v60-secondary" onclick="login()">تسجيل الدخول</button>
+        <p class="v60-hint">🔐 حساب الإدارة يُضبط من السيرفر فقط</p>
+      </div>
+
+      <div class="v60-trust">
+        <span>🔒 اتصال آمن</span>
+        <span>⚡ خدمة فورية</span>
+        <span>🏆 فنيون موثوقون</span>
+      </div>
+    </div>
+  </div>`;
+
+  // Set role
+  document.getElementById('role').value = role;
+  v60SwitchRole(role);
+
+  // Bind area selects
+  if(typeof bindAreaSelect === 'function'){
+    bindAreaSelect('city', 'regArea');
+    bindAreaSelect('city', 'areas');
+  }
+
+  // Particles + animation
+  v60RegParticles();
+  requestAnimationFrame(()=>{
+    const card = document.getElementById('v60RegCard');
+    if(card){ card.style.opacity='0'; card.style.transform='translateY(30px) scale(0.97)';
+      setTimeout(()=>{ card.style.transition='all 0.7s cubic-bezier(0.22,1,0.36,1)';
+        card.style.opacity='1'; card.style.transform='translateY(0) scale(1)'; }, 50);
+    }
+  });
+};
+
+window.v60SwitchRole = function(role){
+  document.getElementById('role').value = role;
+  const techFields = document.querySelectorAll('.techOnly');
+  techFields.forEach(el => el.style.display = role === 'technician' ? 'block' : 'none');
+  document.getElementById('v60TabCust')?.classList.toggle('active', role === 'customer');
+  document.getElementById('v60TabTech')?.classList.toggle('active', role === 'technician');
+};
+
+window.v60ClearRegError = function(){
+  const e = document.getElementById('v60RegError');
+  if(e) e.style.display = 'none';
+};
+
+window.v60ToggleRegPass = function(){
+  const inp = document.getElementById('rpassword');
+  if(inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+};
+
+window.v60PreviewAvatar = function(input){
+  const label = document.getElementById('v60AvatarLabel');
+  if(input.files?.[0] && label) label.textContent = '✓ ' + input.files[0].name;
+};
+
+window.v60DoRegister = async function(e){
+  e.preventDefault();
+  const role = document.getElementById('role')?.value;
+  const btn  = document.getElementById('v60RegBtn');
+  const btnText = document.getElementById('v60RegBtnText');
+  const spinner = document.getElementById('v60RegSpinner');
+  const errBox  = document.getElementById('v60RegError');
+  const errMsg  = document.getElementById('v60RegErrorMsg');
+
+  if(btn) btn.disabled = true;
+  if(btnText) btnText.textContent = 'جاري الإنشاء...';
+  if(spinner) spinner.style.display = 'block';
+
+  try{
+    const fd = new FormData();
+    fd.append('role', role);
+    fd.append('name', document.getElementById('name')?.value.trim() || '');
+    fd.append('email', document.getElementById('remail')?.value.trim() || '');
+    fd.append('phone', document.getElementById('phone')?.value.trim() || '');
+    fd.append('password', document.getElementById('rpassword')?.value || '');
+    fd.append('city', document.getElementById('city')?.value || '');
+    fd.append('national_number', document.getElementById('national')?.value.trim() || '');
+    fd.append('services', (typeof vals==='function' ? vals('#srv') : []).join(','));
+    fd.append('areas',
+      typeof selectedArea === 'function'
+        ? selectedArea('regArea', 'regAreaOther') || document.getElementById('regArea')?.value || ''
+        : document.getElementById('areas') ? Array.from(document.getElementById('areas').selectedOptions).map(o=>o.value).join(',') : ''
+    );
+    if(role === 'technician'){
+      const avatar = document.getElementById('avatar')?.files?.[0];
+      if(!avatar) throw new Error('الرجاء اختيار صورة شخصية للفني');
+      fd.append('avatar', avatar);
+    }
+
+    const j = await api('/api/auth/register', {method:'POST', body:fd});
+
+    if(j.step === 'verify'){
+      showOtpScreen?.(j.email);
+    } else {
+      state.user = j.user;
+      if(btn) btn.style.background = 'linear-gradient(135deg,#059669,#10b981)';
+      if(btnText) btnText.textContent = '✓ تم إنشاء الحساب!';
+      setTimeout(()=>{ toast?.('مرحباً ' + (j.user?.name||'') + ' 🎉'); dashboard(); }, 400);
+    }
+  } catch(err){
+    if(errBox && errMsg){
+      errMsg.textContent = err.message || 'حدث خطأ';
+      errBox.style.display = 'flex';
+      const card = document.getElementById('v60RegCard');
+      if(card){ card.style.animation='v60Shake 0.4s ease'; setTimeout(()=>card.style.animation='',400); }
+    }
+    if(btn) btn.disabled = false;
+    if(btnText) btnText.textContent = 'إنشاء الحساب';
+    if(spinner) spinner.style.display = 'none';
+    if(btn) btn.style.background = '';
+  }
+};
+
+function v60RegParticles(){
+  const canvas = document.getElementById('v60RegCanvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+  function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+  function P(){ this.x=Math.random()*W; this.y=Math.random()*H; this.r=Math.random()*2+0.5; this.dx=(Math.random()-0.5)*0.4; this.dy=(Math.random()-0.5)*0.4; this.alpha=Math.random()*0.5+0.1; this.color=Math.random()>0.5?'124,58,237':'37,99,235'; }
+  for(let i=0;i<80;i++) particles.push(new P());
+  let id;
+  function draw(){
+    if(!document.getElementById('v60RegCanvas')){ cancelAnimationFrame(id); return; }
+    ctx.clearRect(0,0,W,H);
+    particles.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fillStyle=`rgba(${p.color},${p.alpha})`; ctx.fill(); p.x+=p.dx; p.y+=p.dy; if(p.x<0||p.x>W)p.dx*=-1; if(p.y<0||p.y>H)p.dy*=-1; });
+    for(let i=0;i<particles.length;i++) for(let j=i+1;j<particles.length;j++){ const d=Math.hypot(particles[i].x-particles[j].x,particles[i].y-particles[j].y); if(d<100){ ctx.beginPath(); ctx.moveTo(particles[i].x,particles[i].y); ctx.lineTo(particles[j].x,particles[j].y); ctx.strokeStyle=`rgba(124,58,237,${0.08*(1-d/100)})`; ctx.lineWidth=0.5; ctx.stroke(); } }
+    id=requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// CSS
+const rst = document.createElement('style');
+rst.id = 'v60r-css';
+if(!document.getElementById('v60r-css')) document.head.appendChild(rst);
+rst.textContent = `
+.v60r-wrap{position:relative;z-index:3;width:100%;max-width:580px;display:flex;flex-direction:column;align-items:center;gap:16px;padding:24px 0}
+.v60r-card{width:100%;padding:36px 32px;border-radius:28px;background:rgba(255,255,255,0.06);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);border:1px solid rgba(255,255,255,0.1);box-shadow:0 32px 80px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.08);position:relative;overflow:hidden}
+@supports not (backdrop-filter:blur(32px)){.v60r-card{background:rgba(15,10,40,0.95)}}
+.v60r-tabs{display:flex;gap:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:5px;margin-bottom:20px}
+.v60r-tab{flex:1;height:38px;border:none;border-radius:10px;color:rgba(255,255,255,0.5);font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;background:transparent;transition:all 0.25s}
+.v60r-tab.active{background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;box-shadow:0 4px 16px rgba(124,58,237,0.35)}
+.v60r-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.v60r-form{display:flex;flex-direction:column;gap:14px}
+.v60-select{cursor:pointer;-webkit-appearance:none;appearance:none}
+.v60-select option{background:#1a1040;color:#fff}
+.v60r-tech-section{padding:16px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);border-radius:16px;display:flex;flex-direction:column;gap:14px}
+.v60r-tech-label{color:#a78bfa;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.v60r-required{background:rgba(239,68,68,0.2);color:#fca5a5;font-size:11px;padding:2px 8px;border-radius:6px;margin-right:6px}
+.v60r-upload{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:20px;border:2px dashed rgba(124,58,237,0.3);border-radius:14px;cursor:pointer;transition:all 0.25s;color:rgba(255,255,255,0.5);font-size:13px;text-align:center}
+.v60r-upload:hover{border-color:#7c3aed;background:rgba(124,58,237,0.08);color:#a78bfa}
+.v60r-upload svg{color:#7c3aed}
+.v60r-upload small{color:rgba(255,255,255,0.25);font-size:11px}
+@media(max-width:560px){.v60r-grid{grid-template-columns:1fr}.v60r-card{padding:24px 18px;border-radius:20px}.v60r-wrap{max-width:100%}}
+`;
+
+})();
 function toggleTech(){document.querySelectorAll('.techOnly').forEach(x=>x.style.display=$('#role').value==='technician'?'block':'none')}
 function vals(sel){return Array.from($(sel).selectedOptions||[]).map(o=>o.value)}
 async function doRegister(e){e.preventDefault();try{const role=$('#role').value;const fd=new FormData();fd.append('role',role);fd.append('name',$('#name').value.trim());fd.append('email',$('#remail').value.trim());fd.append('phone',$('#phone').value.trim());fd.append('password',$('#rpassword').value);fd.append('city',$('#city').value);fd.append('national_number',$('#national')?$('#national').value.trim():'');fd.append('services',vals('#srv').join(','));fd.append('areas',vals('#areas').join(','));if(role==='technician'&&!$('#avatar').files[0]) throw new Error('الرجاء اختيار صورة شخصية للفني');if($('#avatar')&&$('#avatar').files[0])fd.append('avatar',$('#avatar').files[0]);const j=await api('/api/auth/register',{method:'POST',body:fd});if(j.step==='verify'){showOtpScreen(j.email);}else{state.user=j.user;toast('تم إنشاء الحساب');dashboard();}}catch(err){toast(err.message)}}
@@ -1443,1441 +1789,312 @@ window.addEventListener('error', function(e){
 })();
 
 
-/* ===== Sallehly V50 - Premium Login Page ===== */
+// ── V60: Premium Login — Stripe/Vercel level ──
 ;(function(){
 
 login = function(){
   state.tab = 'dash';
-  document.body.classList.remove('dashboard-mode');
+  document.body.classList.remove('dashboard-mode','v37-dashboard','sidebar-open','open');
+
   app.innerHTML = `
-  <div class="v50-login-page">
-    <div class="v50-login-bg">
-      <div class="v50-blob v50-blob1"></div>
-      <div class="v50-blob v50-blob2"></div>
-    </div>
-    <div class="v50-login-container">
+  <div class="v60-page" id="v60Page">
+
+    <!-- Floating particles canvas -->
+    <canvas class="v60-canvas" id="v60Canvas"></canvas>
+
+    <!-- Video background -->
+    <video class="v60-video" id="v60Video" autoplay muted loop playsinline>
+      <source src="/videos/login.mp4" type="video/mp4">
+    </video>
+    <div class="v60-overlay"></div>
+
+    <!-- Content -->
+    <div class="v60-wrap">
 
       <!-- Logo -->
-      <div class="v50-logo">
-        <div class="v50-logo-icon"><img src="/logo.png" alt="صلّحلي" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;"></div>
-        <span>صلّحلي</span>
+      <div class="v60-brand">
+        <div class="v60-brand-icon">
+          <img src="/logo.png" alt="صلّحلي" onerror="this.parentNode.innerHTML='🔧'">
+        </div>
+        <span class="v60-brand-name">صلّحلي</span>
       </div>
 
-      <!-- Card -->
-      <div class="v50-card">
-        <h1 class="v50-title">مرحباً بعودتك 👋</h1>
-        <p class="v50-sub">سجّل دخولك للمتابعة</p>
+      <!-- Glass card -->
+      <div class="v60-card" id="v60Card">
 
-        <form class="v50-form" onsubmit="doLogin(event)">
-          <div class="v50-field">
-            <label>البريد الإلكتروني</label>
-            <div class="v50-input-wrap">
-              <span class="v50-input-icon">✉️</span>
-              <input id="email" type="email" autocomplete="email" placeholder="example@email.com" required>
+        <!-- Glow ring -->
+        <div class="v60-glow"></div>
+
+        <!-- Header -->
+        <div class="v60-head">
+          <h1 class="v60-title">أهلاً بك في صلّحلي</h1>
+          <p class="v60-sub">منصة الصيانة المنزلية الأولى في الأردن</p>
+        </div>
+
+        <!-- Error box -->
+        <div class="v60-error" id="v60Error" style="display:none">
+          <span class="v60-error-icon">⚠️</span>
+          <span id="v60ErrorMsg"></span>
+        </div>
+
+        <!-- Form -->
+        <form class="v60-form" onsubmit="v60DoLogin(event)" novalidate>
+
+          <div class="v60-field">
+            <label class="v60-label">البريد الإلكتروني</label>
+            <div class="v60-input-wrap">
+              <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>
+              <input id="v60Email" class="v60-input" type="email" autocomplete="email"
+                placeholder="example@email.com" required
+                oninput="v60ClearError()">
             </div>
           </div>
 
-          <div class="v50-field">
-            <label>كلمة السر</label>
-            <div class="v50-input-wrap">
-              <span class="v50-input-icon">🔒</span>
-              <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
-              <button type="button" class="v50-eye" onclick="
-                var inp=document.getElementById('password');
-                inp.type=inp.type==='password'?'text':'password';
-                this.textContent=inp.type==='password'?'👁️':'🙈';
-              ">👁️</button>
+          <div class="v60-field">
+            <div class="v60-label-row">
+              <label class="v60-label">كلمة المرور</label>
+              <a href="#" class="v60-forgot" onclick="toast('تواصل مع الإدارة لإعادة تعيين كلمة المرور');return false">نسيت كلمة المرور؟</a>
+            </div>
+            <div class="v60-input-wrap">
+              <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input id="v60Pass" class="v60-input" type="password" autocomplete="current-password"
+                placeholder="••••••••" required
+                oninput="v60ClearError()">
+              <button type="button" class="v60-eye" id="v60EyeBtn"
+                onclick="v60TogglePass()" aria-label="إظهار كلمة المرور">
+                <svg id="v60EyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
             </div>
           </div>
 
-          <button class="v50-btn-primary" type="submit">
-            <span>تسجيل الدخول</span>
-            <span class="v50-arrow">←</span>
+          <button class="v60-btn" type="submit" id="v60Btn">
+            <span id="v60BtnText">تسجيل الدخول</span>
+            <svg id="v60Spinner" class="v60-spinner" style="display:none" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" stroke-width="3"/>
+              <path d="M12 2a10 10 0 0 1 10 10" stroke="white" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+            <svg id="v60Arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
+
         </form>
 
-        <div class="v50-divider"><span>أو</span></div>
+        <div class="v60-divider"><span>أو</span></div>
 
-        <button class="v50-btn-secondary" onclick="register('customer')">
+        <button class="v60-secondary" onclick="register('customer')">
           إنشاء حساب جديد
         </button>
 
-        <p class="v50-hint">🔐 حساب الإدارة يُضبط من السيرفر فقط</p>
+        <p class="v60-hint">🔐 حساب الإدارة يُضبط من السيرفر فقط</p>
+
+      </div><!-- /card -->
+
+      <!-- Trust badges -->
+      <div class="v60-trust">
+        <span>🔒 اتصال آمن</span>
+        <span>⚡ خدمة فورية</span>
+        <span>🏆 فنيون موثوقون</span>
       </div>
 
-    </div>
+    </div><!-- /wrap -->
   </div>`;
-};
 
-// CSS
-const css = `
-.v50-login-page {
-  min-height: 100vh;
-  background: #0d0d1a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  position: relative;
-  overflow: hidden;
-}
-.v50-login-bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-.v50-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.35;
-}
-.v50-blob1 {
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, #6c3dd6, #3b1fa8);
-  top: -100px; right: -100px;
-}
-.v50-blob2 {
-  width: 300px; height: 300px;
-  background: radial-gradient(circle, #1e40af, #0ea5e9);
-  bottom: -80px; left: -80px;
-}
-.v50-login-container {
-  width: 100%;
-  max-width: 420px;
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-}
-.v50-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #fff;
-  font-size: 22px;
-  font-weight: 800;
-}
-.v50-logo-icon {
-  width: 46px; height: 46px;
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
-  border-radius: 14px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px; font-weight: 900; color: #fff;
-  box-shadow: 0 8px 24px rgba(124,58,237,0.4);
-}
-.v50-card {
-  width: 100%;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 24px;
-  padding: 32px 28px;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 24px 60px rgba(0,0,0,0.4);
-}
-.v50-title {
-  font-size: 26px;
-  font-weight: 800;
-  color: #fff;
-  margin: 0 0 6px;
-  text-align: center;
-}
-.v50-sub {
-  font-size: 14px;
-  color: rgba(255,255,255,0.5);
-  text-align: center;
-  margin: 0 0 28px;
-}
-.v50-form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.v50-field {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.v50-field label {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.7);
-}
-.v50-input-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.v50-input-icon {
-  position: absolute;
-  right: 14px;
-  font-size: 15px;
-  pointer-events: none;
-}
-.v50-input-wrap input {
-  width: 100%;
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 12px;
-  padding: 13px 42px 13px 44px;
-  color: #fff;
-  font-size: 15px;
-  outline: none;
-  transition: border-color 0.2s, background 0.2s;
-  font-family: inherit;
-  text-align: right;
-}
-.v50-input-wrap input:focus {
-  border-color: #7c3aed;
-  background: rgba(124,58,237,0.1);
-}
-.v50-input-wrap input::placeholder { color: rgba(255,255,255,0.25); }
-.v50-eye {
-  position: absolute;
-  left: 12px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 4px;
-  line-height: 1;
-}
-.v50-btn-primary {
-  width: 100%;
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
-  color: #fff;
-  border: none;
-  border-radius: 14px;
-  padding: 15px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 6px;
-  box-shadow: 0 8px 24px rgba(124,58,237,0.4);
-  transition: transform 0.15s, box-shadow 0.15s;
-  font-family: inherit;
-}
-.v50-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(124,58,237,0.5); }
-.v50-btn-primary:active { transform: translateY(0); }
-.v50-arrow { font-size: 18px; }
-.v50-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 20px 0;
-  color: rgba(255,255,255,0.25);
-  font-size: 13px;
-}
-.v50-divider::before,.v50-divider::after {
-  content:'';
-  flex: 1;
-  height: 1px;
-  background: rgba(255,255,255,0.1);
-}
-.v50-btn-secondary {
-  width: 100%;
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.15);
-  color: rgba(255,255,255,0.8);
-  border-radius: 14px;
-  padding: 14px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
-  font-family: inherit;
-}
-.v50-btn-secondary:hover {
-  background: rgba(255,255,255,0.07);
-  border-color: rgba(255,255,255,0.25);
-}
-.v50-hint {
-  text-align: center;
-  font-size: 12px;
-  color: rgba(255,255,255,0.25);
-  margin: 16px 0 0;
-}
-`;
-
-const st = document.createElement('style');
-st.textContent = css;
-document.head.appendChild(st);
-
-})();
-
-function v21ResetSessionForRole(user){
-  state.user=user; state.tab='dash'; activeChatId=null;
-  if(chatTimer){ clearInterval(chatTimer); chatTimer=null; }
-}
-function v21El(id){ return document.getElementById(id); }
-
-
-function v21StatusCounts(rows){
-  return {
-    all: rows.length,
-    open: rows.filter(r=>['بانتظار العروض','وصلت عروض'].includes(r.status)).length,
-    active: rows.filter(r=>['تم اختيار عرض','قيد التنفيذ','بانتظار تأكيد الدفع'].includes(r.status)).length,
-    done: rows.filter(r=>r.status==='مكتمل').length
-  };
-}
-function v21RequestDetails(id){
-  api('/api/requests').then(j=>{
-    const r=(j.requests||[]).find(x=>String(x.id)===String(id));
-    if(!r) return toast('الطلب غير موجود');
-    const html=`<div class="v21-modal"><div class="v21-modal-card"><button class="welcome-close" onclick="this.closest('.v21-modal').remove()">×</button>
-      <h2>تفاصيل الطلب #${r.id}</h2>
-      <div class="request-meta v21-details">
-        <span>الخدمة: <b>${v15EscapeHtml(r.service||'-')}</b></span>
-        <span>الحالة: <b>${v15EscapeHtml(r.status||'-')}</b></span>
-        <span>العميل: <b>${v15EscapeHtml(r.customer_name||'-')}</b></span>
-        <span>الفني: <b>${v15EscapeHtml(r.technician_name||'-')}</b></span>
-        <span>المحافظة: <b>${v15EscapeHtml(r.city||'-')}</b></span>
-        <span>المنطقة: <b>${v15EscapeHtml(r.area||'-')}</b></span>
-        <span>السعر: <b>${r.offer_price? v15EscapeHtml(r.offer_price)+' د.أ':'-'}</b></span>
-        <span>المدة: <b>${v15EscapeHtml(r.arrival_time||'-')}</b></span>
-      </div>
-      ${r.problem_image_url?`<img class="problem-img big-preview" src="${_safeSrc(r.problem_image_url)}" alt="صورة المشكلة">`:''}
-      <p class="v21-desc">${v15EscapeHtml(r.description||'لا يوجد وصف')}</p>
-      <div class="actions"><button class="btn ghost" onclick="loadOffers(${r.id});this.closest('.v21-modal').remove();state.tab='orders';dashboard();setTimeout(()=>loadOffers(${r.id}),250)">عرض عروض الفنيين</button><button class="btn" onclick="chat(${r.id})">فتح المحادثة</button></div>
-    </div></div>`;
-    document.body.insertAdjacentHTML('beforeend',html);
-  }).catch(e=>toast(e.message));
-}
-
-const __v21OldActions = actions;
-actions=function(r){
-  let a='';
-  if(state.user?.role==='admin'){
-    a+=`<button class="btn" onclick="v21RequestDetails(${r.id})">فتح التفاصيل</button> `;
-    a+=`<button class="btn ghost" onclick="loadOffers(${r.id})">العروض</button> `;
-    a+=`<button class="btn ghost" onclick="chat(${r.id})">الشات</button> `;
-    if(r.status!=='مكتمل') a+=`<button class="btn green" onclick="setStatus(${r.id},'مكتمل')">إنهاء</button> `;
-    if(!['مكتمل','ملغي'].includes(r.status)) a+=`<button class="btn danger" onclick="setStatus(${r.id},'ملغي')">إلغاء</button>`;
-    return a;
-  }
-  return __v21OldActions(r);
-}
-
-const __v21OldReqTable=reqTable;
-reqTable=function(rows){
-  if(!rows || !rows.length) return '<div class="empty">لا توجد طلبات</div>';
-  return `<div class="request-list v21-request-list">${rows.map(r=>`<div class="request-card v21-request-card">
-    <div class="request-head"><div><b>#${r.id} - ${v15EscapeHtml(r.service||'-')}</b><p class="muted">${v15EscapeHtml(r.city||'-')}${r.area?' - '+v15EscapeHtml(r.area):''} • ${v15EscapeHtml(r.preferred_time||'بدون وقت محدد')}</p></div><span class="status">${v15EscapeHtml(r.status||'-')}</span></div>
-    ${r.problem_image_url?`<img class="problem-img" src="${_safeSrc(r.problem_image_url)}" alt="صورة المشكلة">`:''}
-    <p>${v15EscapeHtml(r.description||'')}</p>
-    <div class="request-meta"><span>الفني: ${v15EscapeHtml(r.technician_name||'-')}</span><span>العميل: ${v15EscapeHtml(r.customer_name||'-')}</span><span>السعر: ${r.offer_price? v15EscapeHtml(r.offer_price)+' د.أ':'-'}</span><span>المدة: ${v15EscapeHtml(r.arrival_time||'-')}</span></div>
-    <div class="actions">${actions(r)}</div><div id="offers-${r.id}" class="offers-box"></div>
-  </div>`).join('')}</div>`;
-}
-
-admin=async function(){
-  state.user = (await api('/api/me')).user;
-  const menu=[['dash','لوحة الإدارة'],['users','المستخدمين'],['orders','الطلبات'],['topups','شحن الفنيين'],['services','المهن والخدمات'],['packages','الباقات'],['support','الدعم'],['violations','محاولات الشات']];
-  let c='';
-  try{
-    if(state.tab==='users'){
-      const j=await api('/api/admin/users');
-      c=dashboardHero('إدارة المستخدمين','كل حسابات العملاء والفنيين مع التفعيل والتعطيل',[{label:'المستخدمين',value:j.users.length,up:'إجمالي',icon:'👥'},{label:'الفنيين',value:j.users.filter(u=>u.role==='technician').length,up:'فني',icon:'👨‍🔧'},{label:'العملاء',value:j.users.filter(u=>u.role==='customer').length,up:'عميل',icon:'🙂'},{label:'نشط',value:j.users.filter(u=>u.is_active).length,up:'حساب',icon:'✅'}])+usersTable(j.users);
-    }else if(state.tab==='orders'){
-      const j=await api('/api/requests'); const s=v21StatusCounts(j.requests||[]);
-      c=dashboardHero('إدارة الطلبات','افتح أي طلب، راجع العروض، الشات، الصورة، والحالة',[{label:'كل الطلبات',value:s.all,up:'إجمالي',icon:'🛒'},{label:'مفتوحة',value:s.open,up:'طلبات',icon:'⚡'},{label:'قيد التنفيذ',value:s.active,up:'طلبات',icon:'🔧'},{label:'مكتملة',value:s.done,up:'طلبات',icon:'✅'}])+`<div class="dash-card"><h2>كل الطلبات</h2>${reqTable(j.requests||[])}</div>`;
-    }else if(state.tab==='topups'){
-      const j=await api('/api/topups');
-      c=dashboardHero('شحن الفنيين','راجع إثباتات الدفع وفعّل الرصيد',[{label:'طلبات الشحن',value:j.topups.length,up:'إجمالي',icon:'🚚'},{label:'بانتظار',value:j.topups.filter(t=>t.status==='pending').length,up:'مراجعة',icon:'⏳'},{label:'موافق عليها',value:j.topups.filter(t=>t.status==='approved').length,up:'عملية',icon:'✅'},{label:'مرفوضة',value:j.topups.filter(t=>t.status==='rejected').length,up:'عملية',icon:'❌'}])+topupTable(j.topups);
-    }else if(state.tab==='services'){
-      c=dashboardHero('المهن والخدمات','أي مهنة تضيفها تظهر مباشرة في الشريط المتحرك والطلبات',[{label:'الخدمات',value:state.meta.services.length,up:'متاحة',icon:'💼'},{label:'الشريط',value:'Live',up:'مباشر',icon:'⚡'},{label:'بحث',value:'فعال',up:'للعميل',icon:'🔎'},{label:'حالة',value:'جاهز',up:'نظام',icon:'✅'}])+`<div class="dash-grid two"><div class="dash-card v6-form">${servicesAdmin()}</div>${promoBox('إضافة خدمة جديدة','بعد الإضافة ستظهر في القوائم وشريط المهن المباشر تلقائياً')}</div>${categoriesBox()}`;
-    }else if(state.tab==='packages'){
-      c=dashboardHero('إدارة الباقات','أنشئ باقات شحن للفنيين وحدد العمولة',[{label:'الباقات',value:state.meta.packages.length,up:'متاحة',icon:'📦'},{label:'الدفع',value:'بنكي',up:'تحويل',icon:'🏦'},{label:'العمولة',value:'2 د.أ',up:'افتراضي',icon:'💳'},{label:'حالة',value:'فعال',up:'جاهز',icon:'✅'}])+packagesAdmin();
-    }else if(state.tab==='support'){
-      const j=await api('/api/support');
-      c=dashboardHero('الدعم الفني','كل تذاكر الدعم من العملاء والفنيين',[{label:'التذاكر',value:j.tickets.length,up:'إجمالي',icon:'🎧'},{label:'مفتوحة',value:j.tickets.filter(t=>t.status==='open').length,up:'جديدة',icon:'📩'},{label:'مستخدمين',value:new Set(j.tickets.map(t=>t.user_id)).size,up:'تواصلوا',icon:'👥'},{label:'جاهز',value:'24/7',up:'دعم',icon:'✅'}])+`<div class="dash-card"><h2>تذاكر الدعم</h2>${j.tickets.length?`<div class="table-wrap"><table><thead><tr><th>#</th><th>المستخدم</th><th>النوع</th><th>العنوان</th><th>التفاصيل</th><th>التاريخ</th></tr></thead><tbody>${j.tickets.map(t=>`<tr><td>${t.id}</td><td>${v15EscapeHtml(t.user_name||'-')}<br><small>${v15EscapeHtml(t.email||'')}</small></td><td>${v15EscapeHtml(t.type||'-')}</td><td>${v15EscapeHtml(t.title||'-')}</td><td>${v15EscapeHtml(t.body||'-')}</td><td>${v15EscapeHtml(t.created_at||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر</div>'}</div>`;
-    }else if(state.tab==='violations'){
-      const j=await api('/api/chat-violations');
-      c=dashboardHero('محاولات التواصل الخارجي','أي رقم أو واتساب أو إيميل يتم تسجيله هنا',[{label:'المحاولات',value:j.violations.length,up:'آخر 200',icon:'🛡️'},{label:'الشات',value:'محمي',up:'فعال',icon:'💬'},{label:'العمولة',value:'محفوظة',up:'منصة',icon:'💰'},{label:'الأمان',value:'Live',up:'مباشر',icon:'⚡'}])+`<div class="dash-card"><h2>السجل</h2>${j.violations.length?`<div class="table-wrap"><table><thead><tr><th>#</th><th>المستخدم</th><th>الطلب</th><th>السبب</th><th>المحتوى</th><th>الوقت</th></tr></thead><tbody>${j.violations.map(v=>`<tr><td>${v.id}</td><td>${v15EscapeHtml(v.user_name||'-')}<br><small>${v15EscapeHtml(v.user_email||'')}</small></td><td>#${v.request_id}<br><small>${v15EscapeHtml(v.service||'')}</small></td><td>${v15EscapeHtml(v.reason||'')}</td><td>${v15EscapeHtml(v.body||'')}</td><td>${v15EscapeHtml(v.created_at||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">لا توجد محاولات ممنوعة</div>'}</div>`;
-    }else{
-      const j=await api('/api/admin/stats'); const s=j.stats;
-      c=dashboardHero('مرحباً بك في لوحة الإدارة','تحكم كامل في المنصة من مكان واحد',[{label:'العملاء',value:s.customers||0,up:'حساب',icon:'🙂'},{label:'الفنيين',value:s.technicians||0,up:'حساب',icon:'👨‍🔧'},{label:'الطلبات',value:s.requests||0,up:'إجمالي',icon:'🛒'},{label:'مكتملة',value:s.completed||0,up:'طلب',icon:'✅'}])+`<div class="dash-grid"><div>${activityBox()}</div><div class="dash-card v6-form">${servicesAdmin()}</div>${promoBox('لوحة إدارة جاهزة','المستخدمين، الطلبات، الشحن، الخدمات، الدعم، ومحاولات التواصل الخارجي')}</div>${categoriesBox()}${chartsBox()}`;
+  // Start particles
+  v60Particles();
+  // Card entrance animation
+  requestAnimationFrame(()=>{
+    const card = document.getElementById('v60Card');
+    if(card){ card.style.opacity='0'; card.style.transform='translateY(30px) scale(0.97)';
+      setTimeout(()=>{ card.style.transition='all 0.7s cubic-bezier(0.22,1,0.36,1)';
+        card.style.opacity='1'; card.style.transform='translateY(0) scale(1)'; }, 50);
     }
-  }catch(err){ c=`<div class="dash-card"><h2>حدث خطأ</h2><p class="muted">${v15EscapeHtml(err.message||'تعذر تحميل الصفحة')}</p><button class="btn" onclick="state.tab='dash';dashboard()">رجوع للوحة</button></div>`; }
-  layout('لوحة الإدارة',menu,c);
-}
-
-logout=async function(){
-  try{ await api('/api/auth/logout',{method:'POST'}); }catch(e){}
-  localStorage.removeItem('pendingService'); delete localStorage.token; state.user=null; state.tab='dash'; activeChatId=null;
-  if(chatTimer){ clearInterval(chatTimer); chatTimer=null; }
-  toast('تم تسجيل الخروج');
-  login();
+    const brand = document.querySelector('.v60-brand');
+    if(brand){ brand.style.opacity='0'; brand.style.transform='translateY(-20px)';
+      setTimeout(()=>{ brand.style.transition='all 0.6s cubic-bezier(0.22,1,0.36,1)';
+        brand.style.opacity='1'; brand.style.transform='translateY(0)'; }, 0);
+    }
+  });
 };
 
-
-function v22Money(n){ return (Number(n||0)).toFixed(2).replace('.00','')+' د.أ'; }
-function v22UnreadBadge(n){ n=Number(n||0); return n>0?`<span class="badge-dot">${n}</span>`:''; }
-function v22TechMetrics(me, requests=[]){
-  const open=requests.filter(r=>['بانتظار العروض','وصلت عروض'].includes(r.status)).length;
-  const active=requests.filter(r=>r.technician_id===me.id && !['مكتمل','ملغي'].includes(r.status)).length;
-  return [
-    {label:'طلبات متاحة',value:open,up:'Live',icon:'🛠️'},
-    {label:'دردشات',value:state.chatCount||0,up:'غير مقروءة',icon:'💬'},
-    {label:'الرصيد',value:v22Money(me.balance),up:'متاح',icon:'💳'},
-    {label:'طلب نشط',value:active,up:'قيد العمل',icon:'⚡'}
-  ];
-}
-function v22Safe(v){ return (typeof v15EscapeHtml==='function'?v15EscapeHtml(String(v??'')):String(v??'')); }
-async function v22Counters(){ try{ return await v17LoadCounters(); }catch(e){ return {requests:[],chats:[]}; } }
-function v22TechWelcome(me, requests){
-  return dashboardHero('لوحة الفني','كل شيء يعمل من هنا: الطلبات، الدردشات، الشحن، الرصيد والسجل.',v22TechMetrics(me,requests))+
-  v20LiveServicesStrip()+
-  `<div class="v22-grid">
-    <div class="dash-card v22-action" onclick="state.tab='orders';dashboard()"><span>🛠️</span><h3>الطلبات المتاحة</h3><p>شاهد الطلبات المناسبة لمهنتك ومناطقك وقدم عرض سعر ومدة.</p></div>
-    <div class="dash-card v22-action" onclick="state.tab='chats';dashboard()"><span>💬</span><h3>الدردشات ${v22UnreadBadge(state.chatCount)}</h3><p>كل محادثاتك مع العملاء تظهر هنا مع عداد الرسائل الجديدة.</p></div>
-    <div class="dash-card v22-action" onclick="state.tab='balance';dashboard()"><span>💳</span><h3>الرصيد والباقات</h3><p>اشحن رصيدك واختر باقة مناسبة لتفعيل استقبال الطلبات.</p></div>
-    <div class="dash-card v22-action" onclick="state.tab='ledger';dashboard()"><span>📘</span><h3>سجل الرصيد</h3><p>تابع خصم العمولة وعمليات الشحن بشكل واضح.</p></div>
-  </div><div class="dash-card"><h2>آخر الطلبات المناسبة</h2>${reqTable((requests||[]).slice(0,6))}</div>`;
-}
-function v22TechOrders(me, requests){
-  const split=typeof v18SplitRequests==='function'?v18SplitRequests(requests):{active:requests,done:[]};
-  const filter=state.orderFilter||'active';
-  const selected=filter==='done'?split.done:split.active;
-  return dashboardHero('طلبات الفني','طلبات العملاء تظهر هنا مباشرة. أرسل عرض السعر والمدة وانتظر موافقة العميل.',v22TechMetrics(me,requests))+
-    v20LiveServicesStrip()+
-    `<div class="dash-card"><div class="v22-head"><div><h2>الطلبات المتاحة والحالية</h2><p class="muted">إذا قبل العميل عرضك يفتح الشات ويتحول الطلب لقيد التنفيذ.</p></div><button class="btn ghost" onclick="dashboard()">تحديث الآن</button></div>
-    <div class="v18-tabs"><button class="btn ${filter==='active'?'':'ghost'}" onclick="state.orderFilter='active';dashboard()">نشطة ${v22UnreadBadge(split.active.length)}</button><button class="btn ${filter==='done'?'':'ghost'}" onclick="state.orderFilter='done';dashboard()">مكتملة/ملغية ${v22UnreadBadge(split.done.length)}</button></div>${reqTable(selected)}</div>`;
-}
-async function v22TechTopups(me){
-  const j=await api('/api/topups');
-  return dashboardHero('طلبات الشحن','تابع حالة طلبات الشحن وإثباتات الدفع التي رفعتها للإدارة.',[
-    {label:'طلبات الشحن',value:j.topups.length,up:'إجمالي',icon:'🚚'},
-    {label:'بانتظار',value:j.topups.filter(t=>t.status==='pending').length,up:'مراجعة',icon:'⏳'},
-    {label:'الرصيد',value:v22Money(me.balance),up:'حالي',icon:'💳'},
-    {label:'الباقات',value:state.meta.packages.length,up:'متاحة',icon:'📦'}
-  ])+`<div class="dash-card"><div class="v22-head"><h2>طلبات الشحن</h2><button class="btn" onclick="state.tab='balance';dashboard()">شحن جديد</button></div>${topupTable(j.topups)}</div>`;
-}
-async function v22TechLedger(me){
-  const j=await api('/api/ledger');
-  return dashboardHero('سجل الرصيد','كل عمليات الشحن والخصم والعمولة محفوظة هنا.',[
-    {label:'عمليات',value:j.ledger.length,up:'مسجلة',icon:'📘'},
-    {label:'الرصيد',value:v22Money(me.balance),up:'حالي',icon:'💳'},
-    {label:'أعمال مكتملة',value:me.completed_jobs||0,up:'طلب',icon:'✅'},
-    {label:'تقييم',value:stars(me.rating_avg),up:'فني',icon:'⭐'}
-  ])+`<div class="dash-card"><h2>السجل المالي</h2>${ledgerTable(j.ledger)}</div>`;
-}
-function v22TechBalance(me){
-  return dashboardHero('الرصيد والباقات','اشحن الرصيد من خلال باقة، ثم ارفع إثبات الدفع للإدارة.',[
-    {label:'رصيدك',value:v22Money(me.balance),up:'متاح',icon:'💳'},
-    {label:'طلبات مجانية',value:(me.free_quota_used ?? (me.free_orders_used||0))+'/2',up:'مستخدمة',icon:'🎁'},
-    {label:'الباقات',value:state.meta.packages.length,up:'متاحة',icon:'📦'},
-    {label:'حالة الحساب',value:'فعال',up:'جاهز',icon:'✅'}
-  ])+balancePage(me);
-}
-
-requestForm=function(){
-  return `<div class="card bluehint offer-request v22-request-form"><h2>طلب خدمة جديد</h2><p class="muted">حدد الخدمة والمنطقة، أضف وصف المشكلة، والصورة اختيارية لكنها تساعد الفني يعطيك سعر أدق.</p>
-  <form class="form two" onsubmit="createReq(event)">
-    <div class="field"><label>الخدمة</label><select id="qservice">${state.meta.services.map(s=>`<option>${v22Safe(s.name)}</option>`).join('')}</select></div>
-    <div class="field"><label>المحافظة</label><select id="qcity">${typeof governorateOptions==='function'?governorateOptions(state.user?.city||'عمان'):state.meta.cities.map(c=>`<option>${v22Safe(c)}</option>`).join('')}</select></div>
-    <div class="field"><label>منطقة السكن</label><select id="qarea"></select></div>
-    <div class="field"><label>الوقت المطلوب</label><input id="qtime" placeholder="مثال: اليوم مساءً"></div>
-    <div class="field" style="grid-column:1/-1"><label>وصف المشكلة</label><textarea id="qdesc" required minlength="10" placeholder="مثال: المكيف لا يبرد وأحتاج فني اليوم"></textarea></div>
-    <div class="field" style="grid-column:1/-1"><label>📷 صورة المشكلة <span class="muted">اختياري</span></label><label class="v22-upload"><input id="problemImage" type="file" accept="image/png,image/jpeg,image/webp" onchange="previewProblemImage()"><span>اضغط لاختيار صورة أو اسحبها هنا</span><small>JPG / PNG / WEBP حتى 3MB</small></label><div id="problemPreview"></div></div>
-    <div class="field" style="grid-column:1/-1"><button type="button" class="btn ghost" onclick="useGPS('request')">📍 تحديد موقعي الحالي</button><small class="muted">الموقع يساعد الفنيين على معرفة قربك قبل تقديم العرض.</small><div id="requestMap">${typeof mapBox==='function'?mapBox(state.gps?.lat,state.gps?.lng):''}</div></div>
-    <button class="btn big" type="submit">🚀 نشر الطلب واستقبال العروض</button>
-  </form></div>`;
+window.v60ClearError = function(){
+  const e = document.getElementById('v60Error');
+  if(e) e.style.display = 'none';
 };
-createReq=async function(e){
+
+window.v60TogglePass = function(){
+  const inp = document.getElementById('v60Pass');
+  const icon = document.getElementById('v60EyeIcon');
+  if(!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  if(icon) icon.innerHTML = show
+    ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+    : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+};
+
+window.v60DoLogin = async function(e){
   e.preventDefault();
-  try{
-    const fd=new FormData();
-    fd.append('service',document.getElementById('qservice').value);
-    fd.append('city',document.getElementById('qcity').value);
-    fd.append('area',document.getElementById('qarea')?.value||'');
-    fd.append('preferred_time',document.getElementById('qtime').value||'');
-    fd.append('description',document.getElementById('qdesc').value.trim());
-    fd.append('lat',state.gps?.lat||''); fd.append('lng',state.gps?.lng||'');
-    const img=document.getElementById('problemImage')?.files?.[0];
-    if(img) fd.append('problem_image',img);
-    await api('/api/requests',{method:'POST',body:fd});
-    toast('تم نشر الطلب بنجاح، وسيظهر للفنيين مباشرة');
-    state.tab='orders'; state.orderFilter='active'; dashboard();
-  }catch(err){ toast(err.message); }
-};
-previewProblemImage=function(){
-  const file=document.getElementById('problemImage')?.files?.[0], box=document.getElementById('problemPreview');
-  if(!box) return; if(!file){ box.innerHTML=''; return; }
-  if(!['image/png','image/jpeg','image/webp'].includes(file.type)){ box.innerHTML=''; toast('نوع الصورة غير مسموح'); return; }
-  if(file.size>3*1024*1024){ box.innerHTML=''; toast('حجم الصورة كبير، الحد الأقصى 3MB'); return; }
-  box.innerHTML=`<img class="problem-preview v22-preview" src="${URL.createObjectURL(file)}" alt="معاينة صورة المشكلة"><button type="button" class="btn ghost mini" onclick="document.getElementById('problemImage').value='';document.getElementById('problemPreview').innerHTML=''">إزالة الصورة</button>`;
-};
+  const emailVal = (document.getElementById('v60Email')?.value || '').trim();
+  const passVal  = document.getElementById('v60Pass')?.value || '';
+  const btn      = document.getElementById('v60Btn');
+  const btnText  = document.getElementById('v60BtnText');
+  const spinner  = document.getElementById('v60Spinner');
+  const arrow    = document.getElementById('v60Arrow');
+  const errBox   = document.getElementById('v60Error');
+  const errMsg   = document.getElementById('v60ErrorMsg');
 
-;(function(){
-  const V24 = {};
-  window.v24Safe = function(v){
-    try { return (typeof v15EscapeHtml==='function') ? v15EscapeHtml(String(v ?? '')) : String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
-    catch(e){ return String(v ?? ''); }
-  };
-  window.v24Badge = function(n){ n=Number(n||0); return n>0?`<span class="badge-dot v24-badge">${n>99?'99+':n}</span>`:''; };
-  window.v24Money = function(n){ return (Number(n||0)).toFixed(2).replace('.00','')+' د.أ'; };
-  window.v24BackToDashboard = function(){ activeChatId=null; if(chatTimer){clearInterval(chatTimer); chatTimer=null;} dashboard(); };
-
-  // More accurate chat guard: blocks outside-contact only, allows normal messages.
-  window.v24ChatBlockReason = function(text){
-    const raw=String(text||'');
-    if(/^\[location\]-?\d{1,2}\.\d+,-?\d{1,3}\.\d+$/.test(raw)) return '';
-    if(/^\[audio\]/.test(raw)) return '';
-    const ar='٠١٢٣٤٥٦٧٨٩', fa='۰۱۲۳۴۵۶۷۸۹';
-    const lower=raw.toLowerCase()
-      .replace(/[٠-٩]/g,ch=>String(ar.indexOf(ch)))
-      .replace(/[۰-۹]/g,ch=>String(fa.indexOf(ch)))
-      .replace(/[oO]/g,'0');
-    const compact=lower.replace(/[^0-9a-z\u0600-\u06FF+@.]/g,'');
-    const links=['wa.me','whatsapp','watsapp','واتساب','واتس','وتساب','telegram','t.me','تلجرام','تليجرام','تيليجرام','facebook','fb.com','messenger','instagram','insta','snapchat','discord','discord.gg'];
-    for(const w of links){ if(lower.includes(w) || compact.includes(String(w).toLowerCase().replace(/[^0-9a-z\u0600-\u06FF+@.]/g,''))) return 'وسيلة تواصل خارجية'; }
-    if(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(raw)) return 'بريد إلكتروني';
-    const digits=lower.replace(/[^0-9+]/g,'');
-    const plain=lower.replace(/[^0-9]/g,'');
-    if(/(\+?962|00962)?0?7[789]\d{7}/.test(digits)) return 'رقم هاتف';
-    if(/^(9627|009627|07|7)[789]?\d{7,8}$/.test(plain) && plain.length>=9) return 'رقم هاتف';
-    if(plain.length>=10 && /(07|9627|009627)/.test(plain)) return 'رقم هاتف';
-    return '';
-  };
-
-  window.v24Toast = function(msg){ try{ toast(msg); }catch(e){ alert(msg); } };
-
-  // Replace chat UI with guaranteed working open/read/send behavior for customer + technician.
-  window.chat = async function(id){
-    try{
-      activeChatId = Number(id);
-      if(chatTimer){ clearInterval(chatTimer); chatTimer=null; }
-      setupSocket?.();
-      if(socket){ socket.emit('join-request', activeChatId); }
-      const j = await api(`/api/requests/${activeChatId}/messages`);
-      app.innerHTML = `<div class="page chat-page v24-chat-page">
-        <button class="btn ghost" onclick="if(socket&&activeChatId)socket.emit('leave-request',activeChatId);v24BackToDashboard()">← رجوع</button>
-        <div class="card chat-card v24-chat-card">
-          <div class="v24-chat-head"><div><h2>المحادثة للطلب #${activeChatId}</h2><p class="muted">التواصل داخل صلّحلي فقط لحماية حق العميل والفني والمنصة.</p></div><span class="v24-live-pill"><i></i> Live</span></div>
-          <div class="chat-protection-note">🛡️ مسموح بالرسائل العادية. ممنوع فقط إرسال أرقام الهاتف، الإيميلات، واتساب، تيليجرام وروابط التواصل الخارجي.</div>
-          <div class="chat v24-chat-box" id="chatbox"></div>
-          <form class="chat-input-row v24-chat-form" onsubmit="sendMsg(event,${activeChatId})">
-            <input id="msg" autocomplete="off" placeholder="اكتب رسالة عادية داخل صلّحلي...">
-            <button class="btn send-text-btn" type="submit">إرسال</button>
-          </form>
-          <div class="chat-icon-tools v24-tools">
-            <button type="button" class="round-action location-action" onclick="sendLocation(${activeChatId})" title="إرسال الموقع">📍</button>
-            <button type="button" id="micBtn" class="round-action mic-action" onclick="toggleRec(${activeChatId})" title="تسجيل صوت">🎙️</button>
-            <button type="button" id="sendVoiceBtn" class="round-action send-voice-action hide" onclick="stopRec(${activeChatId})" title="إرسال الصوت">➤</button>
-            <span id="recordingLabel" class="recording-label hide">● جاري التسجيل...</span>
-          </div>
-        </div>
-      </div>`;
-      renderMessages(j.messages||[]);
-      await v24RefreshBadges();
-      chatTimer=setInterval(async()=>{ if(activeChatId) await refreshChat(); },2500);
-    }catch(err){
-      v24Toast('تعذر فتح المحادثة: '+(err.message||err));
-      dashboard();
-    }
-  };
-
-  window.sendMsg = async function(e,id){
-    e.preventDefault();
-    const input=document.getElementById('msg');
-    const text=(input?.value||'').trim();
-    if(!text) return;
-    const reason=v24ChatBlockReason(text);
-    if(reason){
-      input.classList.add('blocked-input'); setTimeout(()=>input.classList.remove('blocked-input'),900);
-      return v24Toast('⚠️ ممنوع إرسال '+reason+' داخل الشات. اكتب رسالتك داخل صلّحلي بدون وسائل تواصل خارجية.');
-    }
-    try{
-      input.value='';
-      const j=await api(`/api/requests/${id}/messages`,{method:'POST',body:JSON.stringify({body:text})});
-      renderMessages(j.messages||[]);
-      try{v10Sound?.('message')}catch(_){ }
-      await v24RefreshBadges();
-    }catch(err){ v24Toast(err.message||'تعذر إرسال الرسالة'); input.value=text; }
-  };
-
-  // If message body is plain, escape it. Only internal [audio]/[location] render specially.
-  window.messageBody = function(body){
-    body=String(body||'');
-    if(body.startsWith('[audio]')){let u=body.replace('[audio]','');return `<audio controls src="${v24Safe(u)}"></audio>`;}
-    if(body.startsWith('[location]')){let p=body.replace('[location]','').split(',');let lat=p[0],lng=p[1];return `📍 <a target="_blank" href="https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}">فتح الموقع على الخريطة</a><div>${mapBox(lat,lng)}</div>`;}
-    return v24Safe(body).replace(/(https?:\/\/\S+)/g,'<span class="muted">[رابط خارجي محجوب]</span>');
-  };
-
-  window.renderMessages = function(messages){
-    const box=document.getElementById('chatbox'); if(!box) return;
-    box.innerHTML=(messages||[]).map(m=>`<div class="msg ${Number(m.sender_id)===Number(state.user?.id)?'me':''}"><b>${v24Safe(m.sender_name||'مستخدم')}</b><br>${messageBody(m.body)}<br><small>${v24Safe(m.created_at||'')}</small></div>`).join('') || '<div class="empty">لا توجد رسائل بعد. ابدأ المحادثة من داخل صلّحلي.</div>';
-    box.scrollTop=box.scrollHeight;
-  };
-
-  window.v24RefreshBadges = async function(){
-    if(!state.user) return;
-    try{
-      const c=await api('/api/chats'); state.chatCount=Number(c.total_unread||0);
-      const r=await api('/api/requests').catch(()=>({requests:[]}));
-      const reqs=r.requests||[];
-      state.orderCount = state.user.role==='technician' ? reqs.filter(x=>['بانتظار العروض','وصلت عروض'].includes(x.status)).length : reqs.filter(x=>!['مكتمل','ملغي'].includes(x.status)).length;
-      document.querySelectorAll('[data-badge="chats"]').forEach(el=>el.innerHTML=v24Badge(state.chatCount));
-      document.querySelectorAll('[data-badge="orders"]').forEach(el=>el.innerHTML=v24Badge(state.orderCount));
-      document.querySelectorAll('.bell-btn').forEach(b=>b.innerHTML='🔔 '+v24Badge(state.chatCount));
-    }catch(_){ }
-  };
-
-  window.v24MenuIcon = function(k){ return ({dash:'🏠',near:'📍',orders:'🛒',chats:'💬',balance:'💳',topups:'🚚',ledger:'📘',settings:'⚙️',support:'🎧'}[k]||'•'); };
-
-  // Strong layout: tabs always clickable, mobile friendly, no hidden admin info.
-  window.layout = function(title,menu,content){
-    const user=state.user||{};
-    const allSystem=[['settings','الإعدادات'],['support','الدعم الفني']];
-    const sidebarBtn=(m)=>`<button type="button" class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${m[1]} <span data-badge="${m[0]==='chats'?'chats':m[0]==='orders'?'orders':''}">${m[0]==='chats'?v24Badge(state.chatCount):m[0]==='orders'?v24Badge(state.orderCount):''}</span></b><span class="mi">${v24MenuIcon(m[0])}</span></button>`;
-    app.innerHTML=`<div class="admin-shell v24-shell"><aside class="admin-sidebar v24-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><button class="mobile-menu-close" onclick="document.body.classList.remove('sidebar-open')">×</button><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${menu.map(sidebarBtn).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu">${allSystem.map(sidebarBtn).join('')}<button type="button" class="sidebtn logout-side v15-logout-side" onclick="v15LogoutConfirm?.()||logout()"><b>تسجيل خروج</b><span class="mi">🚪</span></button></div><div class="admin-profile"><div class="avatar-sm">${v24Safe((user.name||'ص').slice(0,1))}</div><div><b>${v24Safe(user.name||roleName?.()||'مستخدم')}</b><small>${v24Safe(user.email||'')}</small></div></div></aside><main class="admin-main v24-main"><div class="admin-top"><button class="admin-icon-btn mobile-menu-open" onclick="document.body.classList.add('sidebar-open')">☰</button><div class="admin-search">🔎 <input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();setTimeout(()=>{let q=document.getElementById('searchTechQ'); if(q){q.value=this.value; searchTechnicians?.();}},120)}"></div><div class="admin-actions"><button class="admin-icon-btn bell-btn" onclick="v24RefreshBadges()">🔔 ${v24Badge(state.chatCount)}</button><button class="admin-icon-btn" onclick="v10ToggleTheme?.()">🌙</button><button class="admin-icon-btn clean-logout v15-top-logout" onclick="v15LogoutConfirm?.()||logout()">🚪 تسجيل خروج</button></div></div>${typeof v20LiveServicesStrip==='function'?v20LiveServicesStrip():''}<div class="v24-content">${content}</div></main></div>`;
-    v10ApplyTheme?.(); v24RefreshBadges();
-  };
-
-  window.v24Metrics = function(me, reqs){
-    reqs=reqs||[]; const open=reqs.filter(r=>['بانتظار العروض','وصلت عروض'].includes(r.status)).length; const active=reqs.filter(r=>Number(r.technician_id)===Number(me.id)&&!['مكتمل','ملغي'].includes(r.status)).length;
-    return [{label:'طلبات متاحة',value:open,up:'Live',icon:'🛠️'},{label:'دردشات',value:state.chatCount||0,up:'غير مقروءة',icon:'💬'},{label:'الرصيد',value:v24Money(me.balance),up:'متاح',icon:'💳'},{label:'طلب نشط',value:active,up:'قيد العمل',icon:'⚡'}];
-  };
-
-  window.techDash = async function(){
-    try{
-      await v24RefreshBadges();
-      const me=(await api('/api/me')).user; state.user=me;
-      const menu=[['dash','الرئيسية'],['orders','الطلبات'],['chats','الدردشات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']];
-      let content='';
-      if(state.tab==='orders'){
-        const j=await api('/api/requests');
-        content=dashboardHero('طلبات الفني','الطلبات المناسبة تظهر مباشرة. قدم عرض سعر ومدة، وبعد موافقة العميل تفتح المحادثة.',v24Metrics(me,j.requests||[]))+`<div class="dash-card"><div class="v24-head"><h2>الطلبات المتاحة والحالية</h2><button class="btn ghost" onclick="dashboard()">تحديث الآن</button></div>${reqTable(j.requests||[])}</div>`;
-      }else if(state.tab==='chats'){
-        content=dashboardHero('الدردشات','كل محادثاتك مع العملاء هنا، والعداد الأحمر يختفي بعد قراءة المحادثة.',v24Metrics(me,[]))+await chatsPage();
-      }else if(state.tab==='balance'){
-        content=(typeof v22TechBalance==='function')?v22TechBalance(me):balancePage(me);
-      }else if(state.tab==='topups'){
-        const j=await api('/api/topups'); content=dashboardHero('طلبات الشحن','تابع طلبات شحن الرصيد.',v24Metrics(me,[]))+topupTable(j.topups||[]);
-      }else if(state.tab==='ledger'){
-        const j=await api('/api/ledger'); content=dashboardHero('سجل الرصيد','كل عمليات الرصيد والعمولة محفوظة.',v24Metrics(me,[]))+ledgerTable(j.ledger||[]);
-      }else if(state.tab==='settings'){
-        content=dashboardHero('الإعدادات','تعديل الاسم، الهاتف، المنطقة، وكلمة السر.',v24Metrics(me,[]))+settingsPage();
-      }else if(state.tab==='support'){
-        content=dashboardHero('الدعم الفني','تواصل مع إدارة صلحلي من داخل المنصة.',v24Metrics(me,[]))+supportPage();
-      }else{
-        const j=await api('/api/requests');
-        content=dashboardHero('لوحة الفني','إدارة احترافية للطلبات، العروض، الدردشات، الشحن والرصيد.',v24Metrics(me,j.requests||[]))+`<div class="v22-grid v24-grid"><div class="dash-card v22-action" onclick="state.tab='orders';dashboard()"><span>🛠️</span><h3>الطلبات</h3><p>شاهد الطلبات المناسبة وقدم عروض سعر.</p></div><div class="dash-card v22-action" onclick="state.tab='chats';dashboard()"><span>💬</span><h3>الدردشات ${v24Badge(state.chatCount)}</h3><p>افتح محادثات العملاء مباشرة.</p></div><div class="dash-card v22-action" onclick="state.tab='balance';dashboard()"><span>💳</span><h3>الرصيد</h3><p>اشحن الرصيد واختر الباقات.</p></div><div class="dash-card v22-action" onclick="state.tab='ledger';dashboard()"><span>📘</span><h3>السجل</h3><p>تابع الخصومات والعمولات.</p></div></div><div class="dash-card"><h2>آخر الطلبات</h2>${reqTable((j.requests||[]).slice(0,5))}</div>`;
-      }
-      layout('لوحة الفني',menu,content);
-      if(state.tab==='settings') bindAreaSelect?.('setCity','setArea');
-    }catch(err){
-      app.innerHTML=`<div class="page"><div class="card"><h2>حدث خطأ في لوحة الفني</h2><p>${v24Safe(err.message||err)}</p><button class="btn" onclick="dashboard()">إعادة المحاولة</button></div></div>`;
-    }
-  };
-
-  // Customer dashboard with clear upload image and nicer mobile layout.
-  window.custDash = async function(){
-    await v24RefreshBadges();
-    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات']];
-    let content='';
-    if(state.tab==='orders'){
-      const j=await api('/api/requests'); content=dashboardHero('طلباتي','تابع الطلبات والعروض والدردشات بشكل مباشر',v20CustomerStats?.(j.requests||[])||[])+`<div class="dash-card"><h2>طلباتي</h2>${typeof v18OrdersView==='function'?v18OrdersView(j.requests||[]):reqTable(j.requests||[])}</div>`;
-    }else if(state.tab==='chats'){
-      content=dashboardHero('الدردشات','كل محادثاتك مع الفنيين هنا.',v20CustomerStats?.([])||[])+await chatsPage();
-    }else if(state.tab==='near'){
-      content=dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد التقييم والملف قبل الطلب',v20CustomerStats?.([])||[])+v20SearchPanel();
-    }else if(state.tab==='settings'){
-      content=dashboardHero('الإعدادات','تغيير الاسم، المنطقة، الهاتف، وكلمة السر',v20CustomerStats?.([])||[])+settingsPage();
-    }else if(state.tab==='support'){
-      content=dashboardHero('الدعم الفني','أرسل مشكلة أو اقتراح لإدارة صلحلي.',v20CustomerStats?.([])||[])+supportPage();
-    }else{
-      const j=await api('/api/requests').catch(()=>({requests:[]}));
-      content=dashboardHero('لوحة العميل','انشر طلبك بصورة اختيارية واستقبل عروض الفنيين مباشرة',v20CustomerStats?.(j.requests||[])||[])+`<div class="v20-main-grid v24-customer-grid"><div>${requestForm()}</div><div>${v20SearchPanel()}</div></div>`;
-    }
-    layout('لوحة العميل',menu,content);
-    if(['dash','near'].includes(state.tab)){ bindAreaSelect?.('qcity','qarea','qareaOtherWrap'); bindAreaSelect?.('searchCity','searchArea'); }
-    if(state.tab==='near') setTimeout(()=>searchTechnicians?.(),100);
-    if(state.tab==='settings') bindAreaSelect?.('setCity','setArea');
-  };
-
-  // Bind socket live updates once.
-  window.v24BindRealtime = function(){
-    setupSocket?.(); if(!socket || socket.__v24Bound) return; socket.__v24Bound=true;
-    socket.on('messages-updated', data=>{ if(activeChatId && Number(data.requestId)===Number(activeChatId)){ renderMessages(data.messages||[]); } v24RefreshBadges(); });
-    socket.on('chat-badges-updated', ()=>v24RefreshBadges());
-    socket.on('requests-updated', ()=>{ if(state.user && !activeChatId) { v24RefreshBadges(); if(['orders','dash'].includes(state.tab)) dashboard(); } });
-    socket.on('request-status-updated', ()=>{ if(state.user && !activeChatId) { v24RefreshBadges(); if(['orders','dash','chats'].includes(state.tab)) dashboard(); } });
-  };
-  const oldDashboard=window.dashboard;
-  window.dashboard=function(){ v24BindRealtime(); return oldDashboard(); };
-  const oldInit=window.init;
-  window.init=async function(){ await oldInit(); v24BindRealtime(); setInterval(()=>{ if(state.user && !activeChatId) v24RefreshBadges(); },3000); };
-
-  const css=`
-  .mobile-menu-open,.mobile-menu-close{display:none}.v24-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.v24-chat-card{max-width:980px;margin:auto}.v24-chat-head{display:flex;justify-content:space-between;align-items:center;gap:14px}.v24-live-pill{display:inline-flex;gap:8px;align-items:center;background:#eef8ff;border:1px solid #bdd9ff;color:#1d47d8;padding:8px 12px;border-radius:999px;font-weight:900}.v24-live-pill i{width:9px;height:9px;background:#16c784;border-radius:50%;box-shadow:0 0 0 5px rgba(22,199,132,.12)}.v24-chat-box{height:430px}.blocked-input{animation:v24Shake .35s;border-color:#f43f5e!important}@keyframes v24Shake{0%,100%{transform:translateX(0)}25%{transform:translateX(6px)}75%{transform:translateX(-6px)}}.v24-badge{vertical-align:middle}.v24-content{min-width:0}.v24-grid .dash-card{cursor:pointer}.chat-protection-note{margin:12px 0;padding:12px;border-radius:16px;background:#eef6ff;border:1px solid #cfe0ff;color:#1640a6;font-weight:800}.chat-input-row input{min-height:54px}.chat-input-row button{min-height:54px}.v24-sidebar .sidebtn{cursor:pointer}.v24-sidebar .sidebtn:hover{transform:translateX(-2px)}.problem-img,.problem-preview{max-width:320px;width:100%;border-radius:18px;object-fit:cover;border:1px solid #d9e5f8}.v22-upload{transition:.2s}.v22-upload:hover{transform:translateY(-2px);box-shadow:0 18px 44px rgba(47,104,255,.14)}
-  @media(max-width:900px){body{overflow-x:hidden}.v24-shell{display:block!important}.v24-sidebar{position:fixed!important;top:0;right:0;bottom:0;width:min(86vw,340px)!important;z-index:999;transform:translateX(110%);transition:.25s;border-radius:0!important;overflow:auto}.sidebar-open .v24-sidebar{transform:translateX(0)}.sidebar-open:before{content:'';position:fixed;inset:0;background:rgba(3,10,31,.42);z-index:998}.mobile-menu-close{display:grid;position:absolute;left:16px;top:14px;width:38px;height:38px;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;font-size:26px}.mobile-menu-open{display:grid!important}.v24-main{padding:12px!important}.admin-top{grid-template-columns:auto 1fr!important;gap:10px!important}.admin-search{grid-column:1/-1;order:2}.admin-actions{grid-column:1/-1;order:3;display:grid!important;grid-template-columns:repeat(3,1fr);gap:8px}.admin-actions .admin-icon-btn{width:100%;justify-content:center}.dashboard-hero,.v6-hero{border-radius:24px!important;padding:20px!important}.hero-stats,.stats-grid,.cards4{grid-template-columns:1fr 1fr!important}.v20-main-grid,.v24-customer-grid,.dash-grid,.grid,.form.two{grid-template-columns:1fr!important}.v24-chat-box{height:52vh}.v24-chat-form{display:grid!important;grid-template-columns:1fr!important}.request-card,.v21-request-card{padding:14px!important}.request-head{display:block!important}.request-meta{grid-template-columns:1fr!important}.v20-live-card{min-width:210px!important}.v22-grid{grid-template-columns:1fr!important}.admin-profile{margin-bottom:20px}.table{min-width:700px}.table-wrap{overflow:auto}.chat-icon-tools{justify-content:center}.problem-img,.problem-preview{max-width:100%}}
-  @media(max-width:520px){.hero-stats,.stats-grid,.cards4{grid-template-columns:1fr!important}.dashboard-hero h1{font-size:32px!important}.admin-actions{grid-template-columns:1fr 1fr}.admin-actions .clean-logout{grid-column:1/-1}.btn,.admin-icon-btn{min-height:48px}.v24-chat-head{display:block}.chat-protection-note{font-size:13px}.v20-live-card{min-width:185px!important}.auth-card{padding:20px!important}.sidebtn{min-height:54px!important}.v24-main{padding-bottom:80px!important}}
-  `;
-  const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
-})();
-
-;(function(){
-  window.v25Esc = window.v24Safe || function(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))};
-
-  window.v25InsufficientBalanceModal = function(msg){
-    document.querySelectorAll('.v25-modal-backdrop').forEach(x=>x.remove());
-    const d=document.createElement('div');
-    d.className='v25-modal-backdrop';
-    d.innerHTML=`<div class="v25-balance-modal">
-      <div class="v25-modal-icon">💳</div>
-      <h2>رصيدك غير كافي</h2>
-      <p>${v25Esc(msg||'بعد أول طلبين مجانيين يجب شحن الرصيد قبل تقديم عرض جديد.')}</p>
-      <div class="v25-modal-actions">
-        <button class="btn ghost" onclick="document.querySelector('.v25-modal-backdrop')?.remove()">لاحقاً</button>
-        <button class="btn" onclick="document.querySelector('.v25-modal-backdrop')?.remove();state.tab='balance';dashboard()">الانتقال إلى الباقات والشحن</button>
-      </div>
-      <small>سيتم تحويلك تلقائياً خلال ثواني إذا لم تضغط أي خيار.</small>
-    </div>`;
-    document.body.appendChild(d);
-    setTimeout(()=>{ if(document.body.contains(d)){ d.remove(); state.tab='balance'; dashboard(); } }, 2600);
-  };
-
-  window.sendOffer = async function(e,id){
-    e.preventDefault();
-    const btn=e.submitter || e.target.querySelector('button[type="submit"],button.btn');
-    if(btn){btn.disabled=true;btn.textContent='جاري إرسال العرض...';}
-    try{
-      await api(`/api/requests/${id}/offer`,{method:'POST',body:JSON.stringify({offer_price:offerPrice.value,duration:arrivalTime.value,note:offerNote.value||''})});
-      toast('تم إرسال العرض، بانتظار موافقة العميل');
-      state.tab='orders';
-      dashboard();
-    }catch(err){
-      const m=err.message||'حدث خطأ';
-      if(m.includes('رصيدك غير كافي') || m.includes('غير كاف')) v25InsufficientBalanceModal(m);
-      else toast(m);
-    }finally{
-      if(btn){btn.disabled=false;btn.textContent='إرسال العرض للعميل';}
-    }
-  };
-
-  window.v25TopServicesTicker = function(){
-    const base=(state.meta.services&&state.meta.services.length?state.meta.services:[{name:'كهربائي',icon:'⚡'},{name:'سباك',icon:'🚰'},{name:'تكييف',icon:'❄️'}]);
-    const services=[...base,...base,...base];
-    return `<div class="v25-top-services">
-      <div class="v25-top-head"><div><span class="eyebrow">Live</span><h2>الخدمات الأكثر طلباً</h2><p>تتحرك مباشرة وتحدث حسب المهن المضافة من الأدمن.</p></div><b>🔥 الأكثر نشاطاً</b></div>
-      <div class="v25-top-marquee"><div class="v25-top-track">
-        ${services.map((s,i)=>`<div class="v25-top-card" onclick="state.tab=state.user?.role==='customer'?'dash':'orders';dashboard()"><span>${v25Esc(s.icon||'🛠️')}</span><div><b>${v25Esc(s.name||s)}</b><small>${320-((i%8)*19)} طلب هذا الشهر • فنيين متاحين</small></div></div>`).join('')}
-      </div></div>
-    </div>`;
-  };
-
-  const oldCharts = window.chartsBox;
-  window.chartsBox = function(){
-    return v25TopServicesTicker()+`<div class="dash-grid"><div class="dash-card"><h2>أداء الشهر</h2><div class="chart-fake"></div></div><div class="dash-card"><h2>توزيع الطلبات</h2><div class="donut-fake"></div><div class="mini-list" style="margin-top:18px"><div class="mini-list-row"><span>مكتملة</span><b>65%</b></div><div class="mini-list-row"><span>قيد التنفيذ</span><b>25%</b></div><div class="mini-list-row"><span>ملغاة</span><b>10%</b></div></div></div></div>`;
-  };
-
-  const oldV20Strip = window.v20LiveServicesStrip;
-  window.v20LiveServicesStrip = function(){
-    const html = oldV20Strip ? oldV20Strip() : '';
-    return html.replace('v20-marquee-track','v20-marquee-track v25-slow-strip');
-  };
-
-  const oldTechBalance = window.v22TechBalance;
-  window.v22TechBalance = function(me){
-    return `<div class="v25-balance-alert-sm">⚠️ <b>أول طلبين مجاناً</b> — بعدها يلزم رصيد لتقديم عروض.</div>` + (oldTechBalance ? oldTechBalance(me) : balancePage(me));
-  };
-})();
-
-/* V26 location sender override */
-window.sendLocation = async function(id){
-  if(!navigator.geolocation) return toast('المتصفح لا يدعم تحديد الموقع');
-  toast('جاري تحديد موقعك...');
-  navigator.geolocation.getCurrentPosition(async pos=>{
-    const lat=pos.coords.latitude.toFixed(6), lng=pos.coords.longitude.toFixed(6);
-    try{
-      const j=await api(`/api/requests/${id}/messages`,{method:'POST',body:JSON.stringify({body:`[location]${lat},${lng}`})});
-      renderMessages(j.messages||[]);
-      toast('تم إرسال الموقع داخل الشات');
-    }catch(e){ toast(e.message||'تعذر إرسال الموقع'); }
-  },()=>toast('لم يتم السماح بالوصول للموقع. فعّل Location من المتصفح.'),{enableHighAccuracy:true,timeout:12000});
-};
-
-
-;(function(){
-  const esc = window.v15EscapeHtml || ((s)=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
-  const cleanText = (s)=>String(s||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').trim();
-
-  window.__SALLEHLY_PATCH_VERSION__ = 'v33-support-real-final';
-
-  window.sallehlySupportContentV33 = function(){
-    return `<section class="v33-support-page">
-      <div class="dash-card v33-support-main">
-        <span class="eyebrow">مركز الدعم</span>
-        <h2>الدعم الفني</h2>
-        <p class="muted">هذه صفحة الدعم الخاصة بالعميل. ليست صفحة طلب جديد. اكتب المشكلة وسيتم إرسالها للإدارة.</p>
-        <form class="form v33-support-form" onsubmit="sendSupport(event)">
-          <div class="field"><label>نوع المشكلة</label><select id="supportType"><option value="مشكلة طلب">مشكلة طلب</option><option value="مشكلة حساب">مشكلة حساب</option><option value="مشكلة دفع أو رصيد">مشكلة دفع أو رصيد</option><option value="مشكلة في الموقع">مشكلة في الموقع</option><option value="اقتراح تحسين">اقتراح تحسين</option></select></div>
-          <div class="field"><label>عنوان المشكلة</label><input id="supportTitle" required minlength="3" maxlength="120" placeholder="مثال: زر الدردشة لا يعمل"></div>
-          <div class="field full"><label>التفاصيل</label><textarea id="supportBody" required minlength="10" maxlength="2000" placeholder="اشرح المشكلة بشكل واضح..."></textarea></div>
-          <button class="btn" type="submit">إرسال طلب الدعم</button>
-        </form>
-      </div>
-      <div class="dash-card v33-support-side">
-        <h2>مساعدة سريعة</h2>
-        <div class="faq-list">
-          <details open><summary>كيف أتابع الطلب؟</summary><p>من صفحة طلباتي يمكنك مشاهدة الحالة والعروض والدردشة.</p></details>
-          <details><summary>الدردشة لا تظهر؟</summary><p>الدردشة تظهر بعد قبول عرض الفني.</p></details>
-          <details><summary>الموقع لا يرسل؟</summary><p>اسمح للمتصفح باستخدام الموقع ثم جرّب مرة أخرى.</p></details>
-        </div>
-      </div>
-    </section>`;
-  };
-
-  window.supportPage = function(){ return window.sallehlySupportContentV33(); };
-
-  window.sendSupport = async function(e){
-    e.preventDefault();
-    const btn=e.submitter;
-    try{
-      if(btn){btn.disabled=true; btn.textContent='جاري الإرسال...';}
-      const type=document.getElementById('supportType')?.value || 'عام';
-      const title=(document.getElementById('supportTitle')?.value||'').trim();
-      const body=(document.getElementById('supportBody')?.value||'').trim();
-      if(title.length<3) throw new Error('اكتب عنوان المشكلة');
-      if(body.length<10) throw new Error('اكتب تفاصيل أوضح');
-      await api('/api/support',{method:'POST',body:JSON.stringify({type,title,body})});
-      toast?.('تم إرسال طلب الدعم للإدارة بنجاح');
-      e.target.reset();
-    }catch(err){ toast?.(err.message || 'تعذر إرسال طلب الدعم'); }
-    finally{ if(btn){btn.disabled=false; btn.textContent='إرسال طلب الدعم';} }
-  };
-
-  window.renderCustomerSupportV33 = function(){
-    state.tab='support';
-    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات'],['support','الدعم الفني']];
-    const content = (window.dashboardHero ? dashboardHero('الدعم الفني','أرسل مشكلتك للإدارة مباشرة.',[]) : '') + window.sallehlySupportContentV33();
-    window.layout('لوحة العميل', menu, content);
-  };
-
-  window.v13Ticker = function(){ return ''; };
-  window.v20LiveServicesStrip = function(){ return ''; };
-
-  window.v33RequestJobsStrip = function(){
-    const services=(state.meta&&Array.isArray(state.meta.services)&&state.meta.services.length)?state.meta.services:[];
-    const safe=services.length?services:[{name:'كهربائي',icon:''},{name:'سباك',icon:''},{name:'تكييف',icon:''},{name:'نجار',icon:''}];
-    const cards=safe.map(s=>{const name=esc(s.name||'خدمة'); const raw=String(s.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); return `<button type="button" class="v33-job-card" onclick="if(document.getElementById('qservice')){document.getElementById('qservice').value='${raw}';document.getElementById('qservice').scrollIntoView({behavior:'smooth',block:'center'});}"><span>${esc(s.icon||'')}</span><b>${name}</b><small>متوفر الآن</small></button>`;}).join('');
-    return `<section class="v33-job-strip"><div class="v33-strip-head"><h2>شريط المهن</h2><p>كل مهنة يضيفها الأدمن تظهر هنا تلقائياً داخل صفحة طلب جديد.</p></div><div class="v33-marquee"><div class="v33-track">${cards}${cards}${cards}</div></div></section>`;
-  };
-
-  window.layout = function(title,menu,content){
-    document.body.classList.add('dashboard-mode');
-    const user=state.user||{};
-    const hasSupport=(menu||[]).some(m=>m[0]==='support');
-    const system = hasSupport ? [['settings','الإعدادات']] : [['settings','الإعدادات'],['support','الدعم الفني']];
-    const btn=(m)=>{
-      const isSupport=m[0]==='support' && user.role==='customer';
-      const click=isSupport ? 'renderCustomerSupportV33()' : `state.tab='${m[0]}';dashboard()`;
-      return `<button type="button" class="sidebtn ${state.tab===m[0]?'active':''}" onclick="${click}"><b>${cleanText(m[1])}</b></button>`;
-    };
-    app.innerHTML=`<div class="admin-shell v33-shell"><aside class="admin-sidebar v33-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><button class="mobile-menu-close" onclick="document.body.classList.remove('sidebar-open')">×</button><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${(menu||[]).map(btn).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu">${system.map(btn).join('')}<button type="button" class="sidebtn logout-side" onclick="v15LogoutConfirm?.()||logout()"><b>تسجيل خروج</b></button></div><div class="admin-profile"><div class="avatar-sm">${esc((user.name||'ص').slice(0,1))}</div><div><b>${esc(user.name||'مستخدم')}</b><small>${esc(user.email||'')}</small></div></div></aside><main class="admin-main v33-main"><div class="admin-top"><button class="admin-icon-btn mobile-menu-open" onclick="document.body.classList.add('sidebar-open')">القائمة</button><div class="admin-search"><input placeholder="بحث عن فني أو خدمة أو طلب..."></div><div class="admin-actions"><button class="admin-icon-btn" onclick="v24RefreshBadges?.()">التنبيهات</button><button class="admin-icon-btn" onclick="v10ToggleTheme?.()">الوضع</button><button class="admin-icon-btn clean-logout" onclick="v15LogoutConfirm?.()||logout()">تسجيل خروج</button></div></div><div class="v33-content">${content}</div></main></div>`;
-    window.v10ApplyTheme?.();
-  };
-
-  window.custDash = async function(){
-    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات'],['support','الدعم الفني']];
-    let content='';
-    if(state.tab==='support'){
-      content=(window.dashboardHero?dashboardHero('الدعم الفني','أرسل مشكلتك للإدارة مباشرة.',[]): '') + window.sallehlySupportContentV33();
-    }else if(state.tab==='orders'){
-      const j=await api('/api/requests');
-      content=(window.dashboardHero?dashboardHero('طلباتي','تابع طلباتك والعروض والدردشات.',window.v20CustomerStats?.(j.requests||[])||[]): '') + `<div class="dash-card"><h2>طلباتي</h2>${typeof window.v18OrdersView==='function'?window.v18OrdersView(j.requests||[]):reqTable(j.requests||[])}</div>`;
-    }else if(state.tab==='chats'){
-      content=(window.dashboardHero?dashboardHero('الدردشات','كل المحادثات مع الفنيين هنا.',[]): '') + await chatsPage();
-    }else if(state.tab==='near'){
-      content=(window.dashboardHero?dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد التقييم.',[]): '') + (window.v20SearchPanel?window.v20SearchPanel():nearbyPage());
-    }else if(state.tab==='settings'){
-      content=(window.dashboardHero?dashboardHero('الإعدادات','عدّل بيانات حسابك.',[]): '') + settingsPage();
-    }else{
-      const j=await api('/api/requests').catch(()=>({requests:[]}));
-      content=(window.dashboardHero?dashboardHero('لوحة العميل','انشر طلبك واستقبل عروض الفنيين مباشرة.',window.v20CustomerStats?.(j.requests||[])||[]): '') + window.v33RequestJobsStrip() + `<div class="v20-main-grid v24-customer-grid"><div>${requestForm()}</div><div>${window.v20SearchPanel?window.v20SearchPanel():nearbyPage()}</div></div>`;
-    }
-    window.layout('لوحة العميل', menu, content);
-    if(['dash','near'].includes(state.tab)){ window.bindAreaSelect?.('qcity','qarea','qareaOtherWrap'); window.bindAreaSelect?.('searchCity','searchArea'); }
-    if(state.tab==='near') setTimeout(()=>window.searchTechnicians?.(),100);
-    if(state.tab==='settings') window.bindAreaSelect?.('setCity','setArea');
-  };
-
-  window.dashboard = function(){
-    if(!state.user) return login();
-    if(state.user.role==='admin') return admin();
-    if(state.user.role==='technician') return techDash();
-    return window.custDash();
-  };
-
-  const st=document.createElement('style');
-  st.textContent=`
-    .v33-sidebar .mi,.v33-sidebar .sidebtn span.mi,.v33-sidebar .sidebtn>span:not(.badge){display:none!important}.v33-sidebar .sidebtn{justify-content:center!important;text-align:center!important}.v33-sidebar .sidebtn b{font-size:18px!important}.v33-content>.v20-live-strip,.v33-content>.v13-ticker,.v33-content>.v31-job-strip,.v33-content>.v32-job-strip{display:none!important}.v33-support-page{display:grid;grid-template-columns:1.35fr .85fr;gap:22px}.v33-support-main textarea{min-height:190px}.v33-support-form .full{grid-column:1/-1}.v33-job-strip{background:linear-gradient(135deg,#101d55,#6430d5);border-radius:28px;padding:24px;margin:18px 0 24px;color:#fff;overflow:hidden;box-shadow:0 18px 50px rgba(40,35,120,.18)}.v33-strip-head{margin-bottom:16px}.v33-strip-head h2{margin:0;font-size:28px}.v33-strip-head p{margin:6px 0 0;color:rgba(255,255,255,.78)}.v33-marquee{overflow:hidden}.v33-track{display:flex;gap:16px;width:max-content;animation:v33Scroll 85s linear infinite}.v33-job-card{min-width:245px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.10);color:#fff;border-radius:20px;padding:16px 18px;display:flex;align-items:center;gap:12px;cursor:pointer}.v33-job-card span{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:rgba(255,255,255,.13);font-size:22px}.v33-job-card b{font-size:18px}.v33-job-card small{color:#bdf7ff}@keyframes v33Scroll{from{transform:translateX(0)}to{transform:translateX(33.333%)}}@media(max-width:900px){.v33-support-page,.v20-main-grid,.v24-customer-grid{grid-template-columns:1fr!important}.v33-job-card{min-width:220px}.v33-job-strip{padding:18px;border-radius:22px}.admin-shell{display:block!important}.admin-sidebar{position:relative!important;width:100%!important;min-height:auto!important}.admin-main{padding:14px!important}.admin-menu{grid-template-columns:repeat(2,minmax(0,1fr))!important}.admin-top{grid-template-columns:1fr!important}.stats-grid,.hero-stats{grid-template-columns:1fr 1fr!important}}@media(max-width:520px){.v33-job-card{min-width:200px;padding:13px}.v33-track{animation-duration:95s}.stats-grid,.hero-stats{grid-template-columns:1fr!important}.admin-menu{grid-template-columns:1fr!important}.dash-card{padding:16px!important}.dashboard-hero{padding:18px!important}.admin-actions{display:grid!important;grid-template-columns:1fr!important}.admin-search input{width:100%!important}}
-  `;
-  document.head.appendChild(st);
-})();
-
-
-;(function(){
-  window.__SALLEHLY_MAP_PATCH_VERSION__ = 'v34-real-maps-fix';
-  const esc = window.v15EscapeHtml || ((s)=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
-  const maps = window.__sallehlyLeafletMaps = window.__sallehlyLeafletMaps || {};
-  const jordanCenter = [31.9539, 35.9106];
-
-  function validCoord(lat,lng){
-    lat = Number(lat); lng = Number(lng);
-    return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  if(!emailVal || !passVal){
+    if(errBox && errMsg){ errMsg.textContent='يرجى تعبئة جميع الحقول'; errBox.style.display='flex'; }
+    return;
   }
-  function mapsUrl(lat,lng){ return `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`; }
 
-  window.sallehlyInitMap = function(id, lat, lng, label){
-    setTimeout(()=>{
-      const el = document.getElementById(id);
-      if(!el || !validCoord(lat,lng)) return;
-      if(typeof L === 'undefined'){
-        el.innerHTML = `<div class="map-fallback"><b>تعذر تحميل الخريطة</b><small>تأكد أن السيرفر يسمح بتحميل Leaflet/OpenStreetMap.</small><a target="_blank" rel="noopener" href="${mapsUrl(lat,lng)}">فتح الموقع على Google Maps</a></div>`;
-        return;
-      }
-      try{
-        if(maps[id]){ maps[id].remove(); delete maps[id]; }
-        const map = L.map(id, {scrollWheelZoom:false, zoomControl:true}).setView([Number(lat), Number(lng)], 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-        L.marker([Number(lat), Number(lng)]).addTo(map).bindPopup(esc(label || 'الموقع المحدد'));
-        maps[id] = map;
-        setTimeout(()=>map.invalidateSize(), 120);
-      }catch(e){
-        console.error('Sallehly map error:', e);
-        el.innerHTML = `<div class="map-fallback"><b>حدث خطأ في عرض الخريطة</b><a target="_blank" rel="noopener" href="${mapsUrl(lat,lng)}">فتح الموقع على Google Maps</a></div>`;
-      }
-    }, 80);
-  };
+  // Loading state
+  if(btn) btn.disabled = true;
+  if(btnText) btnText.textContent = 'جاري تسجيل الدخول...';
+  if(spinner) spinner.style.display = 'block';
+  if(arrow)   arrow.style.display   = 'none';
 
-  window.mapBox = function(lat,lng,label='موقع العميل'){
-    if(!validCoord(lat,lng)) return `<div class="mapbox empty">لم يتم تحديد الموقع بعد</div>`;
-    const safeLat = Number(lat).toFixed(6), safeLng = Number(lng).toFixed(6);
-    const id = 'map_' + Math.random().toString(36).slice(2,10);
-    setTimeout(()=>window.sallehlyInitMap(id, safeLat, safeLng, label), 0);
-    return `<div class="map-wrap"><div id="${id}" class="mapbox real-map" data-lat="${safeLat}" data-lng="${safeLng}"></div><div class="map-actions"><a class="maplink" target="_blank" rel="noopener" href="${mapsUrl(safeLat,safeLng)}">فتح الموقع على خرائط Google</a></div></div>`;
-  };
-
-  window.useGPS = function(mode='near'){
-    if(!navigator.geolocation){ toast?.('المتصفح لا يدعم تحديد الموقع GPS'); return; }
-    if(location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'){
-      toast?.('تحديد الموقع يحتاج HTTPS عند رفع الموقع على السيرفر');
-    }
-    toast?.('جاري تحديد موقعك... اسمح للمتصفح باستخدام الموقع');
-    navigator.geolocation.getCurrentPosition(pos=>{
-      const lat = Number(pos.coords.latitude).toFixed(6);
-      const lng = Number(pos.coords.longitude).toFixed(6);
-      state.gps = {lat,lng};
-      try{ localStorage.sallehly_last_gps = JSON.stringify(state.gps); }catch(e){}
-      const c = typeof cityFromGPS==='function' ? cityFromGPS(Number(lat), Number(lng)) : 'عمان';
-      const ncity=document.getElementById('ncity'), qcity=document.getElementById('qcity');
-      if(ncity) ncity.value=c;
-      if(qcity) qcity.value=c;
-      const nearMap=document.getElementById('nearMap'), requestMap=document.getElementById('requestMap');
-      if(nearMap) nearMap.innerHTML = window.mapBox(lat,lng,'موقعك الحالي');
-      if(requestMap) requestMap.innerHTML = window.mapBox(lat,lng,'موقع العميل');
-      toast?.('تم تحديد موقعك وعرض الخريطة بنجاح');
-      if(mode==='near') window.loadNearby?.();
-    }, err=>{
-      const messages={1:'لم يتم السماح بالوصول للموقع. فعّل Location من المتصفح.',2:'تعذر معرفة موقعك حاليًا.',3:'انتهت مهلة تحديد الموقع، جرّب مرة ثانية.'};
-      toast?.(messages[err.code] || 'تعذر تحديد الموقع');
-    }, {enableHighAccuracy:true, timeout:15000, maximumAge:60000});
-  };
-
-  const oldRequestForm = window.requestForm;
-  window.requestForm = function(){
-    const html = oldRequestForm ? oldRequestForm() : '';
-    setTimeout(()=>{
-      try{
-        if(!state.gps && localStorage.sallehly_last_gps) state.gps = JSON.parse(localStorage.sallehly_last_gps);
-        if(state.gps && document.getElementById('requestMap')) document.getElementById('requestMap').innerHTML = window.mapBox(state.gps.lat,state.gps.lng,'موقع العميل');
-      }catch(e){}
-    },100);
-    return html;
-  };
-
-  const oldNearbyPage = window.nearbyPage;
-  window.nearbyPage = function(){
-    const html = oldNearbyPage ? oldNearbyPage() : '';
-    setTimeout(()=>{
-      try{
-        if(!state.gps && localStorage.sallehly_last_gps) state.gps = JSON.parse(localStorage.sallehly_last_gps);
-        if(state.gps && document.getElementById('nearMap')) document.getElementById('nearMap').innerHTML = window.mapBox(state.gps.lat,state.gps.lng,'موقعك الحالي');
-      }catch(e){}
-    },100);
-    return html;
-  };
-
-  const oldMsgBody = window.messageBody;
-  window.messageBody = function(body){
-    body=String(body||'');
-    if(body.startsWith('[location]')){
-      const p=body.replace('[location]','').split(',');
-      const lat=p[0], lng=p[1];
-      return validCoord(lat,lng) ? `📍 تم إرسال موقع<div>${window.mapBox(lat,lng,'موقع مرسل في المحادثة')}</div>` : '📍 موقع غير صالح';
-    }
-    return oldMsgBody ? oldMsgBody(body) : esc(body);
-  };
-
-  const st=document.createElement('style');
-  st.textContent=`
-    .map-wrap{width:100%;margin-top:12px}.mapbox.real-map{width:100%;height:270px;min-height:230px;border:1px solid var(--line,#dbe4f0);border-radius:18px;overflow:hidden;background:#eef5ff;position:relative;z-index:1}.map-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px}.maplink{font-weight:900;color:var(--blue,#2563eb);text-decoration:none}.map-fallback{height:100%;min-height:190px;display:grid;place-items:center;text-align:center;gap:8px;padding:16px;background:#f8fafc;border-radius:18px;color:#0f172a}.map-fallback a{color:#2563eb;font-weight:900}.leaflet-container{font-family:Tajawal,Arial,sans-serif}.msg .mapbox.real-map{height:210px;min-height:190px}@media(max-width:700px){.mapbox.real-map{height:230px;min-height:210px}.msg .mapbox.real-map{height:190px}}
-  `;
-  document.head.appendChild(st);
-})();
-
-
-function v35ScrollToContent(){
   try{
-    const main=document.querySelector('.admin-main,.v24-main');
-    if(main && window.innerWidth<=900) main.scrollIntoView({behavior:'smooth',block:'start'});
-  }catch(e){}
+    const j = await api('/api/auth/login',{
+      method:'POST',
+      body: JSON.stringify({ email: emailVal, password: passVal })
+    });
+    state.user = j.user;
+    // Success animation
+    if(btn){ btn.style.background = 'linear-gradient(135deg,#059669,#10b981)'; }
+    if(btnText) btnText.textContent = '✓ تم تسجيل الدخول';
+    setTimeout(()=>{ toast?.('مرحباً ' + (j.user?.name||'') + ' 👋'); dashboard(); }, 400);
+  } catch(err){
+    if(errBox && errMsg){
+      errMsg.textContent = err.message || 'بيانات غير صحيحة';
+      errBox.style.display = 'flex';
+      // Shake animation
+      const card = document.getElementById('v60Card');
+      if(card){ card.style.animation='v60Shake 0.4s ease'; setTimeout(()=>card.style.animation='',400); }
+    }
+    if(btn) btn.disabled = false;
+    if(btnText) btnText.textContent = 'تسجيل الدخول';
+    if(spinner) spinner.style.display = 'none';
+    if(arrow)   arrow.style.display   = 'block';
+    if(btn) btn.style.background = '';
+  }
+};
+
+// Also override doLogin to use v60 error box if on login page
+const __v60OldDoLogin = window.doLogin;
+window.doLogin = async function(e){
+  if(document.getElementById('v60Email')) return v60DoLogin(e);
+  if(typeof __v60OldDoLogin === 'function') return __v60OldDoLogin(e);
+};
+
+// Floating particles
+function v60Particles(){
+  const canvas = document.getElementById('v60Canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+
+  function resize(){ W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function Particle(){
+    this.x = Math.random() * W;
+    this.y = Math.random() * H;
+    this.r = Math.random() * 2 + 0.5;
+    this.dx = (Math.random() - 0.5) * 0.4;
+    this.dy = (Math.random() - 0.5) * 0.4;
+    this.alpha = Math.random() * 0.5 + 0.1;
+    this.color = Math.random() > 0.5 ? '124,58,237' : '37,99,235';
+  }
+
+  for(let i=0; i<80; i++) particles.push(new Particle());
+
+  let animId;
+  function draw(){
+    if(!document.getElementById('v60Canvas')){ cancelAnimationFrame(animId); return; }
+    ctx.clearRect(0,0,W,H);
+    particles.forEach(p=>{
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(${p.color},${p.alpha})`;
+      ctx.fill();
+      p.x += p.dx; p.y += p.dy;
+      if(p.x<0||p.x>W) p.dx*=-1;
+      if(p.y<0||p.y>H) p.dy*=-1;
+    });
+    // Draw connections
+    for(let i=0; i<particles.length; i++){
+      for(let j=i+1; j<particles.length; j++){
+        const dist = Math.hypot(particles[i].x-particles[j].x, particles[i].y-particles[j].y);
+        if(dist < 100){
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = `rgba(124,58,237,${0.08*(1-dist/100)})`;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+    animId = requestAnimationFrame(draw);
+  }
+  draw();
 }
-window.addEventListener('error', function(e){
-  try{
-    if(String(e.message||'').includes('Failed to fetch')){
-      toast('تأكد أنك مشغل المشروع من npm start وليس Live Server فقط');
-    }
-  }catch(_){}
-});
-
-;(function(){
-  function safe(s){return String(s??'').replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]});}
-  function icon(k){try{return (typeof menuIconV13==='function'?menuIconV13(k):(typeof menuIcon==='function'?menuIcon(k):''))||'';}catch(e){return ''}}
-  window.v37CloseDrawer=function(){document.body.classList.remove('v37-menu-open','sidebar-open','open')};
-  window.v37OpenDrawer=function(){document.body.classList.add('v37-menu-open')};
-  window.v37Go=function(tab){state.tab=tab; v37CloseDrawer(); dashboard(); setTimeout(function(){try{document.querySelector('.v37-content,.admin-main')?.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}},80)};
-
-  layout=function(title, menu, content){
-    document.body.classList.add('dashboard-mode','v37-dashboard');
-    const user=state.user||{};
-    const sys=[['settings','الإعدادات'],['support','الدعم الفني']];
-    const make=function(m){
-      const key=String(m[0]); const label=String(m[1]);
-      let badge=''; try{ if(key==='chats' && typeof v13Badge==='function') badge=' '+v13Badge(state.chatCount); }catch(e){}
-      return `<button type="button" class="sidebtn ${state.tab===key?'active':''}" onclick="v37Go('${safe(key)}')"><b>${safe(label)}${badge}</b><span class="mi">${icon(key)}</span></button>`;
-    };
-    app.innerHTML=`
-      <div class="v37-overlay" onclick="v37CloseDrawer()"></div>
-      <div class="admin-shell v37-shell">
-        <header class="v37-mobile-header">
-          <button type="button" class="v37-menu-btn" onclick="v37OpenDrawer()" aria-label="فتح القائمة">☰</button>
-          <div class="v37-brand"><img src="/logo.png" alt="صلّحلي" class="logo-img"><b>صلّحلي</b></div>
-          <div class="v37-header-actions">
-            <button type="button" onclick="toast('لا توجد إشعارات جديدة')">🔔</button>
-            <button type="button" onclick="typeof v10ToggleTheme==='function'?v10ToggleTheme():document.body.classList.toggle('dark-dash')">🌙</button>
-          </div>
-        </header>
-
-        <aside class="admin-sidebar v37-drawer">
-          <div class="v37-drawer-title">
-            <div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div>
-            <button type="button" class="v37-close" onclick="v37CloseDrawer()">×</button>
-          </div>
-          <div class="admin-section-label">الرئيسية</div>
-          <div class="admin-menu">${(menu||[]).map(make).join('')}</div>
-          <div class="admin-section-label">النظام</div>
-          <div class="admin-menu">${sys.map(make).join('')}<button type="button" class="sidebtn logout-side" onclick="v37CloseDrawer();(typeof v15LogoutConfirm==='function'?v15LogoutConfirm():logout())"><b>تسجيل خروج</b><span class="mi">🚪</span></button></div>
-          <div class="admin-profile"><div class="avatar-sm">${safe((user.name||'ص').slice(0,1))}</div><div><b>${safe(user.name||roleName())}</b><small>${safe(user.email||roleName())}</small></div></div>
-        </aside>
-
-        <main class="admin-main v37-main">
-          <div class="admin-top v37-search-row">
-            <div class="admin-search">🔎 <input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();setTimeout(()=>{let q=document.getElementById('searchTechQ');if(q){q.value=this.value;if(typeof searchTechnicians==='function')searchTechnicians();}},120)}"></div>
-          </div>
-          <div class="v37-content">${content}</div>
-        </main>
-      </div>`;
-    try{ if(typeof v10ApplyTheme==='function') v10ApplyTheme(); }catch(e){}
-  };
-
-  const css=`
-  body.v37-dashboard{overflow-x:hidden!important;background:#eef4ff!important}
-  body.v37-dashboard .admin-shell.v37-shell{display:block!important;grid-template-columns:1fr!important;min-height:100vh!important;background:#eef4ff!important}
-  body.v37-dashboard .v37-mobile-header{position:sticky!important;top:0!important;z-index:950!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;padding:12px 14px!important;background:#071331!important;color:#fff!important;border-radius:0 0 24px 24px!important;box-shadow:0 15px 40px rgba(2,6,23,.20)!important;direction:rtl!important}
-  .v37-menu-btn{width:48px!important;height:48px!important;border:0!important;border-radius:15px!important;background:linear-gradient(135deg,#7c3aed,#2563eb)!important;color:#fff!important;font-size:27px!important;font-weight:900!important;display:grid!important;place-items:center!important;cursor:pointer!important}
-  .v37-brand{display:flex!important;align-items:center!important;gap:9px!important;font-size:23px!important;font-weight:900!important}.v37-brand span,.v37-drawer .admin-logo span{width:42px!important;height:42px!important;border-radius:14px!important;display:grid!important;place-items:center!important;background:linear-gradient(135deg,#7c3aed,#2563eb)!important;color:#fff!important}.v37-header-actions{display:flex!important;gap:8px!important}.v37-header-actions button,.v37-close{width:42px!important;height:42px!important;border:0!important;border-radius:14px!important;background:rgba(255,255,255,.14)!important;color:#fff!important;font-size:20px!important;font-weight:900!important}
-  body.v37-dashboard .admin-sidebar.v37-drawer{position:fixed!important;top:0!important;right:-340px!important;left:auto!important;width:min(86vw,330px)!important;height:100vh!important;min-height:100vh!important;max-height:100vh!important;z-index:1002!important;padding:16px!important;background:linear-gradient(180deg,#071331,#0b1a42)!important;border-radius:24px 0 0 24px!important;overflow-y:auto!important;transition:right .28s ease!important;box-shadow:-25px 0 80px rgba(2,6,23,.45)!important;display:block!important}
-  body.v37-menu-open .admin-sidebar.v37-drawer{right:0!important}
-  .v37-overlay{display:none!important;position:fixed!important;inset:0!important;z-index:1001!important;background:rgba(2,6,23,.48)!important;backdrop-filter:blur(4px)!important}body.v37-menu-open .v37-overlay{display:block!important}
-  .v37-drawer-title{display:flex!important;align-items:center!important;justify-content:space-between!important;margin-bottom:12px!important}.v37-drawer .admin-logo{margin:0!important;font-size:24px!important;justify-content:flex-start!important;display:flex!important;align-items:center!important;gap:9px!important}
-  body.v37-dashboard .admin-sidebar.v37-drawer .admin-menu{display:grid!important;grid-template-columns:1fr!important;gap:9px!important}.v37-drawer .sidebtn{height:55px!important;min-height:55px!important;border-radius:16px!important;font-size:16px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;padding:0 16px!important;text-align:right!important}.v37-drawer .sidebtn b{font-size:16px!important;white-space:nowrap!important}.v37-drawer .admin-section-label{text-align:right!important;margin:18px 8px 9px!important;color:#8da0cc!important}.v37-drawer .admin-profile{position:static!important;display:flex!important;margin-top:18px!important}
-  body.v37-dashboard .admin-main.v37-main{width:100%!important;max-width:430px!important;margin:0 auto!important;padding:10px 10px 18px!important;display:block!important}.v37-search-row{position:relative!important;display:flex!important;height:auto!important;padding:0!important;margin:8px 0 16px!important;background:transparent!important;box-shadow:none!important;border:0!important}.v37-search-row .admin-search{width:100%!important}
-  body.v37-dashboard .admin-shell > .admin-sidebar:not(.v37-drawer){display:none!important}body.v37-dashboard .admin-menu:not(.v37-drawer .admin-menu){grid-template-columns:1fr!important}
-  @media(max-width:900px){body.v37-dashboard .admin-shell{display:block!important}.v37-mobile-header{display:flex!important}.admin-main.v37-main{padding:10px!important}.admin-menu{grid-template-columns:1fr!important}.admin-top{grid-template-columns:1fr!important}.dash-card{max-width:100%!important}.dashboard-hero{margin-top:0!important}}
-  @media(min-width:901px){body.v37-dashboard .admin-main.v37-main{max-width:1180px!important}.v37-mobile-header{border-radius:0!important}.v37-search-row{max-width:700px!important;margin:16px auto!important}}
-  `;
-  const st=document.createElement('style'); st.id='v37-true-hamburger-css'; st.textContent=css; document.head.appendChild(st);
-})();
-
-
-(function(){
-  function publicClean(){
-    document.body.classList.remove('open','sidebar-open','v37-menu-open','dashboard-mode','v37-dashboard');
-  }
-  const oldGo = window.go;
-  window.go = function(p){
-    p = String(p || 'home');
-    if(['home','services','how','tech','contact','login','register'].includes(p)) publicClean();
-    if(p==='home') return home();
-    if(p==='services') return servicesPage();
-    if(p==='how') return howPage();
-    if(p==='tech') return techPage();
-    if(p==='contact') return contact();
-    if(p==='login') return login();
-    if(p==='register') return register();
-    if(p==='dashboard') return dashboard();
-    if(typeof oldGo==='function') return oldGo(p);
-  };
-  document.addEventListener('click', function(e){
-    const el = e.target.closest('[data-route]');
-    if(!el) return;
-    e.preventDefault();
-    window.go(el.getAttribute('data-route') || 'home');
-  }, true);
-})();
-
-/* ===== V40 PREMIUM PUBLIC HOME + SLOW LIVE SERVICES ===== */
-(function(){
-  const safe = window.esc || ((v)=>String(v ?? ''));
-  const getServices = ()=>{
-    const fallback=[
-      {name:'كهربائي',icon:'⚡'}, {name:'سباك',icon:'🚰'}, {name:'تكييف',icon:'❄️'},
-      {name:'نجار',icon:'🪚'}, {name:'دهان',icon:'🎨'}, {name:'صيانة أجهزة',icon:'🔧'},
-      {name:'تركيب أثاث',icon:'🪑'}, {name:'تركيب زجاج',icon:'🪟'}
-    ];
-    return (state.meta && Array.isArray(state.meta.services) && state.meta.services.length ? state.meta.services : fallback)
-      .map((s,i)=>({name:s.name||fallback[i%fallback.length].name, icon:s.icon||fallback[i%fallback.length].icon}));
-  };
-  const chooseService = (name)=>{
-    localStorage.pendingService = String(name||'');
-    go(state.user ? 'dashboard' : 'register');
-  };
-  window.v40ChooseService = chooseService;
-  window.home = home = function(){
-    document.body.classList.remove('open','sidebar-open','v37-menu-open','dashboard-mode','v37-dashboard');
-    const services=getServices();
-    const cards=services.map((s,i)=>`<button class="v40-service-pill" onclick="v40ChooseService('${String(s.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')"><span>${safe(s.icon||'🛠️')}</span><b>${safe(s.name)}</b><small>${120+((i%9)*17)} طلب</small></button>`).join('');
-    const mainCards=services.slice(0,6).map((s,i)=>`<button class="v40-main-service" onclick="v40ChooseService('${String(s.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')"><span>${safe(s.icon||'🛠️')}</span><h3>${safe(s.name)}</h3><p>فنيين متاحين قريبين من منطقتك</p><em>ابحث عن فني</em></button>`).join('');
-    app.innerHTML=`
-    <section class="v40-home">
-      <div class="v40-bg-led l1"></div><div class="v40-bg-led l2"></div><div class="v40-bg-led l3"></div>
-      <div class="v40-hero-card">
-        <div class="v40-brand-big"><span><img src="/logo.png" alt="صلّحلي" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;"></span><div><b>صلّحلي</b><small>الفني الأقرب لك بضغطة زر</small></div></div>
-        <div class="v40-live-badge"><i></i> خدمات مباشرة الآن</div>
-        <h1>خدمات الصيانة صارت أسهل، أسرع، وأرتب</h1>
-        <p>اطلب الخدمة، حدّد موقعك، واستقبل عروض الفنيين الموثوقين حسب منطقتك وتقييماتهم.</p>
-        <div class="v40-actions">
-          <button class="btn big" onclick="go('${state.user?'dashboard':'register'}')">اطلب خدمة الآن</button>
-          <button class="btn ghost big" onclick="go('services')">استعرض الخدمات</button>
-        </div>
-        <div class="v40-stats"><div><b>GPS</b><small>تحديد موقع</small></div><div><b>24/7</b><small>طلبات مباشرة</small></div><div><b>4.8</b><small>تقييمات</small></div></div>
-      </div>
-      <div class="v40-phone-preview">
-        <div class="v40-phone-head"><span></span><b>صلّحلي</b><em>Live</em></div>
-        <div class="v40-phone-screen">
-          <div class="v40-mini-search">🔎 ابحث عن خدمة أو فني</div>
-          ${services.slice(0,3).map((s,i)=>`<div class="v40-tech-row"><span>${safe(s.icon||'🛠️')}</span><div><b>${safe(s.name)}</b><small>${stars(5-i/2)} • قريب منك</small></div><button>اختيار</button></div>`).join('')}
-          <div class="v40-map-card">📍 الفنيين الأقرب حسب منطقتك</div>
-        </div>
-      </div>
-    </section>
-    <section class="v40-live-strip">
-      <div class="v40-section-title"><span>LIVE</span><h2>الخدمات الأكثر طلباً</h2><p>شريط مباشر يتحرك تلقائياً بسرعة هادئة.</p></div>
-      <div class="v40-marquee"><div class="v40-track">${cards}${cards}${cards}</div></div>
-    </section>
-    <section class="v40-services-grid">
-      <div class="v40-section-title"><span>خدمات جاهزة</span><h2>اختار الخدمة وابدأ الطلب</h2><p>كل خدمة تظهر هنا تلقائياً من بيانات المشروع.</p></div>
-      <div class="v40-grid">${mainCards}</div>
-    </section>
-    <section class="v40-steps">
-      <div><b>01</b><h3>أنشئ طلب</h3><p>اكتب المشكلة وحدد المحافظة والموقع.</p></div>
-      <div><b>02</b><h3>استقبل عروض</h3><p>شاهد الفنيين والتقييمات واختر الأنسب.</p></div>
-      <div><b>03</b><h3>ادفع كاش وقيّم</h3><p>بعد انتهاء العمل قيّم الفني بسهولة.</p></div>
-    </section>`;
-    window.scrollTo({top:0,behavior:'smooth'});
-  };
-})();
-
-
-/* ===== Sallehly V50 - Premium Login Page ===== */
-;(function(){
-
-login = function(){
-  state.tab = 'dash';
-  document.body.classList.remove('dashboard-mode');
-  app.innerHTML = `
-  <div class="v50-login-page">
-    <div class="v50-login-bg">
-      <div class="v50-blob v50-blob1"></div>
-      <div class="v50-blob v50-blob2"></div>
-    </div>
-    <div class="v50-login-container">
-
-      <!-- Logo -->
-      <div class="v50-logo">
-        <div class="v50-logo-icon"><img src="/logo.png" alt="صلّحلي" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;"></div>
-        <span>صلّحلي</span>
-      </div>
-
-      <!-- Card -->
-      <div class="v50-card">
-        <h1 class="v50-title">مرحباً بعودتك 👋</h1>
-        <p class="v50-sub">سجّل دخولك للمتابعة</p>
-
-        <form class="v50-form" onsubmit="doLogin(event)">
-          <div class="v50-field">
-            <label>البريد الإلكتروني</label>
-            <div class="v50-input-wrap">
-              <span class="v50-input-icon">✉️</span>
-              <input id="email" type="email" autocomplete="email" placeholder="example@email.com" required>
-            </div>
-          </div>
-
-          <div class="v50-field">
-            <label>كلمة السر</label>
-            <div class="v50-input-wrap">
-              <span class="v50-input-icon">🔒</span>
-              <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
-              <button type="button" class="v50-eye" onclick="
-                var inp=document.getElementById('password');
-                inp.type=inp.type==='password'?'text':'password';
-                this.textContent=inp.type==='password'?'👁️':'🙈';
-              ">👁️</button>
-            </div>
-          </div>
-
-          <button class="v50-btn-primary" type="submit">
-            <span>تسجيل الدخول</span>
-            <span class="v50-arrow">←</span>
-          </button>
-        </form>
-
-        <div class="v50-divider"><span>أو</span></div>
-
-        <button class="v50-btn-secondary" onclick="register('customer')">
-          إنشاء حساب جديد
-        </button>
-
-        <p class="v50-hint">🔐 حساب الإدارة يُضبط من السيرفر فقط</p>
-      </div>
-
-    </div>
-  </div>`;
-};
 
 // CSS
-const css = `
-.v50-login-page {
-  min-height: 100vh;
-  background: #0d0d1a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  position: relative;
-  overflow: hidden;
-}
-.v50-login-bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-.v50-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.35;
-}
-.v50-blob1 {
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, #6c3dd6, #3b1fa8);
-  top: -100px; right: -100px;
-}
-.v50-blob2 {
-  width: 300px; height: 300px;
-  background: radial-gradient(circle, #1e40af, #0ea5e9);
-  bottom: -80px; left: -80px;
-}
-.v50-login-container {
-  width: 100%;
-  max-width: 420px;
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-}
-.v50-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #fff;
-  font-size: 22px;
-  font-weight: 800;
-}
-.v50-logo-icon {
-  width: 46px; height: 46px;
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
-  border-radius: 14px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px; font-weight: 900; color: #fff;
-  box-shadow: 0 8px 24px rgba(124,58,237,0.4);
-}
-.v50-card {
-  width: 100%;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 24px;
-  padding: 32px 28px;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 24px 60px rgba(0,0,0,0.4);
-}
-.v50-title {
-  font-size: 26px;
-  font-weight: 800;
-  color: #fff;
-  margin: 0 0 6px;
-  text-align: center;
-}
-.v50-sub {
-  font-size: 14px;
-  color: rgba(255,255,255,0.5);
-  text-align: center;
-  margin: 0 0 28px;
-}
-.v50-form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.v50-field {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.v50-field label {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.7);
-}
-.v50-input-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.v50-input-icon {
-  position: absolute;
-  right: 14px;
-  font-size: 15px;
-  pointer-events: none;
-}
-.v50-input-wrap input {
-  width: 100%;
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 12px;
-  padding: 13px 42px 13px 44px;
-  color: #fff;
-  font-size: 15px;
-  outline: none;
-  transition: border-color 0.2s, background 0.2s;
-  font-family: inherit;
-  text-align: right;
-}
-.v50-input-wrap input:focus {
-  border-color: #7c3aed;
-  background: rgba(124,58,237,0.1);
-}
-.v50-input-wrap input::placeholder { color: rgba(255,255,255,0.25); }
-.v50-eye {
-  position: absolute;
-  left: 12px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 4px;
-  line-height: 1;
-}
-.v50-btn-primary {
-  width: 100%;
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
-  color: #fff;
-  border: none;
-  border-radius: 14px;
-  padding: 15px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 6px;
-  box-shadow: 0 8px 24px rgba(124,58,237,0.4);
-  transition: transform 0.15s, box-shadow 0.15s;
-  font-family: inherit;
-}
-.v50-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(124,58,237,0.5); }
-.v50-btn-primary:active { transform: translateY(0); }
-.v50-arrow { font-size: 18px; }
-.v50-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 20px 0;
-  color: rgba(255,255,255,0.25);
-  font-size: 13px;
-}
-.v50-divider::before,.v50-divider::after {
-  content:'';
-  flex: 1;
-  height: 1px;
-  background: rgba(255,255,255,0.1);
-}
-.v50-btn-secondary {
-  width: 100%;
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.15);
-  color: rgba(255,255,255,0.8);
-  border-radius: 14px;
-  padding: 14px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
-  font-family: inherit;
-}
-.v50-btn-secondary:hover {
-  background: rgba(255,255,255,0.07);
-  border-color: rgba(255,255,255,0.25);
-}
-.v50-hint {
-  text-align: center;
-  font-size: 12px;
-  color: rgba(255,255,255,0.25);
-  margin: 16px 0 0;
-}
-`;
-
 const st = document.createElement('style');
-st.textContent = css;
-document.head.appendChild(st);
+st.id = 'v60-login-css';
+if(!document.getElementById('v60-login-css')) document.head.appendChild(st);
+st.textContent = `
+.v60-page{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden;background:#080818;direction:rtl;font-family:'Tajawal','Segoe UI',sans-serif}
+.v60-canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
+.v60-video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;opacity:0.35}
+.v60-overlay{position:fixed;inset:0;z-index:2;background:linear-gradient(135deg,rgba(8,8,24,0.75) 0%,rgba(15,10,40,0.65) 50%,rgba(8,8,24,0.80) 100%)}
+.v60-wrap{position:relative;z-index:3;width:100%;max-width:460px;display:flex;flex-direction:column;align-items:center;gap:20px}
+.v60-brand{display:flex;align-items:center;gap:12px;color:#fff;font-size:24px;font-weight:900;letter-spacing:-0.5px}
+.v60-brand-icon{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#7c3aed,#2563eb);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(124,58,237,0.5);overflow:hidden}
+.v60-brand-icon img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.v60-brand-name{background:linear-gradient(135deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.v60-card{width:100%;padding:40px 36px;border-radius:28px;background:rgba(255,255,255,0.06);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);border:1px solid rgba(255,255,255,0.1);box-shadow:0 32px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(124,58,237,0.1),inset 0 1px 0 rgba(255,255,255,0.08);position:relative;overflow:hidden}
+.v60-card::before{content:'';position:absolute;top:-50%;right:-50%;width:200%;height:200%;background:radial-gradient(ellipse at 70% 20%,rgba(124,58,237,0.08) 0%,transparent 60%);pointer-events:none}
+.v60-glow{position:absolute;top:0;right:0;width:200px;height:200px;background:radial-gradient(circle,rgba(124,58,237,0.15),transparent 70%);pointer-events:none;border-radius:50%;transform:translate(30%,-30%)}
+@supports not (backdrop-filter:blur(32px)){.v60-card{background:rgba(15,10,40,0.95)}}
+.v60-head{text-align:center;margin-bottom:28px}
+.v60-title{color:#fff;font-size:26px;font-weight:900;margin:0 0 8px;letter-spacing:-0.5px}
+.v60-sub{color:rgba(255,255,255,0.5);font-size:14px;margin:0;line-height:1.6}
+.v60-error{display:none;align-items:center;gap:10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;border-radius:14px;padding:12px 16px;font-size:13px;margin-bottom:20px;animation:v60FadeIn 0.3s ease}
+.v60-error-icon{font-size:16px;flex-shrink:0}
+.v60-form{display:flex;flex-direction:column;gap:16px}
+.v60-field{display:flex;flex-direction:column;gap:8px}
+.v60-label-row{display:flex;justify-content:space-between;align-items:center}
+.v60-label{color:rgba(255,255,255,0.8);font-size:13px;font-weight:700}
+.v60-forgot{color:#60a5fa;font-size:12px;text-decoration:none;transition:color 0.2s}
+.v60-forgot:hover{color:#a78bfa}
+.v60-input-wrap{position:relative;display:flex;align-items:center}
+.v60-ico{position:absolute;right:14px;width:17px;height:17px;color:rgba(255,255,255,0.35);pointer-events:none;flex-shrink:0}
+.v60-input{width:100%;height:52px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:14px;color:#fff;padding:0 44px 0 48px;font-size:15px;font-family:inherit;outline:none;transition:all 0.25s;box-sizing:border-box;text-align:right}
+.v60-input::placeholder{color:rgba(255,255,255,0.25);font-size:13px}
+.v60-input:focus{border-color:#7c3aed;background:rgba(124,58,237,0.1);box-shadow:0 0 0 4px rgba(124,58,237,0.15)}
+.v60-input:hover:not(:focus){border-color:rgba(255,255,255,0.2)}
+.v60-eye{position:absolute;left:12px;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.4);padding:6px;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:all 0.2s}
+.v60-eye:hover{color:#a78bfa;background:rgba(124,58,237,0.15)}
+.v60-btn{width:100%;height:54px;border:none;border-radius:16px;background:linear-gradient(135deg,#7c3aed 0%,#2563eb 100%);color:#fff;font-size:16px;font-weight:800;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-top:6px;box-shadow:0 8px 28px rgba(124,58,237,0.4);transition:all 0.25s;position:relative;overflow:hidden}
+.v60-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.1),transparent);pointer-events:none}
+.v60-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 14px 36px rgba(124,58,237,0.55)}
+.v60-btn:active:not(:disabled){transform:translateY(0)}
+.v60-btn:disabled{opacity:0.75;cursor:not-allowed;transform:none}
+.v60-spinner{animation:v60Spin 0.8s linear infinite;width:20px;height:20px}
+@keyframes v60Spin{to{transform:rotate(360deg)}}
+.v60-divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:rgba(255,255,255,0.2);font-size:13px}
+.v60-divider::before,.v60-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.08)}
+.v60-secondary{width:100%;height:50px;background:transparent;border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.75);border-radius:14px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.25s}
+.v60-secondary:hover{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.2);color:#fff}
+.v60-hint{text-align:center;font-size:12px;color:rgba(255,255,255,0.2);margin:16px 0 0}
+.v60-trust{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.v60-trust span{color:rgba(255,255,255,0.3);font-size:12px;display:flex;align-items:center;gap:4px}
+@keyframes v60FadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes v60Shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+@media(max-width:520px){.v60-card{padding:28px 20px;border-radius:22px}.v60-title{font-size:22px}.v60-trust{gap:10px}}
+`;
 
 })();
