@@ -245,9 +245,6 @@ function packagesAdmin(){return `<div class="card"><h2>إضافة باقة</h2><
 async function addPkg(e){e.preventDefault();try{await api('/api/admin/packages',{method:'POST',body:JSON.stringify({name:pname.value,amount:pamount.value,bonus:pbonus.value,commission_per_order:pcomm.value})});state.meta=await api('/api/meta');toast('تمت إضافة الباقة');admin()}catch(err){toast(err.message)}}
 init();
 
-/* =========================
-   Sallehly V6 Ultra Dashboard JS overrides
-   ========================= */
 function menuIcon(key){return ({dash:'🏠',users:'👥',orders:'🛒',topups:'🚚',services:'💼',packages:'⚙️',near:'📍',balance:'💳',ledger:'📘'}[key]||'•')}
 function roleName(){return state.user?.role==='admin'?'مدير النظام':state.user?.role==='technician'?'فني معتمد':'عميل'}
 function heroMetrics(items){return `<div class="hero-metrics-row">${items.map(x=>`<div class="metric-card-sm"><div class="mc-icon">${x.icon}</div><div class="mc-val">${x.value}</div><div class="mc-label">${x.label}</div><div class="mc-badge">↑ ${x.up||'نشط'}</div></div>`).join('')}</div>`}
@@ -262,7 +259,7 @@ async function techDash(){let me=(await api('/api/me')).user;state.user=me;let m
 async function admin(){let menu=[['dash','لوحة الإدارة'],['users','المستخدمين'],['orders','الطلبات'],['topups','شحن الفنيين'],['services','المهن والخدمات'],['packages','الباقات']];let c='';if(state.tab==='users'){let j=await api('/api/admin/users');c=dashboardHero('إدارة المستخدمين','تحكم بحسابات العملاء والفنيين وحالات التفعيل',[{label:'المستخدمين',value:j.users.length,up:'إجمالي',icon:'👥'},{label:'الفنيين',value:j.users.filter(u=>u.role==='technician').length,up:'فنيين',icon:'👨‍🔧'},{label:'العملاء',value:j.users.filter(u=>u.role==='customer').length,up:'عملاء',icon:'🙂'},{label:'نشط',value:j.users.filter(u=>u.is_active).length,up:'حساب',icon:'✅'}])+usersTable(j.users)}else if(state.tab==='orders'){let j=await api('/api/requests');c=dashboardHero('إدارة الطلبات','راقب جميع طلبات المنصة وحالات التنفيذ',[{label:'كل الطلبات',value:j.requests.length,up:'إجمالي',icon:'🛒'},{label:'مفتوحة',value:j.requests.filter(r=>r.status==='open').length,up:'طلب',icon:'⚡'},{label:'مكتملة',value:j.requests.filter(r=>r.status==='completed').length,up:'طلب',icon:'✅'},{label:'قيد العمل',value:j.requests.filter(r=>r.status==='accepted').length,up:'طلب',icon:'🔧'}])+`<div class="dash-card"><h2>كل الطلبات</h2>${reqTable(j.requests)}</div>`}else if(state.tab==='topups'){let j=await api('/api/topups');c=dashboardHero('شحن الفنيين','راجع إثباتات الدفع وفعّل أرصدة الفنيين',[{label:'طلبات الشحن',value:j.topups.length,up:'إجمالي',icon:'🚚'},{label:'بانتظار',value:j.topups.filter(t=>t.status==='pending').length,up:'مراجعة',icon:'⏳'},{label:'موافق عليها',value:j.topups.filter(t=>t.status==='approved').length,up:'عملية',icon:'✅'},{label:'مرفوضة',value:j.topups.filter(t=>t.status==='rejected').length,up:'عملية',icon:'❌'}])+topupTable(j.topups)}else if(state.tab==='services')c=dashboardHero('المهن والخدمات','أضف خدمات جديدة ورتّبها بشكل جذاب داخل المنصة',[{label:'الخدمات',value:state.meta.services.length,up:'متاحة',icon:'💼'},{label:'الأيقونات',value:'جاهزة',up:'UI',icon:'🎨'},{label:'الفئات',value:'5',up:'رئيسية',icon:'📦'},{label:'النظام',value:'فعال',up:'مباشر',icon:'✅'}])+`<div class="dash-grid two"><div class="dash-card v6-form">${servicesAdmin()}</div>${promoBox('وسّع الخدمات','أضف مهن جديدة مثل الطاقة الشمسية، الزجاج، الأثاث وغيرها')}</div>${categoriesBox()}`;else if(state.tab==='packages')c=dashboardHero('إدارة الباقات','أنشئ باقات شحن للفنيين وحدد العمولة',[{label:'الباقات',value:state.meta.packages.length,up:'متاحة',icon:'📦'},{label:'الدفع',value:'بنكي',up:'تحويل',icon:'🏦'},{label:'العمولة',value:'2 د.أ',up:'افتراضي',icon:'💳'},{label:'حالة',value:'فعال',up:'جاهز',icon:'✅'}])+packagesAdmin();else{let j=await api('/api/admin/stats');let s=j.stats;c=dashboardHero('مرحباً بك في لوحة الإدارة','تحكم كامل في خدماتك وإحصائياتك من مكان واحد',[{label:'إجمالي الإيرادات',value:'25,680 د.ج',up:'24%',icon:'💲'},{label:'الطلبات الكلية',value:s.requests||0,up:'18%',icon:'🛍️'},{label:'المستخدمين',value:(s.customers||0)+(s.technicians||0),up:'12%',icon:'👥'},{label:'الخدمات النشطة',value:state.meta.services.length,up:'7%',icon:'📦'}])+`<div class="dash-grid"><div>${activityBox()}</div><div class="dash-card v6-form">${servicesAdmin()}</div>${promoBox('طور خدماتك','قدم أفضل الخدمات لعملائك وزد من أرباحك')}</div>${categoriesBox()}${chartsBox()}`}layout('لوحة الإدارة',menu,c)}
 
 
-/* ===== Sallehly V7 Ultra Motion Logic ===== */
+
 function showWelcomeModal(){
   if(sessionStorage.sallehlyWelcomeSeen) return;
   sessionStorage.sallehlyWelcomeSeen='1';
@@ -282,9 +279,7 @@ const __oldCustDash=custDash; custDash=async function(){await __oldCustDash(); c
 const __oldTechDash=techDash; techDash=async function(){await __oldTechDash(); const main=document.querySelector('.admin-main'); if(main && state.tab==='dash'){const hero=main.querySelector('.dashboard-hero'); if(hero) hero.insertAdjacentHTML('afterend',`<div class="lock-note">⚠️ نظام صلّحلي: لا يمكنك قبول طلب جديد أثناء وجود طلب قيد التنفيذ أو تم اختيارك له. أنهي الطلب الحالي أولاً.</div>`+securityIdeas());}}
 const __oldAdmin=admin; admin=async function(){await __oldAdmin(); const main=document.querySelector('.admin-main'); if(main && state.tab==='dash'){const hero=main.querySelector('.dashboard-hero'); if(hero) hero.insertAdjacentHTML('afterend',securityIdeas());}}
 
-/* =========================
-   Sallehly V8 Governorates + Welcome Fix
-   ========================= */
+
 const JORDAN_AREAS = {
   'عمان':['القويسمة','الجبيهة','طبربور','صويلح','خلدا','تلاع العلي','مرج الحمام','ضاحية الياسمين','البيادر','الدوار السابع','الدوار الثامن','أبو نصير','شفا بدران','النصر','ماركا','الهاشمي الشمالي','جبل الحسين','جبل عمان','عبدون','دابوق','الرابية','أم أذينة','وادي السير','ناعور','المقابلين','سحاب','اليادودة','خريبة السوق'],
   'الزرقاء':['الزرقاء الجديدة','الجبل الأبيض','الرصيفة','ياجوز','الغويرية','الهاشمية','بيرين','الضليل','حي معصوم','حي الأمير محمد','الزواهرة'],
@@ -336,60 +331,6 @@ function showWelcomeModalForce(){
   document.body.appendChild(el);
 }
 
-
-requestForm=function(){return `<div class="card bluehint"><h2>طلب خدمة جديد</h2><p class="muted">حدد المحافظة ثم اختر المنطقة من القائمة حتى تظهر لك نتائج أدق للفنيين القريبين.</p><form class="form two" onsubmit="createReq(event)"><div class="field"><label>الخدمة</label><select id="qservice">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field"><label>المحافظة</label><select id="qcity">${governorateOptions(state.user?.city||'عمان')}</select></div><div class="field"><label>منطقة السكن</label><select id="qarea"></select></div><div class="field hide" id="qareaOtherWrap"><label>اكتب المنطقة</label><input id="qareaOther" placeholder="اكتب اسم المنطقة"></div><div class="field"><label>الوقت المطلوب</label><input id="qtime" placeholder="اليوم مساءً"></div><div class="field" style="grid-column:1/-1"><label>وصف المشكلة</label><textarea id="qdesc" required placeholder="مثال: المكيف لا يبرد وأحتاج فني اليوم"></textarea></div><div class="field" style="grid-column:1/-1"><button type="button" class="btn ghost" onclick="useGPS('request')">📍 حدد موقعي الآن</button><small class="muted">الموقع يساعد الفنيين على معرفة قربك قبل قبول الطلب.</small><div id="requestMap">${mapBox(state.gps?.lat,state.gps?.lng)}</div></div><button class="btn">نشر الطلب</button></form></div><br><div id="techs"></div>`}
-createReq=async function(e){e.preventDefault();try{await api('/api/requests',{method:'POST',body:JSON.stringify({service:qservice.value,city:qcity.value,area:selectedArea('qarea','qareaOther'),preferred_time:qtime.value,description:qdesc.value,lat:state.gps?.lat||'',lng:state.gps?.lng||''})});toast('تم نشر الطلب');state.tab='orders';dashboard()}catch(err){toast(err.message)}}
-nearbyPage=function(){return `<div class="card bluehint"><h2>الفنيين الأقرب لك</h2><p class="muted">اختر المحافظة والمنطقة، ثم الخدمة المطلوبة. النظام يطابق الفنيين حسب مناطق عملهم وتقييمهم.</p><div class="form three"><div class="field"><label>الخدمة</label><select id="nservice" onchange="loadNearby()">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field"><label>المحافظة</label><select id="ncity" onchange="bindAreaSelect('ncity','narea');loadNearby()">${governorateOptions(state.user?.city||'عمان')}</select></div><div class="field"><label>المنطقة</label><select id="narea" onchange="loadNearby()"></select></div><button class="btn ghost" onclick="useGPS('near')">📍 تحديد موقعي GPS</button></div><div id="nearMap">${mapBox(state.gps?.lat,state.gps?.lng)}</div></div><br><div id="nearList" class="grid"></div>`}
-loadNearby=async function(){try{let service=$('#nservice')?.value||state.meta.services[0]?.name, city=$('#ncity')?.value||state.user.city||'عمان', area=$('#narea')?.value||'';let j=await api(`/api/technicians?service=${encodeURIComponent(service)}&city=${encodeURIComponent(city)}&lat=${state.gps?.lat||''}&lng=${state.gps?.lng||''}`);let techs=(j.technicians||[]).filter(t=>!area||area==='أخرى'||String(t.areas||'').includes(area)||String(t.city||'').includes(city));let box=$('#nearList'); if(!box)return; box.innerHTML=techs.length?techs.map(t=>`<div class="card techcard"><div class="techhead">${t.avatar_url?`<img class="techAvatar" src="${_safeSrc(t.avatar_url)}" onerror="this.outerHTML='<div class=\'techAvatar fallback\'>ف</div>'">`:`<div class="techAvatar fallback">ف</div>`}<div><h3>${_x(t.name||'-')}</h3><div>${stars(t.rating_avg)} <small class="muted">(${t.rating_count||0} تقييم)</small></div></div></div><p><b>الخدمات:</b> ${_x(t.services||'-')}</p><p><b>المحافظة:</b> ${_x(t.city||'-')}</p><p><b>المناطق:</b> ${_x(t.areas||'-')}</p><p><b>أعمال مكتملة:</b> ${t.completed_jobs||0}</p><span class="status">مناسب لـ ${_x(city)}${area?' - '+_x(area):''}</span></div>`).join(''):`<div class="card empty">لا يوجد فنيين مناسبين حالياً لهذه الخدمة والمنطقة.</div>`}catch(e){toast(e.message)}}
-register=function(role='customer'){app.innerHTML=`<div class="page"><div class="card" style="max-width:860px;margin:auto"><h1>إنشاء حساب</h1><form class="form two" onsubmit="doRegister(event)"><div class="field"><label>نوع الحساب</label><select id="role" onchange="toggleTech()"><option value="customer">عميل</option><option value="technician">فني</option></select></div><div class="field"><label>الاسم الكامل</label><input id="name" placeholder="مثال: أحمد محمد" required minlength="2"></div><div class="field techOnly"><label>الصورة الشخصية للفني</label><input id="avatar" type="file" accept="image/png,image/jpeg,image/webp"><small class="muted">مطلوبة للفني فقط حتى يظهر للعميل بشكل موثوق.</small></div><div class="field"><label>البريد الإلكتروني</label><input id="remail" type="email" required></div><div class="field"><label>رقم الهاتف</label><input id="phone" placeholder="0791234567" required></div><div class="field"><label>كلمة السر</label><input id="rpassword" type="password" required minlength="8"></div><div class="field"><label>المحافظة</label><select id="city">${governorateOptions('عمان')}</select></div><div class="field"><label>منطقة السكن</label><select id="customerArea"></select></div><div class="field techOnly"><label>الرقم الوطني</label><input id="national" placeholder="10 أرقام"></div><div class="field techOnly"><label>الخدمات</label><select id="srv" multiple size="5">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field techOnly"><label>مناطق العمل</label><select id="areas" multiple size="7"></select><small class="muted">اختر أكثر من منطقة بزر Ctrl. تتغير حسب المحافظة.</small></div><button class="btn">إنشاء الحساب</button></form></div></div>`;$('#role').value=role;toggleTech();bindAreaSelect('city','customerArea');const city=$('#city'), areas=$('#areas');function refreshWorkAreas(){areas.innerHTML=areaOptions(city.value).replace('<option value="أخرى">أخرى</option>','')}city.addEventListener('change',refreshWorkAreas);refreshWorkAreas();}
-doRegister=async function(e){e.preventDefault();try{const role=$('#role').value;const fd=new FormData();fd.append('role',role);fd.append('name',$('#name').value.trim());fd.append('email',$('#remail').value.trim());fd.append('phone',$('#phone').value.trim());fd.append('password',$('#rpassword').value);fd.append('city',$('#city').value);fd.append('national_number',$('#national')?$('#national').value.trim():'');fd.append('services',vals('#srv').join(','));fd.append('areas', role==='technician' ? vals('#areas').join(',') : (selectedArea('regArea','regAreaOther') || $('#regArea')?.value || ''));if(role==='technician'&&!$('#avatar').files[0]) throw new Error('الرجاء اختيار صورة شخصية للفني');if($('#avatar')&&$('#avatar').files[0])fd.append('avatar',$('#avatar').files[0]);const j=await api('/api/auth/register',{method:'POST',body:fd});if(j.step==='verify'){showOtpScreen(j.email);}else{state.user=j.user;toast('تم إنشاء الحساب');dashboard();}}catch(err){toast(err.message)}}
-const __v8OldCustDash=custDash; custDash=async function(){await __v8OldCustDash(); if(state.tab==='dash') bindAreaSelect('qcity','qarea','qareaOtherWrap'); if(state.tab==='near'){bindAreaSelect('ncity','narea'); loadNearby();}}
-const __v8OldUseGPS=useGPS; useGPS=function(mode='near'){ if(!navigator.geolocation)return toast('المتصفح لا يدعم GPS'); navigator.geolocation.getCurrentPosition(pos=>{state.gps={lat:pos.coords.latitude.toFixed(6),lng:pos.coords.longitude.toFixed(6)};let c=cityFromGPS(pos.coords.latitude,pos.coords.longitude); if($('#ncity')){$('#ncity').value=c; bindAreaSelect('ncity','narea');} if($('#qcity')){$('#qcity').value=c; bindAreaSelect('qcity','qarea','qareaOtherWrap');} if($('#nearMap'))$('#nearMap').innerHTML=mapBox(state.gps.lat,state.gps.lng); if($('#requestMap'))$('#requestMap').innerHTML=mapBox(state.gps.lat,state.gps.lng); toast('تم تحديد موقعك: '+c); if(mode==='near')loadNearby();},()=>toast('لم يتم السماح بالوصول للموقع'),{enableHighAccuracy:true,timeout:10000});}
-
-/* =========================
-   Sallehly V9 Real UX Fixes
-   - customer has no reports / recent admin activity / 4 stats boxes
-   - working settings for name + password
-   - technician search + profile details + direct request + chat
-   - services appear in top moving strip and after admin adds them
-   ========================= */
-function simpleHero(title, sub){
-  return `<div class="dashboard-hero simple-hero"><div class="hero-inner"><div class="hero-title-row"><div><h1>👋 ${title}</h1><p>${sub}</p></div></div></div></div>`;
-}
-function techSearchBox(){
-  return `<div class="dash-card tech-search-card">
-    <div class="section-title-row"><div><h2>ابحث عن فني</h2><p class="muted">اكتب مثل: تكييف، كهرباء، سباكة — ثم اختر المحافظة والمنطقة.</p></div></div>
-    <div class="form four compact-form">
-      <div class="field"><label>كلمة البحث</label><input id="searchTechQ" placeholder="مثال: تكييف" onkeydown="if(event.key==='Enter')searchTechnicians()"></div>
-      <div class="field"><label>الخدمة</label><select id="searchService">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div>
-      <div class="field"><label>المحافظة</label><select id="searchCity">${governorateOptions(state.user?.city||'عمان')}</select></div>
-      <div class="field"><label>المنطقة</label><select id="searchArea"></select></div>
-    </div>
-    <div class="search-actions"><button class="btn" onclick="searchTechnicians()">🔎 بحث عن فني</button><button class="btn ghost" onclick="useGPS('search')">📍 حسب موقعي</button></div>
-  </div><div id="techSearchResults" class="tech-result-grid"></div>`;
-}
-async function searchTechnicians(){
-  try{
-    const q=$('#searchTechQ')?.value?.trim()||'';
-    const service=$('#searchService')?.value||q||state.meta.services[0]?.name||'';
-    const city=$('#searchCity')?.value||state.user?.city||'عمان';
-    const area=$('#searchArea')?.value||'';
-    const url=`/api/technicians?q=${encodeURIComponent(q)}&service=${encodeURIComponent(service)}&city=${encodeURIComponent(city)}&area=${encodeURIComponent(area)}`;
-    const j=await api(url); const box=$('#techSearchResults'); if(!box)return;
-    const techs=j.technicians||[];
-    box.innerHTML=techs.length?techs.map(t=>techCard(t, service, city, area)).join(''):`<div class="dash-card empty">لا يوجد فنيين مناسبين الآن. جرّب خدمة أو منطقة ثانية.</div>`;
-  }catch(e){toast(e.message)}
-}
-function techCard(t, service, city, area){
-  const _esc=typeof v20SafeTxt==='function'?v20SafeTxt:(typeof escapeHtml==='function'?escapeHtml:function(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));});
-  const av=t.avatar_url?`<img class="techAvatar" src="${_esc(t.avatar_url)}" onerror="this.outerHTML='<div class=\'techAvatar fallback\'>\u0641</div>'">`:`<div class="techAvatar fallback">\u0641</div>`;
-  return `<div class="dash-card tech-card-pro">
-    <div class="tech-card-top">${av}<div><h3>${_esc(t.name||'-')}</h3><div>${stars(t.rating_avg)} <small class="muted">${_esc(String(t.rating_count||0))} \u062a\u0642\u064a\u064a\u0645</small></div></div></div>
-    <div class="tech-tags"><span>${_esc(t.city||city||'')}</span><span>${_esc(area||'\u0643\u0644 \u0627\u0644\u0645\u0646\u0627\u0637\u0642')}</span><span>${_esc(String(t.completed_jobs||0))} \u0639\u0645\u0644</span></div>
-    <p><b>\u0627\u0644\u062e\u062f\u0645\u0627\u062a:</b> ${_esc(t.services||'-')}</p><p><b>\u0645\u0646\u0627\u0637\u0642 \u0627\u0644\u0639\u0645\u0644:</b> ${_esc(t.areas||'-')}</p>
-    <div class="actions"><button class="btn ghost" onclick='openTechDetails(${JSON.stringify(t).replace(/'/g,"&#39;")}, ${JSON.stringify(service)}, ${JSON.stringify(city)}, ${JSON.stringify(area)})'>عرض التفاصيل</button><button class="btn" onclick="directRequest(${t.id},${JSON.stringify(String(service))},${JSON.stringify(String(city))},${JSON.stringify(String(area))})">إنشاء طلب</button></div>
-  </div>`;
-}
 function openTechDetails(t, service, city, area){
   const _esc=typeof v20SafeTxt==='function'?v20SafeTxt:(typeof escapeHtml==='function'?escapeHtml:function(s){return String(s??''). replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));});
   const old=document.getElementById('techDetailsOverlay'); if(old)old.remove();
@@ -411,124 +352,7 @@ function settingsPage(){
   const u=state.user||{};
   return `<div class="settings-grid"><div class="dash-card"><h2>تعديل الحساب</h2><form class="form two" onsubmit="saveProfile(event)"><div class="field"><label>الاسم</label><input id="setName" value="${u.name||''}" required></div><div class="field"><label>الهاتف</label><input id="setPhone" value="${u.phone||''}" required></div><div class="field"><label>المحافظة</label><select id="setCity">${governorateOptions(u.city||'عمان')}</select></div><div class="field"><label>المنطقة</label><select id="setArea"></select></div><button class="btn">حفظ التعديلات</button></form></div><div class="dash-card"><h2>تغيير كلمة السر</h2><form class="form" onsubmit="changePassword(event)"><div class="field"><label>كلمة السر الحالية</label><input id="oldPass" type="password" required></div><div class="field"><label>كلمة السر الجديدة</label><input id="newPass" type="password" minlength="8" required></div><button class="btn">تحديث كلمة السر</button></form><p class="muted">نصيحة: استخدم 8 أحرف على الأقل مع أرقام ورموز.</p></div></div>`;
 }
-async function saveProfile(e){e.preventDefault();try{const j=await api('/api/me/profile',{method:'POST',body:JSON.stringify({name:setName.value,phone:setPhone.value,city:setCity.value,area:setArea.value,areas:setArea.value})});state.user=j.user;toast('تم تحديث الحساب');dashboard()}catch(err){toast(err.message)}}
-async function changePassword(e){e.preventDefault();try{await api('/api/me/password',{method:'POST',body:JSON.stringify({current_password:oldPass.value,new_password:newPass.value})});oldPass.value='';newPass.value='';toast('تم تغيير كلمة السر')}catch(err){toast(err.message)}}
-// Override layout: settings button is real now
-layout=function(title,menu,content){document.body.classList.add('dashboard-mode');let user=state.user||{};app.innerHTML=`<div class="admin-shell"><aside class="admin-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${menu.map(m=>`<button class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${m[1]}</b><span class="mi">${menuIcon(m[0])}</span></button>`).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu"><button class="sidebtn ${state.tab==='settings'?'active':''}" onclick="state.tab='settings';dashboard();setTimeout(v35ScrollToContent,80)"><b>الإعدادات</b><span class="mi">⚙️</span></button><button class="sidebtn" onclick="logout()"><b>تسجيل الخروج</b><span class="mi">🚪</span></button></div><div class="admin-profile"><div class="avatar-sm">${(user.name||'ص').slice(0,1)}</div><div><b>${user.name||roleName()}</b><small>${user.email||roleName()}</small></div></div></aside><main class="admin-main"><div class="admin-top"><div class="admin-search">🔎 <input placeholder="ابحث هنا..." onkeydown="if(event.key==='Enter')toast('ابحث من صفحة الفنيين الأقرب أو من إدارة الطلبات')"></div><div class="admin-actions"><button class="admin-icon-btn" onclick="toast('لا توجد إشعارات جديدة')">🔔</button><button class="admin-icon-btn" onclick="document.body.classList.toggle('dark-dash')">🌙</button><button class="admin-icon-btn logout" onclick="logout()">⏻</button></div></div>${content}</main></div>`}
-// Customer dashboard rebuilt cleanly
-custDash=async function(){
-  let menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي']];
-  let c='';
-  if(state.tab==='settings') c=simpleHero('الإعدادات','غيّر اسمك، منطقتك، أو كلمة السر')+settingsPage();
-  else if(state.tab==='orders'){let j=await api('/api/requests');c=simpleHero('طلباتي','تابع الطلبات والمحادثات مع الفنيين')+`<div class="dash-card"><h2>طلباتي</h2>${reqTable(j.requests)}</div>`}
-  else if(state.tab==='near'){c=simpleHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وافتح ملف الفني قبل إنشاء الطلب')+techSearchBox();}
-  else c=simpleHero('لوحة العميل','اطلب خدمة أو ابحث عن الفني المناسب حسب منطقتك')+serviceMarquee()+`<div class="customer-main-grid"><div class="dash-card v6-form">${requestForm()}</div><div>${techSearchBox()}</div></div>`;
-  layout('لوحة العميل',menu,c);
-  if(state.tab==='dash'){bindAreaSelect('qcity','qarea','qareaOtherWrap'); bindAreaSelect('searchCity','searchArea');}
-  if(state.tab==='near'){bindAreaSelect('searchCity','searchArea'); setTimeout(searchTechnicians,100)}
-  if(state.tab==='settings') bindAreaSelect('setCity','setArea');
-}
-// Technician/Admin settings support and keep admin activity only for admin
-const __v9TechDashBase=techDash;
-techDash=async function(){ if(state.tab==='settings'){layout('لوحة الفني',[['dash','الرئيسية'],['orders','الطلبات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']], simpleHero('الإعدادات','عدّل حسابك وكلمة السر')+settingsPage()); bindAreaSelect('setCity','setArea'); return;} await __v9TechDashBase();}
-const __v9AdminBase=admin;
-admin=async function(){ if(state.tab==='settings'){layout('لوحة الإدارة',[['dash','لوحة الإدارة'],['users','المستخدمين'],['orders','الطلبات'],['topups','شحن الفنيين'],['services','المهن والخدمات'],['packages','الباقات']], simpleHero('الإعدادات','إدارة بيانات حساب المدير')+settingsPage()); bindAreaSelect('setCity','setArea'); return;} await __v9AdminBase();}
-// Better request form: no report/admin widgets, and show search results after selecting service
-requestForm=function(){return `<div class="bluehint"><h2>طلب خدمة جديد</h2><p class="muted">حدد الخدمة والمحافظة والمنطقة، ثم اكتب وصف المشكلة.</p><form class="form two" onsubmit="createReq(event)"><div class="field"><label>الخدمة</label><select id="qservice" onchange="syncSearchFromRequest()">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field"><label>المحافظة</label><select id="qcity" onchange="bindAreaSelect('qcity','qarea','qareaOtherWrap');syncSearchFromRequest()">${governorateOptions(state.user?.city||'عمان')}</select></div><div class="field"><label>منطقة السكن</label><select id="qarea" onchange="syncSearchFromRequest()"></select></div><div class="field hide" id="qareaOtherWrap"><label>اكتب المنطقة</label><input id="qareaOther" placeholder="اكتب اسم المنطقة"></div><div class="field"><label>الوقت المطلوب</label><input id="qtime" placeholder="اليوم مساءً"></div><div class="field" style="grid-column:1/-1"><label>وصف المشكلة</label><textarea id="qdesc" required placeholder="مثال: المكيف لا يبرد وأحتاج فني اليوم"></textarea></div><div class="field" style="grid-column:1/-1"><button type="button" class="btn ghost" onclick="useGPS('request')">📍 حدد موقعي الآن</button><small class="muted">الموقع يساعد الفنيين على معرفة قربك قبل قبول الطلب.</small><div id="requestMap">${mapBox(state.gps?.lat,state.gps?.lng)}</div></div><button class="btn">نشر الطلب العام</button></form></div>`}
-function syncSearchFromRequest(){ if($('#searchService')&&$('#qservice')) $('#searchService').value=$('#qservice').value; if($('#searchCity')&&$('#qcity')) {$('#searchCity').value=$('#qcity').value; bindAreaSelect('searchCity','searchArea');} if($('#searchArea')&&$('#qarea')) $('#searchArea').value=$('#qarea').value; }
-// Override nearbyPage to use same search component
-nearbyPage=function(){return techSearchBox()}
-loadNearby=searchTechnicians;
-// Force welcome every browser session once and show for logged-in too if not seen
 
-
-
-/* ===== Sallehly V10 Professional Functional Layer ===== */
-function v10ApplyTheme(){ if(localStorage.sallehlyTheme==='dark') document.body.classList.add('dark-dash'); else document.body.classList.remove('dark-dash'); }
-function v10ToggleTheme(){ localStorage.sallehlyTheme = document.body.classList.contains('dark-dash') ? 'light' : 'dark'; v10ApplyTheme(); toast(localStorage.sallehlyTheme==='dark'?'تم تفعيل الدارك مود':'تم تفعيل الوضع الفاتح'); }
-function v10Sound(type='notify'){
-  try{ const AudioCtx=window.AudioContext||window.webkitAudioContext; const ctx=new AudioCtx(); const o=ctx.createOscillator(); const g=ctx.createGain(); const map={notify:[660,.08],request:[880,.12],message:[520,.09],done:[740,.16],logout:[330,.1]}; const [f,d]=map[type]||map.notify; o.frequency.value=f; o.type='sine'; g.gain.setValueAtTime(.0001,ctx.currentTime); g.gain.exponentialRampToValueAtTime(.16,ctx.currentTime+.01); g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+d); o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+d+.02); }catch(e){}
-}
-function v10Notify(text='تنبيه جديد',type='notify'){ v10Sound(type); const b=document.querySelector('.bell-btn'); if(b){b.classList.add('sound-on'); setTimeout(()=>b.classList.remove('sound-on'),700)} toast(text); }
-const __v10OldToast=toast; toast=function(t){ __v10OldToast(t); };
-function v10Hero(title,desc){return `<section class="v10-clean-hero"><h1>${title}</h1><p>${desc}</p></section>`}
-function v10TopStrip(){return serviceMarquee().replace('service-marquee-wrap','service-marquee-wrap v10-service-strip')}
-function v10PublicActions(){return `<div class="hero-actions"><button class="btn big" onclick="go('register')">إنشاء حساب</button><button class="btn ghost big" onclick="go('login')">تسجيل دخول</button></div>`}
-login=function(){app.innerHTML=`<div class="page"><div class="card v10-auth-card"><div class="v10-auth-wrap"><div class="v10-auth-side"><div class="welcome-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img"></div><h1>تسجيل دخول صلّحلي</h1><p>ادخل إلى حسابك كعميل أو فني أو أدمن، وتابع الطلبات والشات والخدمات من لوحة واحدة.</p><div class="welcome-features"><div><b>آمن</b><small>صلاحيات حسب الدور</small></div><div><b>سريع</b><small>طلبات مباشرة</small></div><div><b>مرتب</b><small>واجهة احترافية</small></div></div></div><div class="v10-auth-form"><h1>تسجيل الدخول</h1><form class="form" onsubmit="doLogin(event)"><div class="field"><label>البريد الإلكتروني</label><input id="email" type="email" required></div><div class="field"><label>كلمة السر</label><input id="password" type="password" required></div><button class="btn">تسجيل دخول</button><p class="muted">حساب الإدارة لا يظهر للعامة. اطلب بيانات الدخول من مالك المنصة.</p></form><button class="btn ghost" onclick="go('register')">إنشاء حساب جديد</button></div></div></div></div>`}
-register=function(role='customer'){app.innerHTML=`<div class="page"><div class="card v10-auth-card"><div class="v10-auth-wrap"><div class="v10-auth-side"><div class="welcome-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img"></div><h1>انضم إلى صلّحلي</h1><p>أنشئ حساب عميل لطلب الخدمات، أو حساب فني لاستقبال الطلبات حسب منطقتك ومهنتك.</p></div><div class="v10-auth-form"><h1>إنشاء حساب</h1><form class="form two" onsubmit="doRegister(event)"><div class="field"><label>نوع الحساب</label><select id="role" onchange="toggleTech()"><option value="customer">عميل</option><option value="technician">فني</option></select></div><div class="field"><label>الاسم الكامل</label><input id="name" placeholder="مثال: أحمد محمد" required minlength="2"></div><div class="field techOnly"><label>الصورة الشخصية للفني</label><input id="avatar" type="file" accept="image/png,image/jpeg,image/webp"><small class="muted">مطلوبة للفني حتى يظهر للعميل.</small></div><div class="field"><label>البريد الإلكتروني</label><input id="remail" type="email" required></div><div class="field"><label>رقم الهاتف</label><input id="phone" placeholder="0791234567" required></div><div class="field"><label>كلمة السر</label><input id="rpassword" type="password" required minlength="8"></div><div class="field"><label>المحافظة</label><select id="city">${governorateOptions('عمان')}</select></div><div class="field"><label>المنطقة</label><select id="regArea"></select></div><div class="field hide" id="regAreaOtherWrap"><label>اكتب المنطقة</label><input id="regAreaOther" placeholder="اكتب اسم المنطقة"></div><div class="field techOnly"><label>الرقم الوطني</label><input id="national" placeholder="10 أرقام"></div><div class="field techOnly"><label>الخدمات</label><select id="srv" multiple size="5">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field techOnly"><label>مناطق العمل</label><select id="areas" multiple size="5">${Object.keys(JORDAN_AREAS).map(c=>`<option>${c}</option>`).join('')}</select></div><button class="btn">إنشاء حساب</button></form><button class="btn ghost" onclick="go('login')">عندي حساب</button></div></div></div></div>`;$('#role').value=role;toggleTech();bindAreaSelect('city','regArea','regAreaOtherWrap')}
-function techSearchBox(){
-  return `<div class="dash-card tech-search-card v10-search-card"><div class="v10-search-head"><div><h2 class="v10-search-title">ابحث عن فني</h2><p class="muted">اكتب الخدمة داخل خانة البحث، ثم اختر المحافظة والمنطقة.</p></div></div><div class="v10-search-line"><div class="field"><label>خانة البحث</label><input id="searchTechQ" placeholder="مثال: تكييف، كهرباء، سباكة" oninput="v10AutoService()" onkeydown="if(event.key==='Enter')searchTechnicians()"></div><div class="field"><label>الخدمة</label><select id="searchService">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field"><label>المحافظة</label><select id="searchCity" onchange="bindAreaSelect('searchCity','searchArea')">${governorateOptions(state.user?.city||'عمان')}</select></div><div class="field"><label>المنطقة</label><select id="searchArea"></select></div><button class="btn" onclick="searchTechnicians()">🔎 بحث</button></div><button class="btn ghost v10-gps-btn" onclick="useGPS('search')">📍 حسب موقعي</button></div><div id="techSearchResults" class="tech-result-grid"></div>`;
-}
-function v10AutoService(){const q=($('#searchTechQ')?.value||'').trim(); if(!q||!$('#searchService'))return; const found=(state.meta.services||[]).find(s=>s.name.includes(q)||q.includes(s.name)||String(s.name).includes(q)); if(found) $('#searchService').value=found.name;}
-requestForm=function(){return `<div class="bluehint"><h2>طلب خدمة جديد</h2><p class="muted">حدد الخدمة والمحافظة والمنطقة، ثم اكتب وصف المشكلة.</p><form class="form two" onsubmit="createReq(event)"><div class="field"><label>الخدمة</label><select id="qservice" onchange="syncSearchFromRequest()">${state.meta.services.map(s=>`<option>${s.name}</option>`).join('')}</select></div><div class="field"><label>المحافظة</label><select id="qcity" onchange="bindAreaSelect('qcity','qarea','qareaOtherWrap');syncSearchFromRequest()">${governorateOptions(state.user?.city||'عمان')}</select></div><div class="field"><label>منطقة السكن</label><select id="qarea" onchange="syncSearchFromRequest()"></select></div><div class="field hide" id="qareaOtherWrap"><label>اكتب المنطقة</label><input id="qareaOther" placeholder="اكتب اسم المنطقة"></div><div class="field"><label>الوقت المطلوب</label><input id="qtime" placeholder="اليوم مساءً"></div><div class="field" style="grid-column:1/-1"><label>وصف المشكلة</label><textarea id="qdesc" required placeholder="مثال: المكيف لا يبرد وأحتاج فني اليوم"></textarea></div><div class="field" style="grid-column:1/-1"><button type="button" class="btn ghost" onclick="useGPS('request')">📍 حدد موقعي الآن</button><small class="muted">الموقع يساعد الفنيين على معرفة قربك قبل قبول الطلب.</small><div id="requestMap">${mapBox(state.gps?.lat,state.gps?.lng)}</div></div><button class="btn">نشر الطلب العام</button></form></div>`}
-const __v10CreateReqBase=createReq; createReq=async function(e){await __v10CreateReqBase(e); v10Sound('request')}
-const __v10SendMsgBase=sendMsg; sendMsg=async function(e,id){await __v10SendMsgBase(e,id); v10Sound('message')}
-const __v10LogoutBase=logout; logout=async function(){v10Sound('logout'); await __v10LogoutBase();}
-layout=function(title,menu,content){document.body.classList.add('dashboard-mode');v10ApplyTheme();let user=state.user||{};app.innerHTML=`<div class="admin-shell"><aside class="admin-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${menu.map(m=>`<button class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${m[1]}</b><span class="mi">${menuIcon(m[0])}</span></button>`).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu"><button class="sidebtn ${state.tab==='settings'?'active':''}" onclick="state.tab='settings';dashboard();setTimeout(v35ScrollToContent,80)"><b>الإعدادات</b><span class="mi">⚙️</span></button><button class="sidebtn" onclick="logout()"><b>تسجيل خروج</b><span class="mi">🚪</span></button></div><div class="admin-profile"><div class="avatar-sm">${(user.name||'ص').slice(0,1)}</div><div><b>${user.name||roleName()}</b><small>${user.email||roleName()}</small></div></div></aside><main class="admin-main"><div class="admin-top"><div class="admin-search">🔎 <input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();setTimeout(()=>{if(document.getElementById('searchTechQ')){document.getElementById('searchTechQ').value=this.value;searchTechnicians()}},100)}"></div><div class="admin-actions"><button class="admin-icon-btn bell-btn" title="التنبيهات" onclick="v10Notify('صوت التنبيه يعمل', 'notify')">🔔</button><button class="admin-icon-btn" title="دارك مود" onclick="v10ToggleTheme()">🌙</button><button class="admin-icon-btn logout" onclick="logout()">⏻</button></div></div>${content}</main></div>`;v10ApplyTheme();}
-custDash=async function(){let menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي']];let c=''; if(state.tab==='settings') c=v10Hero('الإعدادات','تغيير الاسم، المنطقة، الهاتف، وكلمة السر')+settingsPage(); else if(state.tab==='orders'){let j=await api('/api/requests');c=v10Hero('طلباتي','تابع الطلبات وافتح الشات بعد قبول الفني')+`<div class="dash-card"><h2>طلباتي</h2>${reqTable(j.requests)}</div>`} else if(state.tab==='near'){c=v10Hero('البحث عن فني','ابحث من خانة واحدة حسب الخدمة والموقع')+techSearchBox();} else c=v10Hero('لوحة العميل','اطلب خدمة أو ابحث عن الفني المناسب حسب منطقتك')+v10TopStrip()+`<div class="customer-main-grid v10"><div class="dash-card v6-form">${requestForm()}</div>${techSearchBox()}</div>`; layout('لوحة العميل',menu,c); if(state.tab==='dash'){bindAreaSelect('qcity','qarea','qareaOtherWrap');bindAreaSelect('searchCity','searchArea');} if(state.tab==='near'){bindAreaSelect('searchCity','searchArea');setTimeout(searchTechnicians,150)} if(state.tab==='settings') bindAreaSelect('setCity','setArea');}
-const __v10AdminBase=admin; admin=async function(){ if(state.tab==='settings'){layout('لوحة الإدارة',[['dash','لوحة الإدارة'],['users','المستخدمين'],['orders','الطلبات'],['topups','شحن الفنيين'],['services','المهن والخدمات'],['packages','الباقات']], v10Hero('الإعدادات','إدارة حساب المدير')+settingsPage()); bindAreaSelect('setCity','setArea'); return;} await __v10AdminBase(); }
-const __v10TechBase=techDash; techDash=async function(){ if(state.tab==='settings'){layout('لوحة الفني',[['dash','الرئيسية'],['orders','الطلبات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']], v10Hero('الإعدادات','عدّل حسابك وكلمة السر')+settingsPage()); bindAreaSelect('setCity','setArea'); return;} await __v10TechBase(); }
-function showWelcomeModalForce(){ const old=document.getElementById('welcomeOverlay'); if(old) old.remove(); const el=document.createElement('div'); el.className='welcome-overlay v8-welcome'; el.id='welcomeOverlay'; el.innerHTML=`<div class="welcome-card v8-welcome-card"><button class="welcome-close" onclick="closeWelcome()">×</button><div class="welcome-logo big-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img"></div><h2>صلّحلي</h2><p>مرحباً بك في منصة صلّحلي — اطلب الخدمة، تابع الطلب، وتواصل مع الفني من مكان واحد.</p><div class="welcome-features"><div><b>ملف مرتب</b><small>إدارة حسابك بسهولة</small></div><div><b>منع التداخل</b><small>الفني لا يأخذ طلب ثاني قبل إنهاء الحالي</small></div><div><b>بحث سريع</b><small>خدمة + محافظة + منطقة</small></div></div><div class="welcome-actions"><button class="btn" onclick="closeWelcome();go('${state.user?'dashboard':'register'}')">متابعة</button><button class="btn ghost" onclick="closeWelcome()">إغلاق</button></div></div>`; document.body.appendChild(el);}
-
-
-/* ===== Sallehly V11 Slider + Marketplace Layer ===== */
-let v11ServiceIndex=0, v11SliderTimer=null;
-function v11ServiceSlider(){
-  const services=(state.meta.services||[]);
-  if(!services.length) return '';
-  const cards=services.map((s,i)=>`<button class="v11-slide-card" data-service="${String(s.name).replace(/"/g,'&quot;')}" onclick="v11SelectService('${String(s.name).replace(/'/g,"\\'")}')"><span class="v11-slide-icon">${s.icon||'🧰'}</span><span class="v11-slide-text"><b>${s.name}</b><small>طلب سريع • فنيين قريبين • تقييم واضح</small></span></button>`).join('');
-  return `<section class="v11-slider-shell"><div class="v11-slider-head"><div><h2>الخدمات الأكثر طلباً</h2><p>شريط عرض متحرك — اختر الخدمة المناسبة بسرعة</p></div><button class="btn ghost" onclick="go('services')">كل الخدمات</button></div><div class="v11-slider"><button class="v11-arrow" onclick="v11MoveSlider(-1)">‹</button><div class="v11-slider-window"><div id="v11SliderTrack" class="v11-slider-track">${cards}</div></div><button class="v11-arrow" onclick="v11MoveSlider(1)">›</button></div><div id="v11SliderDots" class="v11-dots"></div></section>`;
-}
-function v11VisibleCount(){return window.innerWidth<650?1:window.innerWidth<1050?2:4;}
-function v11UpdateSlider(){
-  const track=document.getElementById('v11SliderTrack'); if(!track) return;
-  const cards=[...track.children]; if(!cards.length) return;
-  const visible=v11VisibleCount(); const max=Math.max(0,cards.length-visible);
-  if(v11ServiceIndex>max) v11ServiceIndex=0; if(v11ServiceIndex<0) v11ServiceIndex=max;
-  const cardW=cards[0].getBoundingClientRect().width+16;
-  track.style.transform=`translateX(${-v11ServiceIndex*cardW}px)`; cards.forEach((c,i)=>c.classList.toggle('is-active', i>=v11ServiceIndex && i<v11ServiceIndex+visible));
-  const pages=max+1; const dots=document.getElementById('v11SliderDots');
-  if(dots) dots.innerHTML=Array.from({length:pages}).map((_,i)=>`<button class="${i===v11ServiceIndex?'active':''}" onclick="v11ServiceIndex=${i};v11UpdateSlider()"></button>`).join('');
-}
-function v11MoveSlider(dir){ v11ServiceIndex+=dir; v11UpdateSlider(); v11RestartSlider(); }
-function v11RestartSlider(){ clearInterval(v11SliderTimer); v11SliderTimer=setInterval(()=>{v11ServiceIndex++;v11UpdateSlider()},4500); }
-function v11InitSlider(){ setTimeout(()=>{v11UpdateSlider(); v11RestartSlider(); const shell=document.querySelector('.v11-slider-shell'); if(shell){shell.onmouseenter=()=>clearInterval(v11SliderTimer); shell.onmouseleave=v11RestartSlider;}},80); }
-function v11SelectService(service){
-  if(!state.user){ localStorage.pendingService=service; go('register'); return; }
-  if(state.user.role==='customer'){
-    state.tab='near'; dashboard();
-    setTimeout(()=>{ if($('#searchTechQ')) $('#searchTechQ').value=service; if($('#searchService')) $('#searchService').value=service; searchTechnicians(); },180);
-  }else{ toast('هذه الخدمة للعميل. يمكنك إدارة الطلبات من لوحتك.'); }
-}
-function v11Hero(title, sub){return `<div class="dh-slim"><div class="dh-slim-top"><span class="dh-slim-title">👋 ${title}</span>${sub?`<span class="dh-slim-sub">${sub}</span>`:''}</div></div>`;}
-function v11Improvements(){return `<div class="v11-improve-grid"><div><b>📌 طلبات بدون تداخل</b><small>الفني لا يقبل طلب جديد قبل إنهاء الطلب النشط.</small></div><div><b>🧾 سجل عمليات</b><small>كل طلب وشحن ورصيد محفوظ للنظام.</small></div><div><b>💬 شات بعد القبول</b><small>المحادثة بين العميل والفني مرتبطة بالطلب.</small></div><div><b>📍 محافظة ومنطقة</b><small>بحث حسب عمان، الزرقاء، إربد وباقي المحافظات.</small></div></div>`;}
-
-const __v11CustDashBase = custDash;
-custDash=async function(){
-  let menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي']];
-  let c='';
-  if(state.tab==='settings') c=v11Hero('الإعدادات','تغيير الاسم، المنطقة، الهاتف، وكلمة السر')+settingsPage();
-  else if(state.tab==='orders'){let j=await api('/api/requests');c=v11Hero('طلباتي','تابع الطلبات وافتح الشات بعد قبول الفني')+`<div class="dash-card"><h2>طلباتي</h2>${reqTable(j.requests)}</div>`}
-  else if(state.tab==='near'){c=v11Hero('البحث عن فني','ابحث من خانة واحدة حسب الخدمة والموقع')+v11ServiceSlider()+techSearchBox();}
-  else c=v11Hero('لوحة العميل','اطلب خدمة أو اختر خدمة من الشريط المتحرك وابحث عن الفني المناسب')+v11ServiceSlider()+`<div class="customer-main-grid v10"><div class="dash-card v6-form">${requestForm()}</div>${techSearchBox()}</div>`+v11Improvements();
-  layout('لوحة العميل',menu,c);
-  if(state.tab==='dash'){bindAreaSelect('qcity','qarea','qareaOtherWrap');bindAreaSelect('searchCity','searchArea');}
-  if(state.tab==='near'){bindAreaSelect('searchCity','searchArea');setTimeout(searchTechnicians,150)}
-  if(state.tab==='settings') bindAreaSelect('setCity','setArea');
-  v11InitSlider();
-}
-const __v11HomeBase = home;
-home=function(){
-  __v11HomeBase();
-  const services=document.querySelector('.services-section');
-  if(services){ services.insertAdjacentHTML('beforebegin', v11ServiceSlider()); v11InitSlider(); }
-}
-servicesPage=function(){app.innerHTML=`<div class="page"><div class="v11-page-title"><h1>كل خدمات صلّحلي</h1><p class="muted">عدد الخدمات مفتوح، وأي مهنة تضيفها من لوحة الإدارة تظهر هنا وفي الشريط المتحرك تلقائياً.</p></div>${v11ServiceSlider()}<div class="grid">${state.meta.services.map(s=>`<div class="card service-card"><div class="icon">${s.icon}</div><h3>${s.name}</h3><p class="muted">اضغط للبحث عن الفنيين المتاحين لهذه الخدمة.</p><button class="btn" onclick="v11SelectService('${String(s.name).replace(/'/g,"\\'")}')">ابحث عن فني</button></div>`).join('')}</div></div>`;v11InitSlider();}
-window.addEventListener('resize',()=>v11UpdateSlider());
-
-
-/* ===== Sallehly V13 Final: Chats Badge + Live Professions Ticker + Strong Support ===== */
-state.chatCount = 0;
 function v13Badge(n){ n=Number(n||0); return n>0?`<em class="chat-badge">${n>99?'99+':n}</em>`:''; }
 async function v13LoadChatCount(){
   try{ if(!state.user || state.user.role==='admin') return 0; const j=await api('/api/chats'); state.chatCount=j.total_unread||0; return state.chatCount; }catch(e){ return state.chatCount||0; }
@@ -586,70 +410,7 @@ async function chatsPage(){
     `:'<div class="empty">لا توجد دردشات حالياً. تظهر الدردشة بعد قبول عرض الفني أو بدء محادثة على طلب.</div>'}
   </div>`;
 }
-function supportPage(){
-  return v11Hero('الدعم الفني','مركز مساعدة قوي للعميل والفني')+`<div class="support-grid"><div class="dash-card support-card"><h2>تواصل مع الدعم</h2><p class="muted">اكتب المشكلة وسيتم حفظها داخل النظام ليراجعها الأدمن.</p><form class="form" onsubmit="sendSupport(event)"><div class="field"><label>نوع المشكلة</label><select id="supportType"><option>مشكلة طلب</option><option>مشكلة دفع أو رصيد</option><option>مشكلة حساب</option><option>اقتراح تحسين</option></select></div><div class="field"><label>عنوان مختصر</label><input id="supportTitle" required placeholder="مثال: لم يصلني رد من الفني"></div><div class="field"><label>التفاصيل</label><textarea id="supportBody" required minlength="10" placeholder="اكتب التفاصيل هنا..."></textarea></div><button class="btn">إرسال للدعم</button></form></div><div class="dash-card"><h2>مساعدة سريعة</h2><div class="faq-list"><details open><summary>متى يفتح الشات؟</summary><p>بعد قبول العميل لعرض الفني يظهر الشات للطرفين.</p></details><details><summary>هل يستطيع الفني أخذ أكثر من طلب؟</summary><p>لا، إذا عنده طلب قيد التنفيذ يجب إنهاؤه أولاً.</p></details><details><summary>ماذا لو رفض العميل السعر؟</summary><p>يبقى الطلب مطروحاً، ويمكن لفنيين آخرين إرسال عروض.</p></details><details><summary>كيف تظهر المهنة بالشريط؟</summary><p>أي مهنة يضيفها الأدمن تظهر تلقائياً في شريط المهن المباشر.</p></details></div></div></div>`;
-}
-async function sendSupport(e){e.preventDefault();try{await api('/api/support',{method:'POST',body:JSON.stringify({type:supportType.value,title:supportTitle.value,body:supportBody.value})});toast('تم إرسال طلب الدعم بنجاح');supportTitle.value='';supportBody.value='';}catch(err){toast(err.message)}}
-// override dashboards to include chats and support
-custDash=async function(){await v13LoadChatCount();let menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات']];let c=''; if(state.tab==='support') c=supportPage(); else if(state.tab==='chats') c=await chatsPage(); else if(state.tab==='settings') c=v11Hero('الإعدادات','تغيير الاسم، المنطقة، الهاتف، وكلمة السر')+settingsPage(); else if(state.tab==='orders'){let j=await api('/api/requests');c=v11Hero('طلباتي','تابع الطلبات وافتح الشات بعد قبول الفني')+`<div class="dash-card"><h2>طلباتي</h2>${reqTable(j.requests)}</div>`} else if(state.tab==='near'){c=v11Hero('البحث عن فني','ابحث من خانة واحدة حسب الخدمة والموقع')+v11ServiceSlider()+techSearchBox();} else c=v11Hero('لوحة العميل','اطلب خدمة أو اختر خدمة من الشريط المتحرك وابحث عن الفني المناسب')+v11ServiceSlider()+`<div class="customer-main-grid v10"><div class="dash-card v6-form">${requestForm()}</div>${techSearchBox()}</div>`+v11Improvements(); layout('لوحة العميل',menu,c); if(state.tab==='dash'){bindAreaSelect('qcity','qarea','qareaOtherWrap');bindAreaSelect('searchCity','searchArea');} if(state.tab==='near'){bindAreaSelect('searchCity','searchArea');setTimeout(searchTechnicians,150)} if(state.tab==='settings') bindAreaSelect('setCity','setArea'); v11InitSlider();}
-techDash=async function(){await v13LoadChatCount(); let menu=[['dash','الرئيسية'],['orders','الطلبات'],['chats','الدردشات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']]; if(state.tab==='support'){layout('لوحة الفني',menu,supportPage());return;} if(state.tab==='chats'){layout('لوحة الفني',menu,await chatsPage());return;} if(state.tab==='settings'){layout('لوحة الفني',menu,v10Hero('الإعدادات','عدّل حسابك وكلمة السر')+settingsPage()); bindAreaSelect('setCity','setArea'); return;} await __v10TechBase();}
-// after opening chat, count becomes clean on refresh
-const __v13ChatBase=chat; chat=async function(id){await __v13ChatBase(id); v13LoadChatCount();}
 
-
-/* ===== Sallehly V14: Professional Chat Protection + Infinite Professions + Logout Polish ===== */
-function v14ChatBlockReason(text){
-  const raw=String(text||'');
-  const ar='٠١٢٣٤٥٦٧٨٩', fa='۰۱۲۳۴۵۶۷۸۹';
-  const lower=raw.toLowerCase().replace(/[٠-٩]/g,ch=>String(ar.indexOf(ch))).replace(/[۰-۹]/g,ch=>String(fa.indexOf(ch)));
-  const compact=lower.replace(/[\u064B-\u065F\u0670ـ\s\-_.()\[\]{}|\\/]+/g,'');
-  const words=['واتس','واتساب','whatsapp','watsapp','wa.me','تيليجرام','تليجرام','تلجرام','telegram','t.me','facebook','fb.com','messenger','instagram','insta','snapchat','gmail.com','hotmail.com','outlook.com','yahoo.com'];
-  if(words.some(w=>lower.includes(w)||compact.includes(w.replace(/\W/g,'')))) return 'وسيلة تواصل خارجية';
-  if(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(raw)) return 'بريد إلكتروني';
-  const digits=compact.replace(/[^0-9+]/g,'');
-  const onlyNums=lower.replace(/[^0-9]/g,'');
-  if(/(\+?962|00962)?0?7[789]\d{7}/.test(digits) || /(962|00962)?0?7[789]\d{7}/.test(onlyNums) || onlyNums.length>=9) return 'رقم هاتف';
-  return '';
-}
-function v14BlockedNotice(reason){
-  v10Sound?.('notify');
-  toast('⚠️ ممنوع إرسال '+reason+' داخل الشات. استخدم دردشة صلّحلي فقط.');
-}
-const __v14SendMsgBase = sendMsg;
-sendMsg = async function(e,id){
-  e.preventDefault();
-  const input=document.getElementById('msg');
-  const text=(input?.value||'').trim();
-  if(!text) return;
-  const reason=v14ChatBlockReason(text);
-  if(reason){ v14BlockedNotice(reason); input.classList.add('blocked-input'); setTimeout(()=>input.classList.remove('blocked-input'),900); return; }
-  return __v14SendMsgBase(e,id);
-};
-const __v14ChatBase = chat;
-chat = async function(id){
-  await __v14ChatBase(id);
-  const card=document.querySelector('.chat-card');
-  if(card && !document.querySelector('.chat-protection-note')){
-    const note=document.createElement('div');
-    note.className='chat-protection-note';
-    note.innerHTML='🛡️ حماية المنصة فعّالة: ممنوع مشاركة رقم الهاتف أو واتساب أو تيليجرام أو روابط التواصل الخارجية. أي محاولة يتم تسجيلها للإدارة.';
-    const form=document.querySelector('.chat-input-row');
-    card.insertBefore(note, form);
-  }
-  const input=document.getElementById('msg');
-  if(input){ input.placeholder='اكتب رسالتك هنا — بدون أرقام هاتف أو واتساب'; }
-};
-// Infinite ticker: duplicates enough items to keep the strip alive on wide screens
-v13Ticker = function(){
-  const sv=(state.meta.services||[]); if(!sv.length) return '';
-  const items=sv.map(s=>`<button class="v13-tick" onclick="v11SelectService('${String(s.name).replace(/'/g,"\\'")}')"><span>${s.icon||'🧰'}</span><b>${s.name}</b><small>متوفر الآن</small></button>`).join('');
-  const repeated = Array(8).fill(items).join('');
-  return `<section class="v13-ticker-wrap v14-live-ticker"><div class="v13-ticker-title"><b>⚡ شريط المهن المباشر</b><small>كل مهنة تضيفها من الإدارة تظهر هنا تلقائياً وتستمر بالدوران</small></div><div class="v13-ticker-window"><div class="v13-ticker-track v14-infinite-track">${repeated}</div></div></section>`;
-};
-function v14LogoutConfirm(){ v13LogoutConfirm(); const box=document.querySelector('.logout-box'); if(box){ box.classList.add('logout-box-pro'); const h=box.querySelector('h2'); if(h)h.textContent='تأكيد تسجيل الخروج'; const p=box.querySelector('p'); if(p)p.textContent='سيتم إنهاء الجلسة والرجوع إلى الصفحة الرئيسية.'; }}
-v13LogoutConfirm = v14LogoutConfirm;
-
-/* ===== Sallehly V15 FINAL FIX: Reliable Logout + Strong Chat Protection + Live Ticker ===== */
 function v15EscapeHtml(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
 
 // Fully replace the broken recursive logout popup from V14
@@ -683,162 +444,7 @@ async function v15DoLogout(){
   toast('تم تسجيل الخروج بنجاح');
   setTimeout(()=>{ try{home()}catch(e){location.reload()} },180);
 }
-window.v13LogoutConfirm = v15LogoutConfirm;
-window.v14LogoutConfirm = v15LogoutConfirm;
-window.logout = async function(){ await v15DoLogout(); };
 
-// Stronger visual layout override so every logout button uses the fixed popup and looks professional
-layout=function(title,menu,content){
-  document.body.classList.add('dashboard-mode'); v10ApplyTheme?.(); let user=state.user||{};
-  const contentWithTicker = (state.user && state.user.role!=='admin' ? v13Ticker() : '') + content;
-  app.innerHTML=`<div class="admin-shell"><aside class="admin-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${menu.map(m=>`<button class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${m[1]} ${m[0]==='chats'?v13Badge(state.chatCount):''}</b><span class="mi">${menuIconV13(m[0])}</span></button>`).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu"><button class="sidebtn ${state.tab==='settings'?'active':''}" onclick="state.tab='settings';dashboard();setTimeout(v35ScrollToContent,80)"><b>الإعدادات</b><span class="mi">⚙️</span></button><button class="sidebtn ${state.tab==='support'?'active':''}" onclick="state.tab='support';dashboard();setTimeout(v35ScrollToContent,80)"><b>الدعم الفني</b><span class="mi">🎧</span></button><button type="button" class="sidebtn logout-side v15-logout-side" onclick="v15LogoutConfirm()"><b>تسجيل خروج</b><span class="mi">🚪</span></button></div><div class="admin-profile"><div class="avatar-sm">${(user.name||'ص').slice(0,1)}</div><div><b>${v15EscapeHtml(user.name||roleName())}</b><small>${v15EscapeHtml(user.email||roleName())}</small></div></div></aside><main class="admin-main"><div class="admin-top"><div class="admin-search">🔎 <input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();setTimeout(()=>{if(document.getElementById('searchTechQ')){document.getElementById('searchTechQ').value=this.value;searchTechnicians()}},100)}"></div><div class="admin-actions"><button class="admin-icon-btn bell-btn" title="التنبيهات" onclick="v10Notify('صوت التنبيه يعمل', 'notify')">🔔 ${v13Badge(state.chatCount)}</button><button class="admin-icon-btn" title="دارك مود" onclick="v10ToggleTheme()">🌙</button><button type="button" class="admin-icon-btn clean-logout v15-top-logout" onclick="v15LogoutConfirm()">🚪 تسجيل خروج</button></div></div>${contentWithTicker}</main></div>`;
-  v10ApplyTheme?.();
-};
-
-// Keep live profession ticker running forever and make newly-added services appear after dashboard refresh
-v13Ticker = function(){
-  const sv=(state.meta.services||[]); if(!sv.length) return '';
-  const items=sv.map(s=>`<button class="v13-tick v15-tick" onclick="v11SelectService('${String(s.name).replace(/'/g,"\\'")}')"><span>${s.icon||'🧰'}</span><b>${v15EscapeHtml(s.name)}</b><small>متوفر الآن</small></button>`).join('');
-  const repeated = Array(12).fill(items).join('');
-  return `<section class="v13-ticker-wrap v14-live-ticker v15-live-ticker"><div class="v13-ticker-title"><b>⚡ شريط المهن المباشر</b><small>كل مهنة تضيفها من الإدارة تظهر تلقائياً وتستمر بالدوران بدون توقف</small></div><div class="v13-ticker-window"><div class="v13-ticker-track v14-infinite-track v15-infinite-track">${repeated}</div></div></section>`;
-};
-
-// Professional chat guard: blocks phone numbers, WhatsApp, Telegram, email, social links, separated Arabic/English digits
-function v15ChatBlockReason(text){
-  const raw=String(text||'');
-  const ar='٠١٢٣٤٥٦٧٨٩', fa='۰۱۲۳۴۵۶۷۸۹';
-  const normalized=raw.toLowerCase()
-    .replace(/[٠-٩]/g,ch=>String(ar.indexOf(ch)))
-    .replace(/[۰-۹]/g,ch=>String(fa.indexOf(ch)))
-    .replace(/[oO]/g,'0');
-  const compact=normalized.replace(/[\u064B-\u065F\u0670ـ\s\-_.()\[\]{}|\\/,:;]+/g,'');
-  const blocked=['واتس','واتساب','وتساب','whatsapp','watsapp','wa.me','تيليجرام','تليجرام','تلجرام','telegram','t.me','facebook','فيس','fb.com','messenger','instagram','انستا','insta','snapchat','سناب','gmail','hotmail','outlook','yahoo'];
-  if(blocked.some(w=>normalized.includes(w)||compact.includes(w.replace(/\W/g,'')))) return 'وسيلة تواصل خارجية';
-  if(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(raw)) return 'بريد إلكتروني';
-  const nums=normalized.replace(/[^0-9]/g,'');
-  if(/(00962|962)?0?7[789]\d{7}/.test(nums) || nums.length>=9) return 'رقم هاتف';
-  return '';
-}
-function v15BlockedNotice(reason){
-  try{v10Sound?.('notify')}catch(e){}
-  toast('⚠️ ممنوع إرسال '+reason+' داخل الشات. التواصل فقط داخل صلّحلي.');
-}
-sendMsg = async function(e,id){
-  e.preventDefault();
-  const input=document.getElementById('msg');
-  const text=(input?.value||'').trim();
-  if(!text) return;
-  const reason=v15ChatBlockReason(text);
-  if(reason){
-    v15BlockedNotice(reason);
-    input.classList.add('blocked-input');
-    setTimeout(()=>input.classList.remove('blocked-input'),1000);
-    return;
-  }
-  try{
-    let j=await api(`/api/requests/${id}/messages`,{method:'POST',body:JSON.stringify({body:text})});
-    input.value=''; renderMessages(j.messages); v10Sound?.('message'); v13LoadChatCount?.();
-  }catch(err){ toast(err.message); }
-};
-
-const __v15ChatBase = chat;
-chat = async function(id){
-  await __v15ChatBase(id);
-  const card=document.querySelector('.chat-card');
-  if(card && !document.querySelector('.chat-protection-note')){
-    const note=document.createElement('div');
-    note.className='chat-protection-note v15-chat-protection-note';
-    note.innerHTML='🛡️ حماية صلّحلي: ممنوع مشاركة رقم هاتف، واتساب، تيليجرام، إيميل أو روابط تواصل خارجية. أي محاولة يتم تسجيلها للإدارة.';
-    const form=document.querySelector('.chat-input-row');
-    card.insertBefore(note, form);
-  }
-  const input=document.getElementById('msg');
-  if(input){ input.placeholder='اكتب رسالتك هنا — بدون رقم هاتف أو واتساب'; }
-};
-
-
-/* ===== Sallehly V16 FINAL: Accurate Chat Protection + Technician Chats ===== */
-function v16NormalizeDigits(text){
-  const ar='٠١٢٣٤٥٦٧٨٩', fa='۰۱۲۳۴۵۶۷۸۹';
-  return String(text||'').toLowerCase()
-    .replace(/[٠-٩]/g,ch=>String(ar.indexOf(ch)))
-    .replace(/[۰-۹]/g,ch=>String(fa.indexOf(ch)))
-    .replace(/[oO]/g,'0');
-}
-function v16Compact(text){
-  return v16NormalizeDigits(text).replace(/[\u064B-\u065F\u0670ـ\s\-_.()\[\]{}|\\/,:;،]+/g,'');
-}
-function v16ChatBlockReason(text){
-  const raw=String(text||'');
-  const lower=v16NormalizeDigits(raw);
-  const compact=v16Compact(raw);
-  const keywordGroups=[
-    {reason:'واتساب', words:['واتساب','واتس','وتساب','whatsapp','watsapp','wa.me','wa me']},
-    {reason:'تيليجرام', words:['تيليجرام','تليجرام','تلجرام','telegram','t.me','t me']},
-    {reason:'فيسبوك أو ماسنجر', words:['facebook','fb.com','fb com','messenger','فيسبوك','ماسنجر']},
-    {reason:'إنستغرام أو سناب', words:['instagram','insta','انستا','إنستا','snapchat','سناب']},
-    {reason:'بريد إلكتروني', words:['gmail.com','hotmail.com','outlook.com','yahoo.com','gmail','hotmail','outlook','yahoo']}
-  ];
-  for(const group of keywordGroups){
-    for(const word of group.words){
-      const wLower=v16NormalizeDigits(word);
-      const wCompact=v16Compact(word);
-      if((wLower && lower.includes(wLower)) || (wCompact && compact.includes(wCompact))) return group.reason;
-    }
-  }
-  if(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(raw)) return 'بريد إلكتروني';
-  const digits=lower.replace(/[^0-9+]/g,'');
-  const separated=lower.replace(/[^0-9]/g,'');
-  if(/(\+?962|00962)?0?7[789]\d{7}/.test(digits) || /(962|00962)?0?7[789]\d{7}/.test(separated)) return 'رقم هاتف';
-  if(/\d{10,}/.test(separated)) return 'رقم هاتف';
-  if(separated.length>=9 && /^(0?7|9627|009627)/.test(separated)) return 'رقم هاتف';
-  return '';
-}
-function v16BlockedNotice(reason){
-  try{v10Sound?.('notify')}catch(e){}
-  toast('⚠️ ممنوع مشاركة '+reason+' داخل الشات. الرسائل العادية مسموحة، والتواصل فقط داخل صلّحلي.');
-}
-sendMsg = async function(e,id){
-  e.preventDefault();
-  const input=document.getElementById('msg');
-  const text=(input?.value||'').trim();
-  if(!text) return;
-  const reason=v16ChatBlockReason(text);
-  if(reason){
-    v16BlockedNotice(reason);
-    input.classList.add('blocked-input');
-    setTimeout(()=>input.classList.remove('blocked-input'),1000);
-    return;
-  }
-  try{
-    const j=await api(`/api/requests/${id}/messages`,{method:'POST',body:JSON.stringify({body:text})});
-    input.value=''; renderMessages(j.messages); v10Sound?.('message'); v13LoadChatCount?.();
-  }catch(err){ toast(err.message); }
-};
-const __v16ChatBase = chat;
-chat = async function(id){
-  await __v16ChatBase(id);
-  const card=document.querySelector('.chat-card');
-  if(card){
-    const old=document.querySelector('.chat-protection-note');
-    if(old) old.innerHTML='🛡️ حماية صلّحلي: الرسائل العادية مسموحة. الممنوع فقط: رقم هاتف، واتساب، تيليجرام، إيميل أو روابط تواصل خارجية.';
-  }
-  const input=document.getElementById('msg');
-  if(input){ input.placeholder='اكتب رسالتك عادي — بدون رقم هاتف أو واتساب أو إيميل'; }
-};
-const __v16TechDashBase = techDash;
-techDash = async function(){
-  await v13LoadChatCount?.();
-  let menu=[['dash','الرئيسية'],['orders','الطلبات'],['chats','الدردشات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']];
-  if(state.tab==='chats'){layout('لوحة الفني',menu,await chatsPage());return;}
-  if(state.tab==='support'){layout('لوحة الفني',menu,supportPage());return;}
-  if(state.tab==='settings'){layout('لوحة الفني',menu,v10Hero('الإعدادات','عدّل حسابك وكلمة السر')+settingsPage()); bindAreaSelect('setCity','setArea'); return;}
-  return __v16TechDashBase();
-};
-
-
-/* ===== Sallehly V17: Technician Chats + Live Request Counters + Pro Chat Fix ===== */
-state.orderCount = 0;
 async function v17LoadCounters(){
   try{
     if(!state.user) return {orders:0,chats:0};
@@ -854,53 +460,14 @@ async function v17LoadCounters(){
     return {orders:state.orderCount||0, chats:state.chatCount||0, requests, chats};
   }catch(e){ return {orders:state.orderCount||0,chats:state.chatCount||0,requests:[],chats:[]}; }
 }
+
 function v17MenuLabel(key,label){
   let badge='';
   if(key==='chats') badge=v13Badge(state.chatCount);
   if(key==='orders') badge=v13Badge(state.orderCount);
   return `${label} ${badge}`;
 }
-const __v17LayoutPrev = layout;
-layout=function(title,menu,content){
-  document.body.classList.add('dashboard-mode');v10ApplyTheme();let user=state.user||{};
-  const contentWithTicker = (state.user && state.user.role!=='admin' ? v13Ticker() : '') + content;
-  app.innerHTML=`<div class="admin-shell"><aside class="admin-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${menu.map(m=>`<button class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${v17MenuLabel(m[0],m[1])}</b><span class="mi">${menuIconV13(m[0])}</span></button>`).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu"><button class="sidebtn ${state.tab==='settings'?'active':''}" onclick="state.tab='settings';dashboard();setTimeout(v35ScrollToContent,80)"><b>الإعدادات</b><span class="mi">⚙️</span></button><button class="sidebtn ${state.tab==='support'?'active':''}" onclick="state.tab='support';dashboard();setTimeout(v35ScrollToContent,80)"><b>الدعم الفني</b><span class="mi">🎧</span></button><button type="button" class="sidebtn logout-side v17-logout-side" onclick="v15LogoutConfirm()"><b>تسجيل خروج</b><span class="mi">🚪</span></button></div><div class="admin-profile"><div class="avatar-sm">${(user.name||'ص').slice(0,1)}</div><div><b>${v15EscapeHtml(user.name||roleName())}</b><small>${v15EscapeHtml(user.email||roleName())}</small></div></div></aside><main class="admin-main"><div class="admin-top"><div class="admin-search">🔎 <input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();setTimeout(()=>{if(document.getElementById('searchTechQ')){document.getElementById('searchTechQ').value=this.value;searchTechnicians()}},100)}"></div><div class="admin-actions"><button class="admin-icon-btn bell-btn" title="التنبيهات" onclick="v10Notify('صوت التنبيه يعمل', 'notify')">🔔 ${v13Badge(state.chatCount)}</button><button class="admin-icon-btn" title="دارك مود" onclick="v10ToggleTheme()">🌙</button><button type="button" class="admin-icon-btn clean-logout v17-top-logout" onclick="v15LogoutConfirm()">🚪 تسجيل خروج</button></div></div>${contentWithTicker}</main></div>`;
-  v10ApplyTheme();
-};
-function v17TechHome(me,requests){
-  const active=requests.filter(r=>r.technician_id===me.id && !['مكتمل','ملغي'].includes(r.status)).length;
-  const open=requests.filter(r=>['بانتظار العروض','وصلت عروض'].includes(r.status)).length;
-  return dashboardHero('لوحة الفني','طلبات جديدة تظهر لك فوراً حسب خدماتك ومناطق عملك',[{label:'طلبات متاحة',value:open,up:'جديدة',icon:'🛒'},{label:'دردشات',value:state.chatCount||0,up:'رسائل',icon:'💬'},{label:'رصيدك',value:(me.balance||0)+' د.أ',up:'متاح',icon:'💳'},{label:'طلب نشط',value:active,up:'قيد العمل',icon:'🔧'}])+`<div class="dash-card"><div class="v13-card-head"><h2>الطلبات المناسبة ${v13Badge(open)}</h2><p class="muted">أي عميل ينشر طلب يناسب خدماتك يظهر هنا مباشرة، وتقدر تقدم عرض سعر ومدة.</p></div>${reqTable(requests)}</div>`;
-}
-techDash = async function(){
-  const me=(await api('/api/me')).user; state.user=me;
-  const counters=await v17LoadCounters();
-  const menu=[['dash','الرئيسية'],['orders','الطلبات'],['chats','الدردشات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']];
-  let c='';
-  if(state.tab==='chats'){ c=await chatsPage(); }
-  else if(state.tab==='support'){ c=supportPage(); }
-  else if(state.tab==='settings'){ c=v10Hero('الإعدادات','عدّل حسابك وكلمة السر')+settingsPage(); }
-  else if(state.tab==='orders'){ c=v17TechHome(me,counters.requests||[]); }
-  else if(state.tab==='balance'){ c=dashboardHero('الرصيد والباقات','اشحن رصيدك وتابع خصم عمولة الطلبات',[{label:'الرصيد',value:(me.balance||0)+' د.أ',up:'متاح',icon:'💳'},{label:'مجاني مستخدم',value:(me.free_quota_used ?? (me.free_orders_used||0))+'/2',up:'طلبات',icon:'🎁'},{label:'الباقات',value:state.meta.packages.length,up:'متاحة',icon:'📦'},{label:'الأعمال',value:me.completed_jobs||0,up:'منجزة',icon:'✅'}])+balancePage(me); }
-  else if(state.tab==='topups'){ let j=await api('/api/topups'); c=dashboardHero('طلبات الشحن','تابع حالة دفعاتك وموافقات الإدارة',[{label:'طلبات الشحن',value:j.topups.length,up:'إجمالي',icon:'🚚'},{label:'الرصيد',value:(me.balance||0)+' د.أ',up:'متاح',icon:'💳'},{label:'باقات',value:state.meta.packages.length,up:'متوفرة',icon:'📦'},{label:'حالة الحساب',value:'فعال',up:'نشط',icon:'✅'}])+topupTable(j.topups); }
-  else if(state.tab==='ledger'){ let j=await api('/api/ledger'); c=dashboardHero('سجل الرصيد','كل عمليات الخصم والشحن في مكان واحد',[{label:'عمليات',value:j.ledger.length,up:'مسجلة',icon:'📘'},{label:'الرصيد',value:(me.balance||0)+' د.أ',up:'حالي',icon:'💳'},{label:'طلبات',value:me.completed_jobs||0,up:'مكتملة',icon:'✅'},{label:'تقييم',value:stars(me.rating_avg),up:'فني',icon:'⭐'}])+ledgerTable(j.ledger); }
-  else { c=v17TechHome(me,counters.requests||[]); }
-  layout('لوحة الفني',menu,c);
-  if(state.tab==='settings') bindAreaSelect('setCity','setArea');
-};
-const __v17CustDashPrev = custDash;
-custDash = async function(){
-  await v17LoadCounters();
-  await __v17CustDashPrev();
-};
-// refresh badges live when socket events arrive
-if(socket){
-  socket.on('messages-updated', ()=>{ v17LoadCounters().then(()=>{ const bells=document.querySelectorAll('.bell-btn'); bells.forEach(b=>b.innerHTML='🔔 '+v13Badge(state.chatCount)); }); });
-  socket.on('requests-updated', ()=>{ if(state.user?.role==='technician') v17LoadCounters().then(()=>dashboard()); });
-}
 
-
-/* ===== Sallehly V18: Real-time chat read, completed list, delete request, optional image polish ===== */
 state.orderFilter = state.orderFilter || 'active';
 function v18IsCompleted(r){ return ['مكتمل','ملغي'].includes(r.status); }
 function v18SplitRequests(rows){
@@ -909,131 +476,20 @@ function v18SplitRequests(rows){
     done:(rows||[]).filter(r=>v18IsCompleted(r))
   };
 }
+
 function v18OrdersView(rows){
   const parts=v18SplitRequests(rows||[]);
   const filter=state.orderFilter||'active';
   const selected=filter==='done'?parts.done:parts.active;
   return `<div class="v18-tabs"><button class="btn ${filter==='active'?'':'ghost'}" onclick="state.orderFilter='active';dashboard()">طلبات نشطة ${v13Badge(parts.active.length)}</button><button class="btn ${filter==='done'?'':'ghost'}" onclick="state.orderFilter='done';dashboard()">طلبات مكتملة/ملغية ${v13Badge(parts.done.length)}</button></div>${reqTable(selected)}`;
 }
-const __v18OldActions = actions;
-actions=function(r){
-  let a=__v18OldActions(r)||'';
-  if(state.user?.role==='customer' && !['مكتمل','ملغي'].includes(r.status)) a+=` <button class="btn danger ghost" onclick="v18DeleteRequest(${r.id})">حذف طلبي</button>`;
-  if(state.user?.role==='customer' && r.status==='مكتمل') a+=` <span class="status done-status">تم نقل الطلب إلى المكتملة</span>`;
-  return a;
-};
+
 async function v18DeleteRequest(id){
   if(!confirm('هل تريد حذف/إلغاء هذا الطلب؟ سيبقى محفوظاً في السجل كملغي.')) return;
   try{ await api(`/api/requests/${id}`,{method:'DELETE'}); toast('تم إلغاء الطلب ونقله للسجل'); await v18RefreshCountersAndPage(); }
   catch(e){ toast(e.message); }
 }
-const __v18OldReqTable = reqTable;
-reqTable=function(rows){
-  if(!rows || !rows.length) return '<div class="empty">لا توجد طلبات في هذا القسم</div>';
-  return __v18OldReqTable(rows);
-};
-// Better customer dashboard with completed list and chats tab
-const __v18PrevCustDash = custDash;
-custDash = async function(){
-  await v17LoadCounters?.();
-  const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات']];
-  let c='';
-  if(state.tab==='chats'){
-    c=await chatsPage();
-  }else if(state.tab==='orders'){
-    let j=await api('/api/requests');
-    c=dashboardHero('طلباتي','الطلبات النشطة تظهر هنا، وبعد الاكتمال تنتقل تلقائياً لقائمة المكتملة',[{label:'النشطة',value:v18SplitRequests(j.requests).active.length,up:'قيد العمل',icon:'🛒'},{label:'المكتملة',value:v18SplitRequests(j.requests).done.length,up:'سجل',icon:'✅'},{label:'الدردشات',value:state.chatCount||0,up:'غير مقروءة',icon:'💬'},{label:'الخدمات',value:state.meta.services.length,up:'متاحة',icon:'📦'}])+`<div class="dash-card"><h2>طلباتي</h2>${v18OrdersView(j.requests)}</div>`;
-  }else if(state.tab==='near'){
-    c=dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد الفنيين المناسبين',[{label:'خدمات',value:state.meta.services.length,up:'متاحة',icon:'💼'},{label:'رسائل',value:state.chatCount||0,up:'جديدة',icon:'💬'},{label:'موقع',value:'GPS',up:'اختياري',icon:'📍'},{label:'تقييم',value:'⭐',up:'موثوق',icon:'⭐'}])+nearbyPage();
-  }else{
-    c=dashboardHero('لوحة العميل','انشر طلبك وأرفق صورة المشكلة اختيارياً وتابع العروض والدردشة مباشرة',[{label:'طلباتي',value:state.orderCount||0,up:'إجمالي',icon:'🛠️'},{label:'دردشات',value:state.chatCount||0,up:'غير مقروءة',icon:'💬'},{label:'خدمات',value:state.meta.services.length,up:'متوفرة',icon:'📦'},{label:'صورة المشكلة',value:'اختياري',up:'JPG/PNG',icon:'📷'}])+`<div class="dash-grid"><div class="dash-card v6-form">${requestForm()}</div>${techSearchBox?techSearchBox():''}</div>`+v11Improvements?.();
-  }
-  layout('لوحة العميل',menu,c);
-  if(state.tab==='dash'){
-    bindAreaSelect?.('qcity','qarea','qareaOtherWrap');
-    bindAreaSelect?.('searchCity','searchArea');
-  }
-  if(state.tab==='near') loadNearby?.();
-};
-// Add request image drag/drop visual if present
-const __v18OldRequestForm = requestForm;
-requestForm=function(){
-  let html=__v18OldRequestForm();
-  html=html.replace('صورة المشكلة اختياري','📷 صورة المشكلة اختياري');
-  html=html.replace('<input id="problemImage"', '<input id="problemImage" class="v18-file-input"');
-  return html;
-};
-// Update unread counts immediately when chat opens / message read
-async function v18RefreshCountersOnly(){
-  try{
-    await v17LoadCounters?.();
-    document.querySelectorAll('.bell-btn').forEach(b=>b.innerHTML='🔔 '+v13Badge(state.chatCount||0));
-    document.querySelectorAll('.sidebtn').forEach(btn=>{
-      const txt=btn.textContent||'';
-      if(txt.includes('الدردشات')){
-        const b=btn.querySelector('b'); if(b) b.innerHTML=v17MenuLabel('chats','الدردشات');
-      }
-      if(txt.includes('طلباتي')||txt.includes('الطلبات')){
-        const b=btn.querySelector('b'); if(b) b.innerHTML=v17MenuLabel('orders', state.user?.role==='customer'?'طلباتي':'الطلبات');
-      }
-    });
-  }catch(e){}
-}
-async function v18RefreshCountersAndPage(){
-  await v18RefreshCountersOnly();
-  if(state.user && !activeChatId) dashboard();
-}
-const __v18PrevChat = chat;
-chat = async function(id){
-  if(socket){ try{ if(activeChatId) socket.emit('leave-request', activeChatId); socket.emit('join-request', id); }catch(e){} }
-  await __v18PrevChat(id);
-  setTimeout(v18RefreshCountersOnly,250);
-};
-const __v18PrevRenderMessages = renderMessages;
-renderMessages=function(messages){
-  __v18PrevRenderMessages(messages);
-  setTimeout(v18RefreshCountersOnly,100);
-};
-async function v18CompleteRequest(id){
-  try{ await setStatus(id,'مكتمل'); state.orderFilter='done'; toast('تم اكتمال الطلب ونقله إلى قائمة الطلبات المكتملة'); }
-  catch(e){ toast(e.message); }
-}
-const __v18PrevActions2 = actions;
-actions=function(r){
-  let a='';
-  if(state.user.role==='customer') a+=`<button class="btn ghost" onclick="loadOffers(${r.id})">عروض الفنيين</button> `;
-  if(r.technician_id||state.user.role==='admin') a+=`<button class="btn ghost" onclick="chat(${r.id})">محادثة</button> `;
-  if(state.user.role==='technician'&&['بانتظار العروض','وصلت عروض'].includes(r.status)) a+=`<button class="btn" onclick="offerForm(${r.id},'${(r.service||'').replaceAll("'",'')}')">تقديم عرض سعر</button>`;
-  if(state.user.role==='customer'&&['تم اختيار عرض','قيد التنفيذ','بانتظار تأكيد الدفع'].includes(r.status)) a+=`<button class="btn green" onclick="v18CompleteRequest(${r.id})">تم اكتمال الطلب</button>`;
-  if(state.user.role==='customer'&&r.status==='مكتمل') a+=`<button class="btn" onclick="rate(${r.id})">تقييم الفني</button>`;
-  if(state.user.role==='customer' && !['مكتمل','ملغي'].includes(r.status)) a+=` <button class="btn danger ghost" onclick="v18DeleteRequest(${r.id})">حذف طلبي</button>`;
-  return a;
-};
-// Real-time polling fallback + sockets for badges/orders/messages
-if(!window.v18RealtimeStarted){
-  window.v18RealtimeStarted=true;
-  setInterval(()=>{ if(state.user && !activeChatId) v18RefreshCountersOnly(); }, 4000);
-  setInterval(()=>{ if(state.user && (state.tab==='orders'||state.tab==='chats') && !activeChatId && !isUiModalOpen()) dashboard(); }, 30000);
-}
-if(socket){
-  socket.on('chat-badges-updated', ()=>v18RefreshCountersOnly());
-  socket.on('messages-updated', data=>{
-    if(activeChatId && data.requestId==activeChatId){ renderMessages(data.messages||[]); }
-    v18RefreshCountersOnly();
-    try{ v10Sound?.('message'); }catch(e){}
-  });
-  socket.on('requests-updated', ()=>{ if(state.user && !activeChatId && !isUiModalOpen()) dashboard(); });
-}
 
-
-/* =========================================================
-   Sallehly V20 MARKET READY
-   - Polished customer/technician/admin UI
-   - Optional problem image upload with preview
-   - Offers marketplace: price + duration + accept/reject
-   - Live Socket.IO refresh for requests, chats, badges, offers
-   - Chat guard keeps normal messages allowed and blocks external contact only
-   ========================================================= */
 window.SALLEHLY_VERSION='V20 Market Ready';
 
 function v20SafeTxt(x){return String(x??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
@@ -1133,216 +589,13 @@ offerCards=function(offers,req){
   return `<div class="v20-offers-list"><h3>العروض المستلمة (${offers.length})</h3>${offers.map(o=>`<div class="v20-offer ${o.status}">${o.avatar_url?`<img class="miniAvatar" src="${o.avatar_url}">`:'<div class="miniAvatar fallback">ف</div>'}<div class="v20-offer-info"><b>${v20SafeTxt(o.technician_name)}</b><small>📍 ${v20SafeTxt(o.technician_city||'')} • ${v20SafeTxt(o.technician_areas||'')}</small><span>${stars(o.rating_avg)} • ${o.completed_jobs||0} عمل مكتمل</span><p>${v20SafeTxt(o.note||'لا توجد ملاحظة')}</p></div><div class="v20-offer-price"><b>${o.price} د.أ</b><span>${v20SafeTxt(o.duration)}</span><em>${o.status==='accepted'?'مقبول':o.status==='rejected'?'مرفوض':'بانتظار قرار العميل'}</em>${state.user.role==='customer'&&o.status==='pending'&&req.customer_id===state.user.id?`<button class="btn green mini" onclick="decideOffer(${o.id},'accepted',${req.id})">قبول العرض</button><button class="btn red mini" onclick="decideOffer(${o.id},'rejected',${req.id})">رفض</button>`:''}</div></div>`).join('')}</div>`;
 };
 
+
 function v20CustomerStats(requests=[]){
   const active=requests.filter(r=>!['مكتمل','ملغي'].includes(r.status)).length;
   const done=requests.filter(r=>r.status==='مكتمل').length;
   return [{label:'طلبات نشطة',value:active,up:'مباشر',icon:'🛠️'},{label:'دردشات',value:state.chatCount||0,up:'غير مقروءة',icon:'💬'},{label:'مكتملة',value:done,up:'سجل',icon:'✅'},{label:'الخدمات',value:(state.meta.services||[]).length,up:'متاحة',icon:'📦'}];
 }
 
-custDash=async function(){
-  await v17LoadCounters?.();
-  const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات']];
-  let c='';
-  if(state.tab==='chats') c=await chatsPage();
-  else if(state.tab==='settings') c=dashboardHero('الإعدادات','تغيير الاسم، المنطقة، الهاتف، وكلمة السر',v20CustomerStats([]))+settingsPage();
-  else if(state.tab==='orders'){
-    const j=await api('/api/requests');
-    c=dashboardHero('طلباتي','تابع الطلبات والعروض والدردشات بشكل مباشر',v20CustomerStats(j.requests))+`<div class="dash-card"><h2>طلباتي</h2>${typeof v18OrdersView==='function'?v18OrdersView(j.requests):reqTable(j.requests)}</div>`;
-  }else if(state.tab==='near'){
-    c=dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد التقييم والملف قبل الطلب',v20CustomerStats([]))+v20LiveServicesStrip()+v20SearchPanel();
-  }else{
-    const j=await api('/api/requests').catch(()=>({requests:[]}));
-    c=dashboardHero('لوحة العميل','انشر طلبك بصورة اختيارية واستقبل عروض الفنيين مباشرة',v20CustomerStats(j.requests||[]))+v20LiveServicesStrip()+`<div class="v20-main-grid"><div>${requestForm()}</div><div>${v20SearchPanel()}</div></div>`;
-  }
-  layout('لوحة العميل',menu,c);
-  if(state.tab==='dash'){bindAreaSelect?.('qcity','qarea','qareaOtherWrap');bindAreaSelect?.('searchCity','searchArea');}
-  if(state.tab==='near'){bindAreaSelect?.('searchCity','searchArea'); setTimeout(searchTechnicians,100);}
-  if(state.tab==='settings') bindAreaSelect?.('setCity','setArea');
-};
-
-techDash=async function(){
-  await v17LoadCounters?.();
-  const me=(await api('/api/me')).user; state.user=me;
-  const menu=[['dash','الرئيسية'],['orders','الطلبات'],['chats','الدردشات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']];
-  if(state.tab==='support'){layout('لوحة الفني',menu,supportPage());return;}
-  if(state.tab==='chats'){layout('لوحة الفني',menu,await chatsPage());return;}
-  if(state.tab==='settings'){layout('لوحة الفني',menu,dashboardHero('الإعدادات','عدّل حسابك وكلمة السر',[{label:'الرصيد',value:(me.balance||0)+' د.أ',up:'متاح',icon:'💳'},{label:'تقييم',value:stars(me.rating_avg),up:'فني',icon:'⭐'},{label:'دردشات',value:state.chatCount||0,up:'غير مقروءة',icon:'💬'},{label:'طلبات',value:state.orderCount||0,up:'متاحة',icon:'🛠️'}])+settingsPage()); bindAreaSelect?.('setCity','setArea'); return;}
-  if(state.tab==='orders'){
-    const j=await api('/api/requests');
-    layout('لوحة الفني',menu,dashboardHero('طلبات الفني','الطلبات المناسبة تظهر فوراً، أرسل عرض السعر والمدة وانتظر موافقة العميل',[{label:'طلبات مناسبة',value:j.requests.length,up:'مباشر',icon:'🛠️'},{label:'دردشات',value:state.chatCount||0,up:'غير مقروءة',icon:'💬'},{label:'الرصيد',value:(me.balance||0)+' د.أ',up:'متاح',icon:'💳'},{label:'تقييم',value:stars(me.rating_avg),up:'ثقة',icon:'⭐'}])+v20LiveServicesStrip()+`<div class="dash-card"><h2>الطلبات المتاحة والحالية</h2>${reqTable(j.requests)}</div>`);return;
-  }
-  return __v10TechBase?__v10TechBase():null;
-};
-
-async function v20LiveRefresh(full=false){
-  try{await v17LoadCounters?.();}catch(_){ }
-  if(full && state.user && !activeChatId) dashboard();
-  document.querySelectorAll('.bell-btn').forEach(b=>{b.innerHTML='🔔 '+v20Badge(state.chatCount||0); b.classList.toggle('shake',Number(state.chatCount||0)>0)});
-}
-function v20BindRealtime(){
-  setupSocket?.(); if(!socket||socket.__v20Bound) return; socket.__v20Bound=true;
-  socket.on('messages-updated', data=>{ if(activeChatId && Number(data.requestId)===Number(activeChatId)){renderMessages(data.messages||[]);} v20LiveRefresh(false); try{v10Sound?.('message')}catch(_){ } });
-  socket.on('chat-badges-updated', ()=>v20LiveRefresh(false));
-  socket.on('requests-updated', ()=>{ if(state.user && !activeChatId){v20LiveRefresh(true);} });
-  socket.on('request-status-updated', ()=>{ if(state.user && !activeChatId){v20LiveRefresh(true);} });
-}
-const __v20DashboardBase=dashboard; dashboard=function(){v20BindRealtime(); return __v20DashboardBase();};
-const __v20InitBase=init; init=async function(){await __v20InitBase(); v20BindRealtime(); setInterval(()=>{ if(state.user && !activeChatId) v20LiveRefresh(false); },3000); setInterval(()=>{ if(state.user && !activeChatId && ['orders','chats'].includes(state.tab) && !isUiModalOpen()) dashboard(); },30000);};
-
-/* ===== Sallehly V21 Login/Admin Full Fix ===== */
-function v21ResetSessionForRole(user){
-  state.user=user; state.tab='dash'; activeChatId=null;
-  if(chatTimer){ clearInterval(chatTimer); chatTimer=null; }
-}
-function v21El(id){ return document.getElementById(id); }
-
-login=function(){
-  state.tab='dash';
-  app.innerHTML=`<div class="auth-page v21-auth"><div class="auth-shell">
-    <div class="auth-card">
-      <div class="auth-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img"><b>صلّحلي</b></div>
-      <h1>تسجيل الدخول</h1>
-      <p class="muted">ادخل بحساب العميل أو الفني أو الإدارة، وسيتم فتح اللوحة المناسبة تلقائياً.</p>
-      <form class="form" onsubmit="doLogin(event)">
-        <div class="field"><label>البريد الإلكتروني</label><input id="email" type="email" autocomplete="email" placeholder="example@email.com" required></div>
-        <div class="field"><label>كلمة السر</label><input id="password" type="password" autocomplete="current-password" placeholder="••••••••" required></div>
-        <button class="btn big" type="submit">دخول الآن</button>
-      </form>
-      <div class="login-hint secure-hint"><b>تسجيل آمن</b><span>لا يتم عرض بيانات الإدارة داخل الواجهة.</span><span>يتم إنشاء حساب الإدارة من ملف .env فقط.</span></div>
-      <button class="btn ghost" onclick="register('customer')">إنشاء حساب جديد</button>
-    </div>
-    <div class="auth-side"><div class="welcome-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img"></div><h2>لوحة واحدة لكل الأدوار</h2><p>عميل، فني، وإدارة بصلاحيات منفصلة وواجهات مرتبة.</p></div>
-  </div></div>`;
-}
-
-doLogin=async function(e){
-  e.preventDefault();
-  const emailInput=v21El('email'), passInput=v21El('password');
-  try{
-    const j=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:emailInput.value.trim(),password:passInput.value})});
-    v21ResetSessionForRole(j.user);
-    toast('تم تسجيل الدخول بنجاح');
-    dashboard();
-  }catch(err){ toast(err.message || 'تعذر تسجيل الدخول'); }
-}
-
-register=function(role='customer'){
-  state.tab='dash';
-  const services=(state.meta.services||[]).map(s=>`<option value="${v15EscapeHtml(s.name)}">${v15EscapeHtml(s.name)}</option>`).join('');
-  const cities=(state.meta.cities||[]).map(c=>`<option value="${v15EscapeHtml(c)}">${v15EscapeHtml(c)}</option>`).join('');
-  app.innerHTML=`<div class="auth-page v21-auth"><div class="auth-shell register-shell">
-    <div class="auth-card register-card">
-      <div class="auth-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img"><b>صلّحلي</b></div>
-      <h1>إنشاء حساب</h1>
-      <p class="muted">اختر نوع الحساب بدقة. صورة الفني مطلوبة للفني فقط ولا تؤثر على تسجيل دخول الإدارة.</p>
-      <form class="form two" onsubmit="doRegister(event)">
-        <div class="field"><label>نوع الحساب</label><select id="role" onchange="toggleTech()"><option value="customer">عميل</option><option value="technician">فني</option></select></div>
-        <div class="field"><label>الاسم الكامل</label><input id="name" required minlength="2" placeholder="مثال: أحمد محمد"></div>
-        <div class="field"><label>البريد الإلكتروني</label><input id="remail" type="email" autocomplete="email" required placeholder="example@email.com"></div>
-        <div class="field"><label>رقم الهاتف</label><input id="phone" required placeholder="0791234567"></div>
-        <div class="field"><label>كلمة السر</label><input id="rpassword" type="password" autocomplete="new-password" required minlength="8"></div>
-        <div class="field"><label>المحافظة</label><select id="city">${cities}</select></div>
-        <div class="field techOnly"><label>الصورة الشخصية للفني</label><input id="avatar" type="file" accept="image/png,image/jpeg,image/webp" onchange="v21PreviewAvatar()"><small class="muted">مطلوبة للفني فقط. JPG / PNG / WEBP.</small><div id="avatarPreview"></div></div>
-        <div class="field techOnly"><label>الرقم الوطني</label><input id="national" placeholder="10 أرقام"></div>
-        <div class="field techOnly"><label>الخدمات</label><select id="srv" multiple size="5">${services}</select><small class="muted">حدد خدمة واحدة أو أكثر.</small></div>
-        <div class="field techOnly"><label>مناطق العمل</label><select id="areas" multiple size="5">${cities}</select></div>
-        <button class="btn big" type="submit">إنشاء الحساب</button>
-        <button class="btn ghost" type="button" onclick="login()">عندي حساب</button>
-      </form>
-    </div>
-    <div class="auth-side"><div class="welcome-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img"></div><h2>انضم إلى صلّحلي</h2><p>حساب عميل لطلب الخدمات، أو حساب فني لاستقبال الطلبات حسب منطقتك ومهنتك.</p></div>
-  </div></div>`;
-  v21El('role').value=role;
-  toggleTech();
-}
-function v21PreviewAvatar(){
-  const f=v21El('avatar')?.files?.[0], box=v21El('avatarPreview'); if(!box) return;
-  if(!f){ box.innerHTML=''; return; }
-  if(!['image/png','image/jpeg','image/webp'].includes(f.type)){ box.innerHTML=''; toast('نوع الصورة غير مسموح'); return; }
-  box.innerHTML=`<img class="problem-preview avatar-preview" src="${URL.createObjectURL(f)}" alt="صورة الفني">`;
-}
-toggleTech=function(){
-  const isTech=v21El('role')?.value==='technician';
-  document.querySelectorAll('.techOnly').forEach(x=>x.style.display=isTech?'block':'none');
-  const national=v21El('national'); if(national) national.required=isTech;
-}
-doRegister=async function(e){
-  e.preventDefault();
-  try{
-    const role=v21El('role').value;
-    const fd=new FormData();
-    fd.append('role',role);
-    fd.append('name',v21El('name').value.trim());
-    fd.append('email',v21El('remail').value.trim().toLowerCase());
-    fd.append('phone',v21El('phone').value.trim());
-    fd.append('password',v21El('rpassword').value);
-    fd.append('city',v21El('city').value);
-    fd.append('national_number',role==='technician'?(v21El('national')?.value.trim()||''):'');
-    fd.append('services',role==='technician'?vals('#srv').join(','):'');
-    fd.append('areas',role==='technician'?vals('#areas').join(','):'');
-    const avatar=v21El('avatar');
-    if(role==='technician'){
-      if(!avatar?.files?.[0]) throw new Error('الرجاء اختيار صورة شخصية للفني');
-      fd.append('avatar',avatar.files[0]);
-    }
-    const j=await api('/api/auth/register',{method:'POST',body:fd});
-    if(j.step==='verify'){
-      showOtpScreen(j.email);
-    } else {
-      v21ResetSessionForRole(j.user);
-      toast('تم إنشاء الحساب بنجاح');
-      dashboard();
-    }
-  }catch(err){ toast(err.message || 'تعذر إنشاء الحساب'); }
-}
-
-function v21StatusCounts(rows){
-  return {
-    all: rows.length,
-    open: rows.filter(r=>['بانتظار العروض','وصلت عروض'].includes(r.status)).length,
-    active: rows.filter(r=>['تم اختيار عرض','قيد التنفيذ','بانتظار تأكيد الدفع'].includes(r.status)).length,
-    done: rows.filter(r=>r.status==='مكتمل').length
-  };
-}
-function v21RequestDetails(id){
-  api('/api/requests').then(j=>{
-    const r=(j.requests||[]).find(x=>String(x.id)===String(id));
-    if(!r) return toast('الطلب غير موجود');
-    const html=`<div class="v21-modal"><div class="v21-modal-card"><button class="welcome-close" onclick="this.closest('.v21-modal').remove()">×</button>
-      <h2>تفاصيل الطلب #${r.id}</h2>
-      <div class="request-meta v21-details">
-        <span>الخدمة: <b>${v15EscapeHtml(r.service||'-')}</b></span>
-        <span>الحالة: <b>${v15EscapeHtml(r.status||'-')}</b></span>
-        <span>العميل: <b>${v15EscapeHtml(r.customer_name||'-')}</b></span>
-        <span>الفني: <b>${v15EscapeHtml(r.technician_name||'-')}</b></span>
-        <span>المحافظة: <b>${v15EscapeHtml(r.city||'-')}</b></span>
-        <span>المنطقة: <b>${v15EscapeHtml(r.area||'-')}</b></span>
-        <span>السعر: <b>${r.offer_price? v15EscapeHtml(r.offer_price)+' د.أ':'-'}</b></span>
-        <span>المدة: <b>${v15EscapeHtml(r.arrival_time||'-')}</b></span>
-      </div>
-      ${r.problem_image_url?`<img class="problem-img big-preview" src="${_safeSrc(r.problem_image_url)}" alt="صورة المشكلة">`:''}
-      <p class="v21-desc">${v15EscapeHtml(r.description||'لا يوجد وصف')}</p>
-      <div class="actions"><button class="btn ghost" onclick="loadOffers(${r.id});this.closest('.v21-modal').remove();state.tab='orders';dashboard();setTimeout(()=>loadOffers(${r.id}),250)">عرض عروض الفنيين</button><button class="btn" onclick="chat(${r.id})">فتح المحادثة</button></div>
-    </div></div>`;
-    document.body.insertAdjacentHTML('beforeend',html);
-  }).catch(e=>toast(e.message));
-}
-
-const __v21OldActions = actions;
-actions=function(r){
-  let a='';
-  if(state.user?.role==='admin'){
-    a+=`<button class="btn" onclick="v21RequestDetails(${r.id})">فتح التفاصيل</button> `;
-    a+=`<button class="btn ghost" onclick="loadOffers(${r.id})">العروض</button> `;
-    a+=`<button class="btn ghost" onclick="chat(${r.id})">الشات</button> `;
-    if(r.status!=='مكتمل') a+=`<button class="btn green" onclick="setStatus(${r.id},'مكتمل')">إنهاء</button> `;
-    if(!['مكتمل','ملغي'].includes(r.status)) a+=`<button class="btn danger" onclick="setStatus(${r.id},'ملغي')">إلغاء</button>`;
-    return a;
-  }
-  return __v21OldActions(r);
-}
-
-const __v21OldReqTable=reqTable;
 reqTable=function(rows){
   if(!rows || !rows.length) return '<div class="empty">لا توجد طلبات</div>';
   return `<div class="request-list v21-request-list">${rows.map(r=>`<div class="request-card v21-request-card">
@@ -1394,16 +647,7 @@ logout=async function(){
   login();
 };
 
-/* Small styling injected for V21 fixes */
-;(function(){
-  const css=`.v21-auth{min-height:calc(100vh - 90px);display:grid;place-items:center}.auth-shell{display:grid;grid-template-columns:1.1fr .9fr;max-width:1100px;width:min(94vw,1100px);background:#fff;border:1px solid #dbe7ff;border-radius:34px;overflow:hidden;box-shadow:0 28px 80px rgba(19,31,75,.16)}.auth-card{padding:44px}.auth-side{background:linear-gradient(145deg,#10235f,#7434ee);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:44px}.auth-logo{display:flex;gap:10px;align-items:center;margin-bottom:14px}.auth-logo span,.auth-side .welcome-logo{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;background:linear-gradient(135deg,#1e88ff,#8a36ff);color:#fff;font-weight:900;font-size:30px}.login-hint{display:grid;gap:6px;background:#f4f8ff;border:1px solid #dbe7ff;border-radius:18px;padding:14px;margin:14px 0}.v21-modal{position:fixed;inset:0;background:rgba(4,10,30,.45);z-index:9999;display:grid;place-items:center;padding:22px}.v21-modal-card{position:relative;max-width:820px;width:100%;max-height:90vh;overflow:auto;background:#fff;border-radius:26px;padding:30px;box-shadow:0 30px 90px rgba(0,0,0,.25)}.v21-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}.v21-desc{background:#f6f9ff;border:1px solid #dbe7ff;border-radius:18px;padding:14px}.big-preview{max-height:340px;object-fit:contain}.danger{background:#ff3b5c!important;color:#fff!important}.avatar-preview{max-width:150px;height:150px;object-fit:cover;border-radius:22px;margin-top:10px}@media(max-width:850px){.auth-shell{grid-template-columns:1fr}.auth-side{display:none}.v21-details{grid-template-columns:1fr}}`;
-  const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
-})();
 
-/* ===== Sallehly V22 FINAL TECH PANEL FIX =====
-   Fixes: technician sidebar tabs, chats, orders, topups, ledger, balance,
-   customer optional problem image, live refresh and polished UI.
-*/
 function v22Money(n){ return (Number(n||0)).toFixed(2).replace('.00','')+' د.أ'; }
 function v22UnreadBadge(n){ n=Number(n||0); return n>0?`<span class="badge-dot">${n}</span>`:''; }
 function v22TechMetrics(me, requests=[]){
@@ -1464,38 +708,6 @@ function v22TechBalance(me){
   ])+balancePage(me);
 }
 
-// Strong final technician dashboard: no fallback to old broken versions
-techDash=async function(){
-  const me=(await api('/api/me')).user; state.user=me;
-  await v22Counters();
-  const menu=[['dash','الرئيسية'],['orders','الطلبات'],['chats','الدردشات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']];
-  let content='';
-  try{
-    if(state.tab==='orders'){
-      const j=await api('/api/requests'); content=v22TechOrders(me,j.requests||[]);
-    }else if(state.tab==='chats'){
-      content=dashboardHero('الدردشات','كل محادثات العملاء في مكان واحد، والرسائل الجديدة تظهر بعداد أحمر.',v22TechMetrics(me,[]))+await chatsPage();
-    }else if(state.tab==='balance'){
-      content=v22TechBalance(me);
-    }else if(state.tab==='topups'){
-      content=await v22TechTopups(me);
-    }else if(state.tab==='ledger'){
-      content=await v22TechLedger(me);
-    }else if(state.tab==='settings'){
-      content=dashboardHero('الإعدادات','تعديل الاسم، الهاتف، المنطقة، وكلمة السر.',v22TechMetrics(me,[]))+settingsPage();
-    }else if(state.tab==='support'){
-      content=dashboardHero('الدعم الفني','أرسل مشكلة للإدارة وسيتم متابعتها.',v22TechMetrics(me,[]))+supportPage();
-    }else{
-      const j=await api('/api/requests'); content=v22TechWelcome(me,j.requests||[]);
-    }
-  }catch(err){
-    content=`<div class="dash-card"><h2>تعذر تحميل القسم</h2><p class="muted">${v22Safe(err.message||'حدث خطأ')}</p><button class="btn" onclick="dashboard()">إعادة المحاولة</button></div>`;
-  }
-  layout('لوحة الفني',menu,content);
-  if(state.tab==='settings') bindAreaSelect?.('setCity','setArea');
-};
-
-// Final customer request form with clear optional image upload + preview
 requestForm=function(){
   return `<div class="card bluehint offer-request v22-request-form"><h2>طلب خدمة جديد</h2><p class="muted">حدد الخدمة والمنطقة، أضف وصف المشكلة، والصورة اختيارية لكنها تساعد الفني يعطيك سعر أدق.</p>
   <form class="form two" onsubmit="createReq(event)">
@@ -1534,100 +746,6 @@ previewProblemImage=function(){
   box.innerHTML=`<img class="problem-preview v22-preview" src="${URL.createObjectURL(file)}" alt="معاينة صورة المشكلة"><button type="button" class="btn ghost mini" onclick="document.getElementById('problemImage').value='';document.getElementById('problemPreview').innerHTML=''">إزالة الصورة</button>`;
 };
 
-// Make chat/order badges refresh live without breaking pages
-if(!window.v22LiveStarted){
-  window.v22LiveStarted=true;
-  setInterval(async()=>{ if(state.user && !activeChatId){ await v22Counters(); document.querySelectorAll('.bell-btn').forEach(b=>b.innerHTML='🔔 '+v22UnreadBadge(state.chatCount)); } },2500);
-  setInterval(()=>{ if(state.user && !activeChatId && ['orders','chats','topups','ledger'].includes(state.tab) && !isUiModalOpen()) dashboard(); },30000);
-}
-
-;(function(){
-  const css=`
-  .v22-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin:22px 0}.v22-action{cursor:pointer;transition:.25s;min-height:170px}.v22-action:hover{transform:translateY(-6px);box-shadow:0 24px 60px rgba(38,80,230,.16)}.v22-action span{width:58px;height:58px;border-radius:18px;background:linear-gradient(135deg,#2d8cff,#7b35f3);display:grid;place-items:center;font-size:26px;color:#fff;margin-bottom:12px}.v22-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}.badge-dot{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:#f43255;color:#fff;font-size:12px;font-weight:900;margin-inline-start:8px;box-shadow:0 8px 18px rgba(244,50,85,.35)}.v22-upload{display:grid;place-items:center;text-align:center;min-height:145px;border:2px dashed #b9cff8;border-radius:24px;background:linear-gradient(180deg,#f7fbff,#eef6ff);cursor:pointer;color:#1d47d8;font-weight:900}.v22-upload input{display:none}.v22-upload small{display:block;color:#7686a5;margin-top:8px}.v22-preview{max-width:260px;max-height:180px;border-radius:20px;margin-top:12px;border:1px solid #d7e4fa;object-fit:cover}.v22-request-form textarea{min-height:130px}.sidebtn{cursor:pointer}.admin-menu .sidebtn.active{box-shadow:0 14px 34px rgba(47,104,255,.22)}.table-wrap,.request-list,.v20-request-list{overflow:auto}@media(max-width:1100px){.v22-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.v22-grid{grid-template-columns:1fr}.v22-head{display:block}.v22-upload{min-height:120px}}
-  `;
-  const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
-})();
-
-
-/* ===== Sallehly V23 Security + Mobile Polish ===== */
-login=function(){
-  state.tab='dash';
-  app.innerHTML=`<div class="login-page">
-    <video autoplay muted loop playsinline class="login-video">
-      <source src="/videos/login.mp4" type="video/mp4">
-    </video>
-    <div class="login-overlay"></div>
-    <div class="login-card">
-      <img src="/logo.png" alt="صلّحلي" class="login-logo"
-           onerror="this.style.display='none';document.querySelector('.login-logo-fallback').style.display='flex'">
-      <div class="login-logo-fallback" style="display:none"><span>🔧</span></div>
-      <h1 class="login-title">أهلاً بك</h1>
-      <p class="login-subtitle">سجّل دخولك إلى منصة <strong>صلّحلي</strong></p>
-      <div class="login-error" id="loginError" style="display:none"></div>
-      <form id="loginForm" onsubmit="doLogin(event)" novalidate>
-        <div class="login-group">
-          <label for="email">البريد الإلكتروني</label>
-          <div class="input-wrap">
-            <span class="input-icon">✉️</span>
-            <input type="email" id="email" name="email" placeholder="example@email.com" autocomplete="email" required>
-          </div>
-        </div>
-        <div class="login-group">
-          <label for="password">كلمة المرور</label>
-          <div class="input-wrap">
-            <span class="input-icon">🔒</span>
-            <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
-            <button type="button" class="toggle-password" onclick="const i=document.getElementById('password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'" aria-label="إظهار/إخفاء">👁</button>
-          </div>
-        </div>
-        <button class="login-btn" type="submit" id="loginBtn">
-          <span class="btn-text">تسجيل الدخول</span>
-          <span class="btn-spinner" style="display:none">⏳</span>
-        </button>
-      </form>
-      <div class="login-links">
-        <a href="#" onclick="go('register');return false">إنشاء حساب جديد</a>
-        <span style="color:rgba(255,255,255,.3);font-size:12px">حساب الإدارة من .env فقط</span>
-      </div>
-    </div>
-  </div>`;
-}
-
-;(function(){
-  const css=`
-  .secure-hint{background:#eef7ff;border:1px solid #cfe3ff;color:#173263}.secure-hint b{color:#0b3bd8}.v23-auth{padding:18px}.v23-auth-shell{width:min(96vw,1080px)}.v23-auth-card h1{font-size:clamp(30px,5vw,52px)}.secure-list{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px}.secure-list span{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);padding:8px 12px;border-radius:999px;font-weight:900}
-  .login-page{min-height:100vh;display:flex;justify-content:center;align-items:center;padding:24px;position:relative;overflow:hidden;background:#0d0d1a}
-  .login-video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-3}
-  .login-overlay{position:fixed;inset:0;background:linear-gradient(135deg,rgba(5,15,40,.88),rgba(15,23,42,.70));z-index:-2}
-  .login-card{width:min(460px,95vw);padding:40px 36px;border-radius:32px;background:rgba(255,255,255,.08);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.15);box-shadow:0 30px 80px rgba(0,0,0,.4);animation:loginAppear .7s ease}
-  @supports not (backdrop-filter:blur(24px)){.login-card{background:rgba(5,15,40,.94)}}
-  .login-logo{width:88px;height:88px;margin:0 auto 16px;display:block;border-radius:22px;box-shadow:0 12px 36px rgba(124,58,237,.45)}
-  .login-title{text-align:center;color:#fff;font-size:34px;font-weight:900;margin:0 0 6px}
-  .login-subtitle{text-align:center;color:rgba(255,255,255,.65);margin:0 0 28px;font-size:14px}
-  .login-group{margin-bottom:16px}
-  .login-group label{display:block;color:#fff;margin-bottom:7px;font-weight:700;font-size:14px}
-  .login-group input{width:100%;height:54px;border-radius:16px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;padding:0 16px;font-size:15px;outline:none;transition:.25s;box-sizing:border-box}
-  .login-group input:focus{border-color:#60a5fa;box-shadow:0 0 0 4px rgba(96,165,250,.18)}
-  .login-group input::placeholder{color:rgba(255,255,255,.35)}
-  .login-btn{width:100%;height:56px;border:none;border-radius:16px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;font-size:17px;font-weight:900;cursor:pointer;transition:.25s;margin-top:4px}
-  .login-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(124,58,237,.4)}
-  .login-links{display:flex;justify-content:space-between;align-items:center;margin-top:20px}
-  .login-links a{color:#93c5fd;font-size:14px;text-decoration:none}
-  .login-links a:hover{color:#fff}
-  @keyframes loginAppear{from{opacity:0;transform:translateY(40px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-  @media(max-width:480px){.login-card{padding:28px 20px;border-radius:24px}.login-title{font-size:28px}}
-  @media(max-width:920px){
-    .nav{height:auto;min-height:76px;padding:12px 16px}.brand{font-size:26px}.menu{display:grid!important}.links{position:fixed;top:76px;left:12px;right:12px;background:rgba(255,255,255,.97);border:1px solid #dbe7ff;border-radius:24px;box-shadow:0 24px 70px rgba(20,37,83,.16);padding:14px;display:none;z-index:50}.open .links{display:grid;gap:10px}.links a,.links button{width:100%;justify-content:center;text-align:center}.hero,.pro-hero{grid-template-columns:1fr!important;padding:28px 18px!important}.hero h1{font-size:clamp(32px,8vw,48px)!important}.phone{display:none!important}.section,.page{padding:18px!important}.grid,.feature-grid,.steps-grid,.dash-grid,.dash-grid.two,.v20-main-grid{grid-template-columns:1fr!important}.admin-shell{display:block!important}.admin-sidebar{position:relative!important;inset:auto!important;width:100%!important;min-height:auto!important;border-radius:0 0 26px 26px!important;padding:18px!important}.admin-logo{font-size:28px!important}.admin-menu{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.admin-menu .sidebtn{min-height:56px!important;padding:12px!important}.admin-main{padding:16px!important}.admin-top{display:grid!important;grid-template-columns:1fr!important;gap:12px}.admin-search{width:100%!important}.admin-actions{justify-content:space-between!important}.dashboard-hero,.v6-hero{padding:22px!important;border-radius:26px!important}.stats-grid,.hero-stats{grid-template-columns:1fr 1fr!important}.stat-card{min-height:auto!important}.metric-card-sm{padding:8px 4px!important}.mc-icon{font-size:16px!important;margin-bottom:4px!important}.mc-val{font-size:16px!important}.mc-label{font-size:9px!important}.mc-badge{font-size:8px!important}.v20-live-strip{border-radius:24px!important;padding:16px!important}.v20-live-card{min-width:210px!important}.v20-search-grid,.v20-request-form,.form.two{grid-template-columns:1fr!important}.v20-tech-card{grid-template-columns:1fr!important;text-align:start}.v20-tech-actions{display:grid!important;grid-template-columns:1fr 1fr}.request-card,.v21-request-card,.v20-request-card{padding:16px!important}.request-head,.v20-request-head{display:block!important}.request-meta,.v21-details{grid-template-columns:1fr!important}.table-wrap{overflow:auto}.auth-shell,.v23-auth-shell{grid-template-columns:1fr!important;border-radius:26px!important}.auth-side,.v23-auth-side{display:none!important}.auth-card,.v23-auth-card{padding:28px 18px!important}.topbar{display:grid!important;gap:10px}.sidebar{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));position:relative!important;width:100%!important}.panel{grid-template-columns:1fr!important}.v22-grid{grid-template-columns:1fr!important}.v22-upload{min-height:112px!important}.problem-preview,.v22-preview{max-width:100%!important;width:100%!important}.chat-page .card{padding:14px!important}.chat-box{height:48vh!important}.chat-form{display:grid!important;grid-template-columns:1fr!important;gap:10px}.clean-logout,.v17-top-logout{font-size:14px!important;padding:10px 12px!important}
-  }
-  @media(max-width:520px){
-    body{font-size:15px}.brand span,.admin-logo span{width:42px!important;height:42px!important}.btn.big,.btn{min-height:48px}.stats-grid,.hero-stats{grid-template-columns:1fr!important}.admin-menu{grid-template-columns:1fr}.v20-tech-actions{grid-template-columns:1fr}.v20-timeline{grid-template-columns:1fr!important}.v20-offer{grid-template-columns:1fr!important}.v20-live-card{min-width:185px!important;padding:12px!important}.dashboard-hero h1{font-size:32px!important}.auth-card h1{font-size:34px!important}.nav .btn{padding:10px 12px!important}.toast{max-width:92vw!important}
-  }
-  `;
-  const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
-})();
-
-
-/* ===== Sallehly V24 Complete Fix: Technician Panel + Chat Open + Mobile 10/10 ===== */
 ;(function(){
   const V24 = {};
   window.v24Safe = function(v){
@@ -1837,13 +955,6 @@ login=function(){
   const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
 })();
 
-/* ==========================================================
-   V25 Technician Balance Gate + Live Moving Top Services
-   - After 2 free jobs, technician cannot submit offers without balance.
-   - Center modal redirects technician to packages/balance.
-   - Most requested services move live.
-   - Live services strip speed reduced.
-========================================================== */
 ;(function(){
   window.v25Esc = window.v24Safe || function(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))};
 
@@ -1911,7 +1022,6 @@ login=function(){
   };
 })();
 
-
 /* V26 location sender override */
 window.sendLocation = async function(id){
   if(!navigator.geolocation) return toast('المتصفح لا يدعم تحديد الموقع');
@@ -1927,644 +1037,6 @@ window.sendLocation = async function(id){
 };
 
 
-/* ===== V26 Fixes: location allowed + stronger balance gate UI ===== */
-;(function(){
-  const st=document.createElement('style');
-  st.textContent=`
-  .v25-balance-modal{max-width:460px;text-align:center}.v25-modal-icon{animation:v26Pulse 1.3s infinite}.v26-balance-warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:18px;padding:12px 16px;font-weight:900;margin:10px 0}.location-action{background:linear-gradient(135deg,#eef6ff,#fff)!important;border:1px solid #cfe2ff!important}.msg .mapbox{height:190px;margin-top:10px}.toast,.snackbar{max-width:720px}
-  @keyframes v26Pulse{50%{transform:scale(1.08)}}
-  `;
-  document.head.appendChild(st);
-})();
-
-/* ===== V27 customer/mobile final polish: remove technician promo/activity, support fix, request page strip off ===== */
-;(function(){
-  function safe(x){ return (typeof v15EscapeHtml==='function'?v15EscapeHtml(String(x??'')):String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))); }
-
-  // Hide the live professions strip only on the customer's "طلب جديد" page. Keep it on home/admin places.
-  const prevLiveStrip = window.v20LiveServicesStrip;
-  window.v20LiveServicesStrip = function(){
-    if(window.state?.user?.role === 'customer' && (!window.state.tab || window.state.tab === 'dash')) return '';
-    const html = prevLiveStrip ? prevLiveStrip() : '';
-    return html.replace('v20-marquee-track','v20-marquee-track v27-slow-strip');
-  };
-
-  // More reliable support form for customers/technicians.
-  window.supportPage = function(){
-    return `<div class="support-grid v27-support-grid">
-      <div class="dash-card support-card"><h2>الدعم الفني</h2><p class="muted">اكتب مشكلتك وسيتم إرسالها للإدارة داخل لوحة الأدمن.</p>
-        <form class="form" onsubmit="sendSupport(event)">
-          <div class="field"><label>نوع المشكلة</label><select id="supportType"><option value="مشكلة طلب">مشكلة طلب</option><option value="مشكلة دفع أو رصيد">مشكلة دفع أو رصيد</option><option value="مشكلة حساب">مشكلة حساب</option><option value="اقتراح تحسين">اقتراح تحسين</option></select></div>
-          <div class="field"><label>عنوان مختصر</label><input id="supportTitle" required minlength="3" maxlength="120" placeholder="مثال: مشكلة في إرسال الطلب"></div>
-          <div class="field"><label>التفاصيل</label><textarea id="supportBody" required minlength="10" maxlength="2000" placeholder="اشرح المشكلة بوضوح..."></textarea></div>
-          <button class="btn" type="submit">إرسال للدعم</button>
-        </form>
-      </div>
-      <div class="dash-card"><h2>مساعدة سريعة</h2><div class="faq-list">
-        <details open><summary>متى يظهر الشات؟</summary><p>بعد قبول عرض الفني يظهر الشات للطرفين.</p></details>
-        <details><summary>كيف أتابع طلبي؟</summary><p>من صفحة طلباتي يمكنك مشاهدة الحالة والعروض والدردشة.</p></details>
-        <details><summary>كيف أرسل الموقع؟</summary><p>افتح الدردشة واضغط إرسال الموقع واسمح للمتصفح باستخدام Location.</p></details>
-      </div></div>
-    </div>`;
-  };
-  window.sendSupport = async function(e){
-    e.preventDefault();
-    const btn=e.submitter; if(btn){btn.disabled=true;btn.textContent='جاري الإرسال...';}
-    try{
-      const type=document.getElementById('supportType')?.value || 'عام';
-      const title=document.getElementById('supportTitle')?.value?.trim() || '';
-      const body=document.getElementById('supportBody')?.value?.trim() || '';
-      await api('/api/support',{method:'POST',body:JSON.stringify({type,title,body})});
-      toast('تم إرسال طلب الدعم بنجاح');
-      const t=document.getElementById('supportTitle'), b=document.getElementById('supportBody'); if(t)t.value=''; if(b)b.value='';
-    }catch(err){ toast(err.message || 'تعذر إرسال الدعم'); }
-    finally{ if(btn){btn.disabled=false;btn.textContent='إرسال للدعم';} }
-  };
-
-  // Clean technician dashboard: no "زد فرص قبولك" and no "الأنشطة الأخيرة".
-  window.techDash = async function(){
-    await v24RefreshBadges?.();
-    const me=(await api('/api/me')).user; state.user=me;
-    const menu=[['dash','الرئيسية'],['orders','الطلبات'],['chats','الدردشات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد'],['support','الدعم الفني']];
-    let content='';
-    if(state.tab==='orders'){
-      const j=await api('/api/requests');
-      content=dashboardHero('طلبات الفني','الطلبات المناسبة تظهر مباشرة. قدم عرض سعر ومدة، وبعد موافقة العميل تفتح المحادثة.',v24Metrics(me,j.requests||[]))+`<div class="dash-card"><div class="v24-head"><h2>الطلبات المتاحة والحالية</h2><button class="btn ghost" onclick="dashboard()">تحديث الآن</button></div>${reqTable(j.requests||[])}</div>`;
-    }else if(state.tab==='chats'){
-      content=dashboardHero('الدردشات','كل محادثاتك مع العملاء هنا.',v24Metrics(me,[]))+await chatsPage();
-    }else if(state.tab==='balance'){
-      content=(typeof v22TechBalance==='function')?v22TechBalance(me):balancePage(me);
-    }else if(state.tab==='topups'){
-      const j=await api('/api/topups'); content=dashboardHero('طلبات الشحن','تابع طلبات شحن الرصيد.',v24Metrics(me,[]))+topupTable(j.topups||[]);
-    }else if(state.tab==='ledger'){
-      const j=await api('/api/ledger'); content=dashboardHero('سجل الرصيد','كل عمليات الرصيد والعمولة محفوظة.',v24Metrics(me,[]))+ledgerTable(j.ledger||[]);
-    }else if(state.tab==='settings'){
-      content=dashboardHero('الإعدادات','تعديل الاسم، الهاتف، المنطقة، وكلمة السر.',v24Metrics(me,[]))+settingsPage();
-    }else if(state.tab==='support'){
-      content=dashboardHero('الدعم الفني','أرسل مشكلة أو اقتراح لإدارة صلحلي.',v24Metrics(me,[]))+supportPage();
-    }else{
-      const j=await api('/api/requests');
-      content=dashboardHero('لوحة الفني','إدارة احترافية للطلبات، العروض، الدردشات، الشحن والرصيد.',v24Metrics(me,j.requests||[]))+`<div class="v22-grid v24-grid v27-tech-actions"><div class="dash-card v22-action" onclick="state.tab='orders';dashboard()"><span>🛠️</span><h3>الطلبات</h3><p>شاهد الطلبات المناسبة وقدم عروض سعر.</p></div><div class="dash-card v22-action" onclick="state.tab='chats';dashboard()"><span>💬</span><h3>الدردشات ${v24Badge(state.chatCount)}</h3><p>افتح محادثات العملاء مباشرة.</p></div><div class="dash-card v22-action" onclick="state.tab='balance';dashboard()"><span>💳</span><h3>الرصيد</h3><p>اشحن الرصيد واختر الباقات.</p></div><div class="dash-card v22-action" onclick="state.tab='support';dashboard();setTimeout(v35ScrollToContent,80)"><span>🎧</span><h3>الدعم الفني</h3><p>أرسل مشكلة للإدارة.</p></div></div><div class="dash-card"><h2>آخر الطلبات</h2>${reqTable((j.requests||[]).slice(0,5))}</div>`;
-    }
-    layout('لوحة الفني',menu,content);
-    if(state.tab==='settings') bindAreaSelect?.('setCity','setArea');
-  };
-
-  // Customer dashboard with visible support menu and no professions strip on new request.
-  window.custDash = async function(){
-    await v24RefreshBadges?.();
-    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات'],['support','الدعم الفني']];
-    let content='';
-    if(state.tab==='orders'){
-      const j=await api('/api/requests'); content=dashboardHero('طلباتي','تابع الطلبات والعروض والدردشات بشكل مباشر',v20CustomerStats?.(j.requests||[])||[])+`<div class="dash-card"><h2>طلباتي</h2>${typeof v18OrdersView==='function'?v18OrdersView(j.requests||[]):reqTable(j.requests||[])}</div>`;
-    }else if(state.tab==='chats'){
-      content=dashboardHero('الدردشات','كل محادثاتك مع الفنيين هنا.',v20CustomerStats?.([])||[])+await chatsPage();
-    }else if(state.tab==='near'){
-      content=dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد التقييم والملف قبل الطلب',v20CustomerStats?.([])||[])+v20SearchPanel();
-    }else if(state.tab==='settings'){
-      content=dashboardHero('الإعدادات','تغيير الاسم، المنطقة، الهاتف، وكلمة السر',v20CustomerStats?.([])||[])+settingsPage();
-    }else if(state.tab==='support'){
-      content=dashboardHero('الدعم الفني','أرسل مشكلة أو اقتراح لإدارة صلحلي.',v20CustomerStats?.([])||[])+supportPage();
-    }else{
-      const j=await api('/api/requests').catch(()=>({requests:[]}));
-      content=dashboardHero('لوحة العميل','انشر طلبك بصورة اختيارية واستقبل عروض الفنيين مباشرة',v20CustomerStats?.(j.requests||[])||[])+`<div class="v20-main-grid v24-customer-grid"><div>${requestForm()}</div><div>${v20SearchPanel()}</div></div>`;
-    }
-    layout('لوحة العميل',menu,content);
-    if(['dash','near'].includes(state.tab)){ bindAreaSelect?.('qcity','qarea','qareaOtherWrap'); bindAreaSelect?.('searchCity','searchArea'); }
-    if(state.tab==='near') setTimeout(()=>searchTechnicians?.(),100);
-    if(state.tab==='settings') bindAreaSelect?.('setCity','setArea');
-  };
-})();
-
-/* ===== V28 FINAL OVERRIDE: exact requested fixes =====
-   - Customer support tab shows support form, not new request.
-   - Remove live professions strip from customer "طلب جديد" page.
-   - Remove technician promo/activity blocks permanently.
-   - Home page has one moving "الخدمات الأكثر طلباً" section only.
-   - Better mobile fit for all dashboard pages.
-====================================================== */
-;(function(){
-  const esc = (s)=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-
-  // One slow moving top-services section for home only.
-  const topServices = function(){
-    const base=(state.meta?.services?.length?state.meta.services:[{name:'كهربائي',icon:'⚡'},{name:'سباك',icon:'🚰'},{name:'تكييف',icon:'❄️'},{name:'صيانة أجهزة',icon:'🔌'}]);
-    const cards=base.map((s,i)=>`<button class="v25-top-card" onclick="localStorage.pendingService='${String(s.name).replace(/'/g,"\\'")}';go(state.user?'dashboard':'register')"><span>${esc(s.icon||'🛠️')}</span><div><b>${esc(s.name)}</b><small>${240-((i%8)*11)} طلب هذا الشهر • فنيين متاحين</small></div></button>`).join('');
-    return `<section class="v25-top-services v28-home-top"><div class="v25-top-head"><div><span class="eyebrow">Live</span><h2>الخدمات الأكثر طلباً</h2><p>تتحرك تلقائياً وبسرعة هادئة ومناسبة للموبايل.</p></div><b>🔥 الأكثر نشاطاً</b></div><div class="v25-top-marquee"><div class="v25-top-track">${cards}${cards}${cards}</div></div></section>`;
-  };
-
-  // Force home to be clean: no duplicate old sliders/sections.
-  home = window.home = function(){
-    document.body.classList.remove('dashboard-mode','sidebar-open');
-    app.innerHTML=`<section class="hero pro-hero"><div class="hero-copy"><span class="badge glow-badge"><span class="live-dot"></span> منصة صيانة احترافية في الأردن • فنيين موثوقين • دفع كاش</span><h1>صلّحلي — وصّل العميل بالفني الأقرب بشكل أسرع وأرتب</h1><p class="hero-lead">واجهة احترافية تعرض الخدمات، الفنيين، الطلبات، التقييمات، الرصيد، والدردشة بمظهر حديث ومناسب للهاتف.</p><div class="hero-actions"><button class="btn big" onclick="go('${state.user?'dashboard':'register'}')">اطلب خدمة الآن</button><button class="btn ghost big" onclick="register('technician')">انضم كفني</button></div><div class="trust-strip"><div><b>+12</b><span>خدمة صيانة</span></div><div><b>GPS</b><span>تحديد موقع</span></div><div><b>⭐ 4.8</b><span>تقييمات فنيين</span></div></div></div><div class="phone pro-phone"><div class="phone-top"><span></span><b>فنيين مقترحين</b><em>Live</em></div><div class="screen pro-screen">${['فني تكييف','كهربائي','سباك'].map((x,i)=>`<div class="screen-row pro-row"><div style="display:flex;gap:10px;align-items:center"><div class="avatar">${['❄️','⚡','🚰'][i]}</div><div><b>${x}</b><div>${stars(5-i/2)} <small>${20-i*4} عمل مكتمل</small></div></div></div><button class="btn ghost mini">اختيار</button></div>`).join('')}<div class="mini-map"><span>📍</span><div><b>الأقرب لموقعك</b><small>ترتيب حسب المنطقة والتقييم</small></div></div></div></div></section>${topServices()}<section class="section services-section" id="services"><div class="section-head"><span class="eyebrow">خدمات جاهزة</span><h2>كل ما يحتاجه البيت بمكان واحد</h2><p class="muted">اختر الخدمة، انشر الطلب، وشاهد الفنيين المناسبين حسب منطقتك.</p></div><div class="grid feature-grid">${(state.meta.services||[]).slice(0,12).map(s=>`<div class="card service-card"><div class="icon">${esc(s.icon||'🛠️')}</div><h3>${esc(s.name)}</h3><p class="muted">طلب سريع، فنيين قريبين، وتقييم واضح قبل الاختيار.</p></div>`).join('')}</div></section><section class="section"><div class="section-head"><span class="eyebrow">كيف يعمل؟</span><h2>خطوات بسيطة من الطلب إلى الإنجاز</h2></div><div class="grid steps-grid"><div class="card step-card"><span>01</span><h3>أنشئ طلب</h3><p class="muted">اختر الخدمة، اكتب وصف المشكلة، وحدد المحافظة والمنطقة.</p></div><div class="card step-card"><span>02</span><h3>اختر الفني</h3><p class="muted">يعرض النظام الفنيين المناسبين مع التقييم وعدد الأعمال.</p></div><div class="card step-card"><span>03</span><h3>ادفع وقيّم</h3><p class="muted">بعد الإنجاز يتم الدفع كاش وتقييم الفني بالنجوم.</p></div></div></section>`;
-  };
-
-  // The live professions strip must NOT appear inside customer new-request/support pages.
-  v20LiveServicesStrip = window.v20LiveServicesStrip = function(){
-    if(state.user?.role==='customer' && (state.tab==='dash' || state.tab==='support' || !state.tab)) return '';
-    const services=state.meta?.services||[];
-    if(!services.length) return '';
-    const cards=services.map(s=>`<button class="v20-live-card" onclick="v11SelectService?.('${String(s.name).replace(/'/g,"\\'")}')"><span>${esc(s.icon||'🧰')}</span><b>${esc(s.name)}</b><small>متوفر الآن</small></button>`).join('');
-    return `<section class="v20-live-strip"><div class="v20-strip-head"><div><h2>⚡ شريط المهن المباشر</h2><p>كل مهنة تضيفها الإدارة تظهر هنا تلقائياً وتستمر بالدوران بدون توقف</p></div><button class="btn ghost" onclick="go('services')">كل الخدمات</button></div><div class="v20-marquee"><div class="v20-marquee-track v28-slow-strip">${cards}${cards}${cards}</div></div></section>`;
-  };
-
-  supportPage = window.supportPage = function(){
-    return `<div class="support-grid v27-support-grid v28-support-page"><div class="dash-card support-card"><h2>🎧 الدعم الفني</h2><p class="muted">هذه صفحة الدعم فقط. اكتب مشكلتك وسيتم إرسالها للإدارة داخل لوحة الأدمن.</p><form class="form" onsubmit="sendSupport(event)"><div class="field"><label>نوع المشكلة</label><select id="supportType"><option value="مشكلة طلب">مشكلة طلب</option><option value="مشكلة دفع أو رصيد">مشكلة دفع أو رصيد</option><option value="مشكلة حساب">مشكلة حساب</option><option value="اقتراح تحسين">اقتراح تحسين</option></select></div><div class="field"><label>عنوان مختصر</label><input id="supportTitle" required minlength="3" maxlength="120" placeholder="مثال: مشكلة في إرسال الطلب"></div><div class="field"><label>التفاصيل</label><textarea id="supportBody" required minlength="10" maxlength="2000" placeholder="اشرح المشكلة بوضوح..."></textarea></div><button class="btn" type="submit">إرسال للدعم</button></form></div><div class="dash-card"><h2>مساعدة سريعة</h2><div class="faq-list"><details open><summary>متى يظهر الشات؟</summary><p>بعد قبول عرض الفني يظهر الشات للطرفين.</p></details><details><summary>كيف أتابع طلبي؟</summary><p>من صفحة طلباتي يمكنك مشاهدة الحالة والعروض والدردشة.</p></details><details><summary>كيف أرسل الموقع؟</summary><p>افتح الدردشة واضغط إرسال الموقع واسمح للمتصفح باستخدام Location.</p></details></div></div></div>`;
-  };
-
-  sendSupport = window.sendSupport = async function(e){
-    e.preventDefault();
-    const btn=e.submitter; if(btn){btn.disabled=true;btn.textContent='جاري الإرسال...';}
-    try{
-      const type=document.getElementById('supportType')?.value || 'عام';
-      const title=document.getElementById('supportTitle')?.value?.trim() || '';
-      const body=document.getElementById('supportBody')?.value?.trim() || '';
-      await api('/api/support',{method:'POST',body:JSON.stringify({type,title,body})});
-      toast('تم إرسال طلب الدعم بنجاح');
-      e.target.reset();
-    }catch(err){ toast(err.message || 'تعذر إرسال الدعم'); }
-    finally{ if(btn){btn.disabled=false;btn.textContent='إرسال للدعم';} }
-  };
-
-  // Layout: avoid adding support twice, and do not inject the strip before customer request/support.
-  layout = window.layout = function(title,menu,content){
-    const user=state.user||{};
-    const system = user.role==='admin' ? [['settings','الإعدادات']] : [['settings','الإعدادات'],['support','الدعم الفني']];
-    const sidebarBtn=(m)=>`<button type="button" class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${m[1]} <span data-badge="${m[0]==='chats'?'chats':m[0]==='orders'?'orders':''}">${m[0]==='chats'?v24Badge(state.chatCount):m[0]==='orders'?v24Badge(state.orderCount):''}</span></b><span class="mi">${v24MenuIcon?.(m[0])||'•'}</span></button>`;
-    const strip = (typeof v20LiveServicesStrip==='function') ? v20LiveServicesStrip() : '';
-    app.innerHTML=`<div class="admin-shell v24-shell"><aside class="admin-sidebar v24-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><button class="mobile-menu-close" onclick="document.body.classList.remove('sidebar-open')">×</button><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${menu.map(sidebarBtn).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu">${system.map(sidebarBtn).join('')}<button type="button" class="sidebtn logout-side v15-logout-side" onclick="v15LogoutConfirm?.()||logout()"><b>تسجيل خروج</b><span class="mi">🚪</span></button></div><div class="admin-profile"><div class="avatar-sm">${esc((user.name||'ص').slice(0,1))}</div><div><b>${esc(user.name||roleName?.()||'مستخدم')}</b><small>${esc(user.email||'')}</small></div></div></aside><main class="admin-main v24-main"><div class="admin-top"><button class="admin-icon-btn mobile-menu-open" onclick="document.body.classList.add('sidebar-open')">☰</button><div class="admin-search">🔎 <input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();setTimeout(()=>{let q=document.getElementById('searchTechQ'); if(q){q.value=this.value; searchTechnicians?.();}},120)}"></div><div class="admin-actions"><button class="admin-icon-btn bell-btn" onclick="v24RefreshBadges?.()">🔔 ${v24Badge(state.chatCount)}</button><button class="admin-icon-btn" onclick="v10ToggleTheme?.()">🌙</button><button class="admin-icon-btn clean-logout v15-top-logout" onclick="v15LogoutConfirm?.()||logout()">🚪 تسجيل خروج</button></div></div>${strip}<div class="v24-content">${content}</div></main></div>`;
-    v10ApplyTheme?.(); v24RefreshBadges?.();
-  };
-
-  custDash = window.custDash = async function(){
-    await v24RefreshBadges?.();
-    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات'],['support','الدعم الفني']];
-    let content='';
-    if(state.tab==='orders'){
-      const j=await api('/api/requests');
-      content=dashboardHero('طلباتي','تابع الطلبات والعروض والدردشات بشكل مباشر',v20CustomerStats?.(j.requests||[])||[])+`<div class="dash-card"><h2>طلباتي</h2>${typeof v18OrdersView==='function'?v18OrdersView(j.requests||[]):reqTable(j.requests||[])}</div>`;
-    }else if(state.tab==='chats'){
-      content=dashboardHero('الدردشات','كل محادثاتك مع الفنيين هنا.',v20CustomerStats?.([])||[])+await chatsPage();
-    }else if(state.tab==='near'){
-      content=dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد التقييم والملف قبل الطلب',v20CustomerStats?.([])||[])+v20SearchPanel();
-    }else if(state.tab==='settings'){
-      content=dashboardHero('الإعدادات','تغيير الاسم، المنطقة، الهاتف، وكلمة السر',v20CustomerStats?.([])||[])+settingsPage();
-    }else if(state.tab==='support'){
-      content=dashboardHero('الدعم الفني','أرسل مشكلة أو اقتراح لإدارة صلّحلي.',v20CustomerStats?.([])||[])+supportPage();
-    }else{
-      const j=await api('/api/requests').catch(()=>({requests:[]}));
-      content=dashboardHero('لوحة العميل','انشر طلبك بصورة اختيارية واستقبل عروض الفنيين مباشرة',v20CustomerStats?.(j.requests||[])||[])+`<div class="v20-main-grid v24-customer-grid"><div>${requestForm()}</div><div>${v20SearchPanel()}</div></div>`;
-    }
-    layout('لوحة العميل',menu,content);
-    if(['dash','near'].includes(state.tab)){ bindAreaSelect?.('qcity','qarea','qareaOtherWrap'); bindAreaSelect?.('searchCity','searchArea'); }
-    if(state.tab==='near') setTimeout(()=>searchTechnicians?.(),100);
-    if(state.tab==='settings') bindAreaSelect?.('setCity','setArea');
-  };
-
-  techDash = window.techDash = async function(){
-    await v24RefreshBadges?.();
-    const me=(await api('/api/me')).user; state.user=me;
-    const menu=[['dash','الرئيسية'],['orders','الطلبات'],['chats','الدردشات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد'],['support','الدعم الفني']];
-    let content='';
-    if(state.tab==='orders'){
-      const j=await api('/api/requests');
-      content=dashboardHero('طلبات الفني','الطلبات المناسبة تظهر مباشرة. قدم عرض سعر ومدة، وبعد موافقة العميل تفتح المحادثة.',v24Metrics(me,j.requests||[]))+`<div class="dash-card"><div class="v24-head"><h2>الطلبات المتاحة والحالية</h2><button class="btn ghost" onclick="dashboard()">تحديث الآن</button></div>${reqTable(j.requests||[])}</div>`;
-    }else if(state.tab==='chats'){
-      content=dashboardHero('الدردشات','كل محادثاتك مع العملاء هنا.',v24Metrics(me,[]))+await chatsPage();
-    }else if(state.tab==='balance'){
-      content=(typeof v22TechBalance==='function')?v22TechBalance(me):balancePage(me);
-    }else if(state.tab==='topups'){
-      const j=await api('/api/topups'); content=dashboardHero('طلبات الشحن','تابع طلبات شحن الرصيد.',v24Metrics(me,[]))+topupTable(j.topups||[]);
-    }else if(state.tab==='ledger'){
-      const j=await api('/api/ledger'); content=dashboardHero('سجل الرصيد','كل عمليات الرصيد والعمولة محفوظة.',v24Metrics(me,[]))+ledgerTable(j.ledger||[]);
-    }else if(state.tab==='settings'){
-      content=dashboardHero('الإعدادات','تعديل الاسم، الهاتف، المنطقة، وكلمة السر.',v24Metrics(me,[]))+settingsPage();
-    }else if(state.tab==='support'){
-      content=dashboardHero('الدعم الفني','أرسل مشكلة أو اقتراح لإدارة صلّحلي.',v24Metrics(me,[]))+supportPage();
-    }else{
-      const j=await api('/api/requests');
-      content=dashboardHero('لوحة الفني','إدارة احترافية للطلبات، العروض، الدردشات، الشحن والرصيد.',v24Metrics(me,j.requests||[]))+`<div class="v22-grid v24-grid v27-tech-actions"><div class="dash-card v22-action" onclick="state.tab='orders';dashboard()"><span>🛠️</span><h3>الطلبات</h3><p>شاهد الطلبات المناسبة وقدم عروض سعر.</p></div><div class="dash-card v22-action" onclick="state.tab='chats';dashboard()"><span>💬</span><h3>الدردشات ${v24Badge(state.chatCount)}</h3><p>افتح محادثات العملاء مباشرة.</p></div><div class="dash-card v22-action" onclick="state.tab='balance';dashboard()"><span>💳</span><h3>الرصيد</h3><p>اشحن الرصيد واختر الباقات.</p></div><div class="dash-card v22-action" onclick="state.tab='support';dashboard();setTimeout(v35ScrollToContent,80)"><span>🎧</span><h3>الدعم الفني</h3><p>أرسل مشكلة للإدارة.</p></div></div><div class="dash-card"><h2>آخر الطلبات</h2>${reqTable((j.requests||[]).slice(0,5))}</div>`;
-    }
-    layout('لوحة الفني',menu,content);
-    if(state.tab==='settings') bindAreaSelect?.('setCity','setArea');
-  };
-
-  dashboard = window.dashboard = function(){
-    v24BindRealtime?.();
-    if(!state.user) return login();
-    if(state.user.role==='admin') return admin();
-    if(state.user.role==='technician') return techDash();
-    return custDash();
-  };
-
-  const st=document.createElement('style');
-  st.textContent=`
-    .v28-home-top{margin:28px auto;max-width:1180px}.v25-top-track{animation-duration:58s!important}.v28-slow-strip{animation-duration:70s!important}.v28-support-page{align-items:start}.v28-support-page textarea{min-height:150px}.v27-tech-actions{margin-bottom:18px}.v24-content>.v20-live-strip:first-child{display:none!important}
-    @media(max-width:900px){.v28-home-top{margin:18px 12px}.v25-top-head,.v20-strip-head{display:block!important}.v25-top-head b{display:inline-block;margin-top:10px}.v25-top-card{min-width:240px!important}.v20-main-grid,.v24-customer-grid,.support-grid,.v27-support-grid{grid-template-columns:1fr!important}.v24-main{max-width:100vw!important;overflow-x:hidden}.dashboard-hero{margin-top:8px}.admin-main{width:100%!important}.v20-search-grid,.v20-request-form{grid-template-columns:1fr!important}.v20-form-card,.dash-card{border-radius:22px!important}.v20-live-strip{margin:10px 0!important}}
-    @media(max-width:520px){.v25-top-card{min-width:210px!important}.hero.pro-hero{padding:22px 14px!important}.hero-actions{display:grid!important;grid-template-columns:1fr!important}.trust-strip{grid-template-columns:1fr!important}.v24-content{width:100%!important}.admin-search input{width:100%!important}.admin-actions{grid-template-columns:1fr 1fr!important}.clean-logout{grid-column:1/-1}.dashboard-hero h1{font-size:28px!important}.dashboard-hero p{font-size:14px!important}.v20-card-head{display:block!important}.btn{width:auto}.v20-submit{width:100%}}
-  `;
-  document.head.appendChild(st);
-})();
-
-/* ===== V29 FINAL REAL FIX: clean sidebar icons, customer support, no request ticker, one home services ===== */
-;(function(){
-  const esc = window.v15EscapeHtml || ((s)=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
-
-  // Remove sidebar emojis/icons completely (the user asked to remove the useless smileys/icons from the side menu).
-  window.v24MenuIcon = function(){ return ''; };
-  window.menuIconV13 = function(){ return ''; };
-
-  // For customers: never inject the professions/live strip inside dashboard/request/support pages.
-  // Keep the strip available only for admin/technician pages where needed, not for customer pages.
-  window.v20LiveServicesStrip = function(){
-    if(window.state?.user?.role === 'customer') return '';
-    const services=window.state?.meta?.services||[];
-    if(!services.length) return '';
-    const cards=services.map(s=>`<button class="v20-live-card" onclick="v11SelectService?.('${String(s.name).replace(/'/g,"\\'")}')"><span>${esc(s.icon||'')}</span><b>${esc(s.name)}</b><small>متوفر الآن</small></button>`).join('');
-    return `<section class="v20-live-strip"><div class="v20-strip-head"><div><h2>شريط المهن المباشر</h2><p>المهن المضافة من الإدارة تظهر تلقائياً وتتحرك بهدوء.</p></div><button class="btn ghost" onclick="go('services')">كل الخدمات</button></div><div class="v20-marquee"><div class="v20-marquee-track v29-slow-strip">${cards}${cards}${cards}</div></div></section>`;
-  };
-
-  // Also stop the old ticker function completely for customers, because older layout versions may call v13Ticker().
-  window.v13Ticker = function(){ return ''; };
-
-  // Customer/technician support page: real support form only, not a request form.
-  window.supportPage = function(){
-    return `<div class="support-grid v27-support-grid v29-support-page">
-      <div class="dash-card support-card">
-        <h2>الدعم الفني</h2>
-        <p class="muted">اكتب مشكلتك هنا وسيتم إرسالها للإدارة داخل لوحة الأدمن.</p>
-        <form class="form" onsubmit="sendSupport(event)">
-          <div class="field"><label>نوع المشكلة</label><select id="supportType"><option value="مشكلة طلب">مشكلة طلب</option><option value="مشكلة دفع أو رصيد">مشكلة دفع أو رصيد</option><option value="مشكلة حساب">مشكلة حساب</option><option value="اقتراح تحسين">اقتراح تحسين</option></select></div>
-          <div class="field"><label>عنوان مختصر</label><input id="supportTitle" required minlength="3" maxlength="120" placeholder="مثال: مشكلة في إرسال الطلب"></div>
-          <div class="field"><label>التفاصيل</label><textarea id="supportBody" required minlength="10" maxlength="2000" placeholder="اشرح المشكلة بوضوح..."></textarea></div>
-          <button class="btn" type="submit">إرسال للدعم</button>
-        </form>
-      </div>
-      <div class="dash-card"><h2>مساعدة سريعة</h2><div class="faq-list"><details open><summary>متى يظهر الشات؟</summary><p>بعد قبول عرض الفني يظهر الشات للطرفين.</p></details><details><summary>كيف أتابع طلبي؟</summary><p>من صفحة طلباتي يمكنك مشاهدة حالة الطلب والعروض والدردشة.</p></details><details><summary>كيف أرسل الموقع؟</summary><p>افتح الدردشة واضغط إرسال الموقع واسمح للمتصفح باستخدام Location.</p></details></div></div>
-    </div>`;
-  };
-
-  window.sendSupport = async function(e){
-    e.preventDefault();
-    const btn=e.submitter; if(btn){btn.disabled=true; btn.textContent='جاري الإرسال...';}
-    try{
-      const type=document.getElementById('supportType')?.value || 'عام';
-      const title=document.getElementById('supportTitle')?.value?.trim() || '';
-      const body=document.getElementById('supportBody')?.value?.trim() || '';
-      await api('/api/support',{method:'POST',body:JSON.stringify({type,title,body})});
-      toast('تم إرسال طلب الدعم بنجاح');
-      e.target.reset();
-    }catch(err){ toast(err.message || 'تعذر إرسال الدعم'); }
-    finally{ if(btn){btn.disabled=false; btn.textContent='إرسال للدعم';} }
-  };
-
-  // Clean layout: no side-menu icons, no duplicate support in system section, no emojis in logout/sidebar.
-  window.layout = function(title,menu,content){
-    const user=window.state.user||{};
-    const hasSupport=(menu||[]).some(m=>m[0]==='support');
-    const system = user.role==='admin' ? [['settings','الإعدادات']] : (hasSupport ? [['settings','الإعدادات']] : [['settings','الإعدادات'],['support','الدعم الفني']]);
-    const badge=(m)=> m[0]==='chats' ? (window.v24Badge?.(state.chatCount)||'') : (m[0]==='orders' ? (window.v24Badge?.(state.orderCount)||'') : '');
-    const sidebarBtn=(m)=>`<button type="button" class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${m[1]} ${badge(m)}</b></button>`;
-    const strip = (typeof window.v20LiveServicesStrip==='function') ? window.v20LiveServicesStrip() : '';
-    app.innerHTML=`<div class="admin-shell v24-shell v29-clean-sidebar"><aside class="admin-sidebar v24-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><button class="mobile-menu-close" onclick="document.body.classList.remove('sidebar-open')">×</button><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${(menu||[]).map(sidebarBtn).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu">${system.map(sidebarBtn).join('')}<button type="button" class="sidebtn logout-side v15-logout-side" onclick="v15LogoutConfirm?.()||logout()"><b>تسجيل خروج</b></button></div><div class="admin-profile"><div class="avatar-sm">${esc((user.name||'ص').slice(0,1))}</div><div><b>${esc(user.name||roleName?.()||'مستخدم')}</b><small>${esc(user.email||'')}</small></div></div></aside><main class="admin-main v24-main"><div class="admin-top"><button class="admin-icon-btn mobile-menu-open" onclick="document.body.classList.add('sidebar-open')">☰</button><div class="admin-search"><input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();setTimeout(()=>{let q=document.getElementById('searchTechQ'); if(q){q.value=this.value; searchTechnicians?.();}},120)}"></div><div class="admin-actions"><button class="admin-icon-btn bell-btn" onclick="v24RefreshBadges?.()">التنبيهات ${window.v24Badge?.(state.chatCount)||''}</button><button class="admin-icon-btn" onclick="v10ToggleTheme?.()">الوضع</button><button class="admin-icon-btn clean-logout v15-top-logout" onclick="v15LogoutConfirm?.()||logout()">تسجيل خروج</button></div></div>${strip}<div class="v24-content">${content}</div></main></div>`;
-    window.v10ApplyTheme?.(); window.v24RefreshBadges?.();
-  };
-
-  // Customer dashboard final: request page has no ticker, support is real support page.
-  window.custDash = async function(){
-    await window.v24RefreshBadges?.();
-    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات'],['support','الدعم الفني']];
-    let content='';
-    if(state.tab==='orders'){
-      const j=await api('/api/requests');
-      content=dashboardHero('طلباتي','تابع الطلبات والعروض والدردشات بشكل مباشر',window.v20CustomerStats?.(j.requests||[])||[])+`<div class="dash-card"><h2>طلباتي</h2>${typeof window.v18OrdersView==='function'?window.v18OrdersView(j.requests||[]):reqTable(j.requests||[])}</div>`;
-    }else if(state.tab==='chats'){
-      content=dashboardHero('الدردشات','كل محادثاتك مع الفنيين هنا.',window.v20CustomerStats?.([])||[])+await chatsPage();
-    }else if(state.tab==='near'){
-      content=dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد التقييم والملف قبل الطلب',window.v20CustomerStats?.([])||[])+window.v20SearchPanel();
-    }else if(state.tab==='settings'){
-      content=dashboardHero('الإعدادات','تغيير الاسم، المنطقة، الهاتف، وكلمة السر',window.v20CustomerStats?.([])||[])+settingsPage();
-    }else if(state.tab==='support'){
-      content=dashboardHero('الدعم الفني','أرسل مشكلة أو اقتراح لإدارة صلّحلي.',window.v20CustomerStats?.([])||[])+window.supportPage();
-    }else{
-      const j=await api('/api/requests').catch(()=>({requests:[]}));
-      content=dashboardHero('لوحة العميل','انشر طلبك بصورة اختيارية واستقبل عروض الفنيين مباشرة',window.v20CustomerStats?.(j.requests||[])||[])+`<div class="v20-main-grid v24-customer-grid"><div>${requestForm()}</div><div>${window.v20SearchPanel()}</div></div>`;
-    }
-    window.layout('لوحة العميل',menu,content);
-    if(['dash','near'].includes(state.tab)){ window.bindAreaSelect?.('qcity','qarea','qareaOtherWrap'); window.bindAreaSelect?.('searchCity','searchArea'); }
-    if(state.tab==='near') setTimeout(()=>window.searchTechnicians?.(),100);
-    if(state.tab==='settings') window.bindAreaSelect?.('setCity','setArea');
-  };
-
-  // Single slow moving services section on public home. No second duplicate.
-  const topServices = function(){
-    const base=(state.meta?.services?.length?state.meta.services:[{name:'كهربائي',icon:''},{name:'سباك',icon:''},{name:'تكييف',icon:''},{name:'صيانة أجهزة',icon:''}]);
-    const cards=base.map((s,i)=>`<button class="v25-top-card" onclick="localStorage.pendingService='${String(s.name).replace(/'/g,"\\'")}';go(state.user?'dashboard':'register')"><span>${esc(s.icon||'')}</span><div><b>${esc(s.name)}</b><small>${240-((i%8)*11)} طلب هذا الشهر • فنيين متاحين</small></div></button>`).join('');
-    return `<section class="v25-top-services v29-home-top"><div class="v25-top-head"><div><span class="eyebrow">Live</span><h2>الخدمات الأكثر طلباً</h2><p>تتحرك تلقائياً بسرعة هادئة ومناسبة للموبايل.</p></div></div><div class="v25-top-marquee"><div class="v25-top-track v29-top-track">${cards}${cards}${cards}</div></div></section>`;
-  };
-  window.home = function(){
-    document.body.classList.remove('dashboard-mode','sidebar-open');
-    app.innerHTML=`<section class="hero pro-hero"><div class="hero-copy"><span class="badge glow-badge"><span class="live-dot"></span> منصة صيانة احترافية في الأردن • فنيين موثوقين • دفع كاش</span><h1>صلّحلي — وصّل العميل بالفني الأقرب بشكل أسرع وأرتب</h1><p class="hero-lead">واجهة احترافية تعرض الخدمات، الفنيين، الطلبات، التقييمات، الرصيد، والدردشة بمظهر حديث ومناسب للهاتف.</p><div class="hero-actions"><button class="btn big" onclick="go('${state.user?'dashboard':'register'}')">اطلب خدمة الآن</button><button class="btn ghost big" onclick="register('technician')">انضم كفني</button></div><div class="trust-strip"><div><b>+12</b><span>خدمة صيانة</span></div><div><b>GPS</b><span>تحديد موقع</span></div><div><b>4.8</b><span>تقييمات فنيين</span></div></div></div><div class="phone pro-phone"><div class="phone-top"><span></span><b>فنيين مقترحين</b><em>Live</em></div><div class="screen pro-screen">${['فني تكييف','كهربائي','سباك'].map((x,i)=>`<div class="screen-row pro-row"><div style="display:flex;gap:10px;align-items:center"><div><b>${x}</b><div>${stars(5-i/2)} <small>${20-i*4} عمل مكتمل</small></div></div></div><button class="btn ghost mini">اختيار</button></div>`).join('')}<div class="mini-map"><div><b>الأقرب لموقعك</b><small>ترتيب حسب المنطقة والتقييم</small></div></div></div></div></section>${topServices()}<section class="section services-section" id="services"><div class="section-head"><span class="eyebrow">خدمات جاهزة</span><h2>كل ما يحتاجه البيت بمكان واحد</h2><p class="muted">اختر الخدمة، انشر الطلب، وشاهد الفنيين المناسبين حسب منطقتك.</p></div><div class="grid feature-grid">${(state.meta.services||[]).slice(0,12).map(s=>`<div class="card service-card"><div class="icon">${esc(s.icon||'')}</div><h3>${esc(s.name)}</h3><p class="muted">طلب سريع، فنيين قريبين، وتقييم واضح قبل الاختيار.</p></div>`).join('')}</div></section><section class="section"><div class="section-head"><span class="eyebrow">كيف يعمل؟</span><h2>خطوات بسيطة من الطلب إلى الإنجاز</h2></div><div class="grid steps-grid"><div class="card step-card"><span>01</span><h3>أنشئ طلب</h3><p class="muted">اختر الخدمة، اكتب وصف المشكلة، وحدد المحافظة والمنطقة.</p></div><div class="card step-card"><span>02</span><h3>اختر الفني</h3><p class="muted">يعرض النظام الفنيين المناسبين مع التقييم وعدد الأعمال.</p></div><div class="card step-card"><span>03</span><h3>ادفع وقيّم</h3><p class="muted">بعد الإنجاز يتم الدفع كاش وتقييم الفني بالنجوم.</p></div></div></section>`;
-  };
-
-  const st=document.createElement('style');
-  st.textContent=`
-    .v29-clean-sidebar .sidebtn{justify-content:center!important;text-align:center!important;gap:0!important;padding-inline:18px!important}.v29-clean-sidebar .sidebtn .mi{display:none!important}.v29-clean-sidebar .sidebtn b{width:100%;text-align:center!important}.v29-clean-sidebar .logout-side{display:flex!important;justify-content:center!important}.v29-clean-sidebar .admin-section-label{text-align:center!important}.admin-search::before,.admin-search{background-image:none!important}.admin-search{gap:0!important}.admin-search input{padding-inline:16px!important}.bell-btn,.clean-logout{white-space:nowrap}.v29-top-track{animation-duration:62s!important}.v29-slow-strip{animation-duration:80s!important}.v29-support-page textarea{min-height:150px}.v29-home-top{margin:28px auto;max-width:1180px}.v24-content>.v20-live-strip:first-child{display:none!important}
-    @media(max-width:900px){.v29-clean-sidebar .sidebtn{min-height:58px!important;font-size:17px!important}.v29-home-top{margin:18px 12px}.v25-top-head{display:block!important}.v25-top-card{min-width:235px!important}.v20-main-grid,.v24-customer-grid,.support-grid,.v27-support-grid{grid-template-columns:1fr!important}.v24-main{max-width:100vw!important;overflow-x:hidden}.admin-main{width:100%!important}.v20-search-grid,.v20-request-form{grid-template-columns:1fr!important}.dash-card{border-radius:22px!important}}
-    @media(max-width:520px){.v25-top-card{min-width:210px!important}.hero.pro-hero{padding:22px 14px!important}.hero-actions{display:grid!important;grid-template-columns:1fr!important}.trust-strip{grid-template-columns:1fr!important}.v24-content{width:100%!important}.admin-search input{width:100%!important}.admin-actions{grid-template-columns:1fr 1fr!important}.clean-logout{grid-column:1/-1}.dashboard-hero h1{font-size:28px!important}.dashboard-hero p{font-size:14px!important}.btn{width:auto}.v20-submit{width:100%}}
-  `;
-  document.head.appendChild(st);
-})();
-
-/* ===== V30 REAL FINAL PATCH - applied after all old versions ===== */
-;(function(){
-  const cleanText = (s)=>String(s||'').replace(/[🏠📍🛒💬⚙️🎧🚪🔔🌙🔎👋⚡🔥✅➕👤🧰🛠️💳📦⭐🚰❄️]/g,'').trim();
-
-  // Stop old dashboard tickers completely. Home still has the moving "الخدمات الأكثر طلباً" section.
-  window.v13Ticker = function(){ return ''; };
-  window.v20LiveServicesStrip = function(){ return ''; };
-
-  // Real support page, not request page.
-  window.supportPage = function(){
-    return `<div class="support-grid v27-support-grid v28-support-page v30-support-page">
-      <div class="dash-card support-card">
-        <h2>الدعم الفني</h2>
-        <p class="muted">هذه صفحة الدعم فقط. اكتب مشكلتك وسيتم إرسالها للإدارة داخل لوحة الأدمن.</p>
-        <form class="form" onsubmit="sendSupport(event)">
-          <div class="field"><label>نوع المشكلة</label><select id="supportType"><option value="مشكلة طلب">مشكلة طلب</option><option value="مشكلة دفع أو رصيد">مشكلة دفع أو رصيد</option><option value="مشكلة حساب">مشكلة حساب</option><option value="اقتراح تحسين">اقتراح تحسين</option></select></div>
-          <div class="field"><label>عنوان مختصر</label><input id="supportTitle" required minlength="3" maxlength="120" placeholder="مثال: مشكلة في إرسال الطلب"></div>
-          <div class="field"><label>التفاصيل</label><textarea id="supportBody" required minlength="10" maxlength="2000" placeholder="اشرح المشكلة بوضوح..."></textarea></div>
-          <button class="btn" type="submit">إرسال للدعم</button>
-        </form>
-      </div>
-      <div class="dash-card"><h2>مساعدة سريعة</h2><div class="faq-list"><details open><summary>متى يظهر الشات؟</summary><p>بعد قبول عرض الفني يظهر الشات للطرفين.</p></details><details><summary>كيف أتابع طلبي؟</summary><p>من صفحة طلباتي يمكنك مشاهدة الحالة والعروض والدردشة.</p></details><details><summary>كيف أرسل الموقع؟</summary><p>افتح الدردشة واضغط إرسال الموقع واسمح للمتصفح باستخدام Location.</p></details></div></div>
-    </div>`;
-  };
-
-  // Final sidebar layout: no emojis/icons in sidebar, no ticker injected above content.
-  window.layout = function(title,menu,content){
-    document.body.classList.add('dashboard-mode');
-    const user=state.user||{};
-    const hasSupport=(menu||[]).some(m=>m[0]==='support');
-    const system = user.role==='admin' ? [['settings','الإعدادات']] : (hasSupport ? [['settings','الإعدادات']] : [['settings','الإعدادات'],['support','الدعم الفني']]);
-    const badge=(m)=> m[0]==='chats' ? (window.v24Badge?.(state.chatCount)||'') : (m[0]==='orders' ? (window.v24Badge?.(state.orderCount)||'') : '');
-    const sidebarBtn=(m)=>`<button type="button" class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${cleanText(m[1])} ${badge(m)}</b></button>`;
-    app.innerHTML=`<div class="admin-shell v24-shell v30-clean-sidebar"><aside class="admin-sidebar v24-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><button class="mobile-menu-close" onclick="document.body.classList.remove('sidebar-open')">×</button><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${(menu||[]).map(sidebarBtn).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu">${system.map(sidebarBtn).join('')}<button type="button" class="sidebtn logout-side v15-logout-side" onclick="v15LogoutConfirm?.()||logout()"><b>تسجيل خروج</b></button></div><div class="admin-profile"><div class="avatar-sm">${esc((user.name||'ص').slice(0,1))}</div><div><b>${esc(user.name||roleName?.()||'مستخدم')}</b><small>${esc(user.email||'')}</small></div></div></aside><main class="admin-main v24-main"><div class="admin-top"><button class="admin-icon-btn mobile-menu-open" onclick="document.body.classList.add('sidebar-open')">القائمة</button><div class="admin-search"><input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();setTimeout(()=>{let q=document.getElementById('searchTechQ'); if(q){q.value=this.value; searchTechnicians?.();}},120)}"></div><div class="admin-actions"><button class="admin-icon-btn bell-btn" onclick="v24RefreshBadges?.()">التنبيهات ${window.v24Badge?.(state.chatCount)||''}</button><button class="admin-icon-btn" onclick="v10ToggleTheme?.()">الوضع</button><button class="admin-icon-btn clean-logout v15-top-logout" onclick="v15LogoutConfirm?.()||logout()">تسجيل خروج</button></div></div><div class="v24-content">${content}</div></main></div>`;
-    window.v10ApplyTheme?.(); window.v24RefreshBadges?.();
-  };
-
-  // Customer dashboard: request page has no live strip; support opens support only.
-  window.custDash = async function(){
-    await window.v24RefreshBadges?.();
-    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات'],['support','الدعم الفني']];
-    let content='';
-    if(state.tab==='orders'){
-      const j=await api('/api/requests');
-      content=dashboardHero('طلباتي','تابع الطلبات والعروض والدردشات بشكل مباشر',window.v20CustomerStats?.(j.requests||[])||[])+`<div class="dash-card"><h2>طلباتي</h2>${typeof window.v18OrdersView==='function'?window.v18OrdersView(j.requests||[]):reqTable(j.requests||[])}</div>`;
-    }else if(state.tab==='chats'){
-      content=dashboardHero('الدردشات','كل محادثاتك مع الفنيين هنا.',window.v20CustomerStats?.([])||[])+await chatsPage();
-    }else if(state.tab==='near'){
-      content=dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد التقييم والملف قبل الطلب',window.v20CustomerStats?.([])||[])+window.v20SearchPanel();
-    }else if(state.tab==='settings'){
-      content=dashboardHero('الإعدادات','تغيير الاسم، المنطقة، الهاتف، وكلمة السر',window.v20CustomerStats?.([])||[])+settingsPage();
-    }else if(state.tab==='support'){
-      content=dashboardHero('الدعم الفني','أرسل مشكلة أو اقتراح لإدارة صلّحلي.',window.v20CustomerStats?.([])||[])+window.supportPage();
-    }else{
-      const j=await api('/api/requests').catch(()=>({requests:[]}));
-      content=dashboardHero('لوحة العميل','انشر طلبك بصورة اختيارية واستقبل عروض الفنيين مباشرة',window.v20CustomerStats?.(j.requests||[])||[])+`<div class="v20-main-grid v24-customer-grid"><div>${requestForm()}</div><div>${window.v20SearchPanel()}</div></div>`;
-    }
-    window.layout('لوحة العميل',menu,content);
-    if(['dash','near'].includes(state.tab)){ window.bindAreaSelect?.('qcity','qarea','qareaOtherWrap'); window.bindAreaSelect?.('searchCity','searchArea'); }
-    if(state.tab==='near') setTimeout(()=>window.searchTechnicians?.(),100);
-    if(state.tab==='settings') window.bindAreaSelect?.('setCity','setArea');
-  };
-
-  // Final home: one slow "الخدمات الأكثر طلباً" block only.
-  window.home = function(){
-    document.body.classList.remove('dashboard-mode','sidebar-open');
-    const base=(state.meta?.services?.length?state.meta.services:[{name:'كهربائي',icon:''},{name:'سباك',icon:''},{name:'تكييف',icon:''},{name:'صيانة أجهزة',icon:''}]);
-    const cards=base.map((s,i)=>`<button class="v25-top-card" onclick="localStorage.pendingService='${String(s.name).replace(/'/g,"\\'")}';go(state.user?'dashboard':'register')"><span>${esc(s.icon||'')}</span><div><b>${esc(s.name)}</b><small>${240-((i%8)*11)} طلب هذا الشهر • فنيين متاحين</small></div></button>`).join('');
-    const top=`<section class="v25-top-services v30-home-top"><div class="v25-top-head"><div><span class="eyebrow">Live</span><h2>الخدمات الأكثر طلباً</h2><p>تتحرك تلقائياً بسرعة هادئة ومناسبة للموبايل.</p></div></div><div class="v25-top-marquee"><div class="v25-top-track v30-top-track">${cards}${cards}${cards}</div></div></section>`;
-    app.innerHTML=`<section class="hero pro-hero"><div class="hero-copy"><span class="badge glow-badge"><span class="live-dot"></span> منصة صيانة احترافية في الأردن • فنيين موثوقين • دفع كاش</span><h1>صلّحلي — وصّل العميل بالفني الأقرب بشكل أسرع وأرتب</h1><p class="hero-lead">واجهة احترافية تعرض الخدمات، الفنيين، الطلبات، التقييمات، الرصيد، والدردشة بمظهر حديث ومناسب للهاتف.</p><div class="hero-actions"><button class="btn big" onclick="go('${state.user?'dashboard':'register'}')">اطلب خدمة الآن</button><button class="btn ghost big" onclick="register('technician')">انضم كفني</button></div><div class="trust-strip"><div><b>+12</b><span>خدمة صيانة</span></div><div><b>GPS</b><span>تحديد موقع</span></div><div><b>4.8</b><span>تقييمات فنيين</span></div></div></div><div class="phone pro-phone"><div class="phone-top"><span></span><b>فنيين مقترحين</b><em>Live</em></div><div class="screen pro-screen">${['فني تكييف','كهربائي','سباك'].map((x,i)=>`<div class="screen-row pro-row"><div style="display:flex;gap:10px;align-items:center"><div><b>${x}</b><div>${stars(5-i/2)} <small>${20-i*4} عمل مكتمل</small></div></div></div><button class="btn ghost mini">اختيار</button></div>`).join('')}<div class="mini-map"><div><b>الأقرب لموقعك</b><small>ترتيب حسب المنطقة والتقييم</small></div></div></div></div></section>${top}<section class="section services-section" id="services"><div class="section-head"><span class="eyebrow">خدمات جاهزة</span><h2>كل ما يحتاجه البيت بمكان واحد</h2><p class="muted">اختر الخدمة، انشر الطلب، وشاهد الفنيين المناسبين حسب منطقتك.</p></div><div class="grid feature-grid">${(state.meta.services||[]).slice(0,12).map(s=>`<div class="card service-card"><div class="icon">${esc(s.icon||'')}</div><h3>${esc(s.name)}</h3><p class="muted">طلب سريع، فنيين قريبين، وتقييم واضح قبل الاختيار.</p></div>`).join('')}</div></section>`;
-  };
-})();
-
-/* ===== V31 USER REQUESTED FINAL: support fixed + request page live professions only ===== */
-;(function(){
-  const esc = window.v15EscapeHtml || ((s)=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
-  const cleanMenuText = (s)=>String(s||'').replace(/[🏠📍🛒💬⚙️🎧🚪🔔🌙🔎👋⚡🔥✅➕👤🧰🛠️💳📦⭐🚰❄️🎁🚚📘🙂👥💼]/g,'').trim();
-
-  window.v31RequestProfessionsStrip = function(){
-    const services = (window.state && state.meta && Array.isArray(state.meta.services) && state.meta.services.length)
-      ? state.meta.services
-      : [{name:'كهربائي',icon:''},{name:'سباك',icon:''},{name:'تكييف',icon:''},{name:'نجار',icon:''}];
-    const cards = services.map(s=>{
-      const name = esc(s.name||'خدمة');
-      const rawName = String(s.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      return `<button type="button" class="v31-job-card" onclick="window.v31ChooseRequestService('${rawName}')"><span>${esc(s.icon||'')}</span><b>${name}</b><small>متوفر الآن</small></button>`;
-    }).join('');
-    return `<section class="v31-job-strip">
-      <div class="v31-strip-head"><div><h2>شريط المهن</h2><p>كل مهنة تضيفها الإدارة تظهر هنا تلقائياً داخل صفحة طلب جديد.</p></div></div>
-      <div class="v31-marquee"><div class="v31-track">${cards}${cards}${cards}</div></div>
-    </section>`;
-  };
-
-  window.v31ChooseRequestService = function(name){
-    const ids=['reqService','service','requestService'];
-    for(const id of ids){ const el=document.getElementById(id); if(el){ el.value=name; el.dispatchEvent(new Event('change',{bubbles:true})); break; } }
-    try{ localStorage.pendingService=name; }catch(e){}
-    toast?.('تم اختيار: '+name);
-  };
-
-  window.supportPage = function(){
-    return `<div class="v31-support-wrap">
-      <div class="dash-card v31-support-card">
-        <h2>الدعم الفني</h2>
-        <p class="muted">هذه صفحة الدعم فقط، وليست صفحة طلب جديد. اكتب المشكلة وسيتم إرسالها للإدارة.</p>
-        <form class="form" onsubmit="sendSupport(event)">
-          <div class="field"><label>نوع المشكلة</label><select id="supportType"><option value="مشكلة طلب">مشكلة طلب</option><option value="مشكلة حساب">مشكلة حساب</option><option value="مشكلة دفع أو رصيد">مشكلة دفع أو رصيد</option><option value="اقتراح تحسين">اقتراح تحسين</option></select></div>
-          <div class="field"><label>عنوان مختصر</label><input id="supportTitle" required minlength="3" maxlength="120" placeholder="مثال: مشكلة في الدردشة"></div>
-          <div class="field"><label>تفاصيل المشكلة</label><textarea id="supportBody" required minlength="10" maxlength="2000" placeholder="اكتب التفاصيل هنا..."></textarea></div>
-          <button class="btn" type="submit">إرسال للدعم</button>
-        </form>
-      </div>
-      <div class="dash-card v31-help-card"><h2>مساعدة سريعة</h2><div class="faq-list"><details open><summary>الدردشة لا تظهر؟</summary><p>تظهر الدردشة بعد قبول عرض الفني.</p></details><details><summary>الموقع لا يرسل؟</summary><p>اسمح للمتصفح باستخدام الموقع من إعدادات المتصفح.</p></details><details><summary>كيف أتابع الطلب؟</summary><p>افتح صفحة طلباتي وشاهد الحالة والعروض.</p></details></div></div>
-    </div>`;
-  };
-
-  window.sendSupport = async function(e){
-    e.preventDefault();
-    const btn=e.submitter; if(btn){btn.disabled=true; btn.textContent='جاري الإرسال...';}
-    try{
-      const type=document.getElementById('supportType')?.value || 'عام';
-      const title=(document.getElementById('supportTitle')?.value||'').trim();
-      const body=(document.getElementById('supportBody')?.value||'').trim();
-      await api('/api/support',{method:'POST',body:JSON.stringify({type,title,body})});
-      toast?.('تم إرسال طلب الدعم للإدارة');
-      e.target.reset();
-    }catch(err){ toast?.(err.message || 'تعذر إرسال الدعم'); }
-    finally{ if(btn){btn.disabled=false; btn.textContent='إرسال للدعم';} }
-  };
-
-  // Keep normal dashboard pages clean: no global live strip injection.
-  window.v13Ticker = function(){ return ''; };
-  window.v20LiveServicesStrip = function(){ return ''; };
-
-  window.layout = function(title,menu,content){
-    document.body.classList.add('dashboard-mode');
-    const user=state.user||{};
-    const system = (menu||[]).some(m=>m[0]==='support') ? [['settings','الإعدادات']] : [['settings','الإعدادات'],['support','الدعم الفني']];
-    const btn=(m)=>`<button type="button" class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${cleanMenuText(m[1])}</b></button>`;
-    app.innerHTML=`<div class="admin-shell v31-shell"><aside class="admin-sidebar v31-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><button class="mobile-menu-close" onclick="document.body.classList.remove('sidebar-open')">×</button><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${(menu||[]).map(btn).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu">${system.map(btn).join('')}<button type="button" class="sidebtn logout-side" onclick="v15LogoutConfirm?.()||logout()"><b>تسجيل خروج</b></button></div><div class="admin-profile"><div class="avatar-sm">${esc((user.name||'ص').slice(0,1))}</div><div><b>${esc(user.name||'مستخدم')}</b><small>${esc(user.email||'')}</small></div></div></aside><main class="admin-main v31-main"><div class="admin-top"><button class="admin-icon-btn mobile-menu-open" onclick="document.body.classList.add('sidebar-open')">القائمة</button><div class="admin-search"><input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();}"></div><div class="admin-actions"><button class="admin-icon-btn" onclick="v24RefreshBadges?.()">التنبيهات</button><button class="admin-icon-btn" onclick="v10ToggleTheme?.()">الوضع</button><button class="admin-icon-btn clean-logout" onclick="v15LogoutConfirm?.()||logout()">تسجيل خروج</button></div></div><div class="v31-content">${content}</div></main></div>`;
-    window.v10ApplyTheme?.();
-  };
-
-  window.custDash = async function(){
-    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات'],['support','الدعم الفني']];
-    let content='';
-    if(state.tab==='support'){
-      content=(window.dashboardHero?dashboardHero('الدعم الفني','أرسل مشكلتك للإدارة مباشرة.',window.v20CustomerStats?.([])||[]): '<div></div>') + window.supportPage();
-    }else if(state.tab==='orders'){
-      const j=await api('/api/requests');
-      content=(window.dashboardHero?dashboardHero('طلباتي','تابع طلباتك والعروض والدردشات.',window.v20CustomerStats?.(j.requests||[])||[]): '')+`<div class="dash-card"><h2>طلباتي</h2>${typeof window.v18OrdersView==='function'?window.v18OrdersView(j.requests||[]):reqTable(j.requests||[])}</div>`;
-    }else if(state.tab==='chats'){
-      content=(window.dashboardHero?dashboardHero('الدردشات','كل المحادثات مع الفنيين هنا.',window.v20CustomerStats?.([])||[]): '')+await chatsPage();
-    }else if(state.tab==='near'){
-      content=(window.dashboardHero?dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد التقييم.',window.v20CustomerStats?.([])||[]): '')+(window.v20SearchPanel?window.v20SearchPanel():nearbyPage());
-    }else if(state.tab==='settings'){
-      content=(window.dashboardHero?dashboardHero('الإعدادات','عدّل بيانات حسابك.',window.v20CustomerStats?.([])||[]): '')+settingsPage();
-    }else{
-      const j=await api('/api/requests').catch(()=>({requests:[]}));
-      content=(window.dashboardHero?dashboardHero('لوحة العميل','انشر طلبك واستقبل عروض الفنيين مباشرة.',window.v20CustomerStats?.(j.requests||[])||[]): '') + window.v31RequestProfessionsStrip() + `<div class="v20-main-grid v24-customer-grid"><div>${requestForm()}</div><div>${window.v20SearchPanel?window.v20SearchPanel():nearbyPage()}</div></div>`;
-    }
-    window.layout('لوحة العميل',menu,content);
-    if(['dash','near'].includes(state.tab)){ window.bindAreaSelect?.('qcity','qarea','qareaOtherWrap'); window.bindAreaSelect?.('searchCity','searchArea'); }
-    if(state.tab==='near') setTimeout(()=>window.searchTechnicians?.(),100);
-    if(state.tab==='settings') window.bindAreaSelect?.('setCity','setArea');
-  };
-
-  window.dashboard = function(){
-    if(!state.user) return login();
-    if(state.user.role==='admin') return admin();
-    if(state.user.role==='technician') return techDash();
-    return window.custDash();
-  };
-
-  const st=document.createElement('style');
-  st.textContent=`
-    .v31-sidebar .mi,.v31-sidebar .sidebtn span.mi,.v31-sidebar .sidebtn>span:not(.badge){display:none!important}.v31-sidebar .sidebtn{justify-content:center!important;text-align:center!important}.v31-sidebar .sidebtn b{font-size:18px!important}.v31-job-strip{background:linear-gradient(135deg,#101d55,#6430d5);border-radius:28px;padding:24px;margin:18px 0 24px;color:#fff;overflow:hidden;box-shadow:0 18px 50px rgba(40,35,120,.18)}.v31-strip-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.v31-strip-head h2{margin:0;font-size:28px}.v31-strip-head p{margin:6px 0 0;color:rgba(255,255,255,.78)}.v31-marquee{overflow:hidden}.v31-track{display:flex;gap:16px;width:max-content;animation:v31Scroll 75s linear infinite}.v31-job-card{min-width:245px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.10);color:#fff;border-radius:20px;padding:16px 18px;display:flex;align-items:center;gap:12px;cursor:pointer}.v31-job-card span{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:rgba(255,255,255,.13);font-size:22px}.v31-job-card b{font-size:18px}.v31-job-card small{color:#bdf7ff}.v31-support-wrap{display:grid;grid-template-columns:1.35fr .8fr;gap:22px}.v31-support-card textarea{min-height:170px}.v31-content>.v20-live-strip,.v31-content>.v13-ticker{display:none!important}@keyframes v31Scroll{from{transform:translateX(0)}to{transform:translateX(33.333%)}}@media(max-width:900px){.v31-support-wrap,.v20-main-grid,.v24-customer-grid{grid-template-columns:1fr!important}.v31-job-card{min-width:220px}.v31-job-strip{padding:18px;border-radius:22px}.v31-strip-head{display:block}.v31-strip-head h2{font-size:23px}.admin-shell{display:block!important}.admin-sidebar{position:relative!important;width:100%!important;min-height:auto!important}.admin-main{padding:14px!important}.admin-menu{grid-template-columns:repeat(2,minmax(0,1fr))!important}.admin-top{grid-template-columns:1fr!important}.stats-grid,.hero-stats{grid-template-columns:1fr 1fr!important}}@media(max-width:520px){.v31-job-card{min-width:200px;padding:13px}.v31-job-card b{font-size:16px}.v31-track{animation-duration:85s}.stats-grid,.hero-stats{grid-template-columns:1fr!important}.admin-menu{grid-template-columns:1fr!important}.dash-card{padding:16px!important}.dashboard-hero{padding:18px!important}.admin-actions{display:grid!important;grid-template-columns:1fr!important}.admin-search input{width:100%!important}}
-  `;
-  document.head.appendChild(st);
-})();
-
-/* ===== V32 HARD FIX: customer support opens real support page, request jobs strip stays only on طلب جديد ===== */
-;(function(){
-  const esc = window.v15EscapeHtml || ((s)=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
-  const cleanMenuText = (s)=>String(s||'').replace(/[🏠📍🛒💬⚙️🎧🚪🔔🌙🔎👋⚡🔥✅➕👤🧰🛠️💳📦⭐🚰❄️🎁🚚📘🙂👥💼]/g,'').trim();
-
-  window.v32SupportOnlyContent = function(){
-    return `<div class="v32-support-only">
-      <div class="dash-card v32-support-card">
-        <h2>الدعم الفني</h2>
-        <p class="muted">هذه صفحة الدعم الفني فقط. اكتب مشكلتك وسيتم إرسالها للإدارة، وليست صفحة طلب جديد.</p>
-        <form class="form" onsubmit="sendSupport(event)">
-          <div class="field"><label>نوع المشكلة</label><select id="supportType"><option value="مشكلة طلب">مشكلة طلب</option><option value="مشكلة حساب">مشكلة حساب</option><option value="مشكلة دفع أو رصيد">مشكلة دفع أو رصيد</option><option value="اقتراح تحسين">اقتراح تحسين</option></select></div>
-          <div class="field"><label>عنوان مختصر</label><input id="supportTitle" required minlength="3" maxlength="120" placeholder="مثال: مشكلة في الدردشة"></div>
-          <div class="field"><label>تفاصيل المشكلة</label><textarea id="supportBody" required minlength="10" maxlength="2000" placeholder="اكتب التفاصيل هنا..."></textarea></div>
-          <button class="btn" type="submit">إرسال للدعم</button>
-        </form>
-      </div>
-      <div class="dash-card v32-help-card"><h2>مساعدة سريعة</h2><div class="faq-list"><details open><summary>الدردشة لا تظهر؟</summary><p>تظهر الدردشة بعد قبول عرض الفني.</p></details><details><summary>الموقع لا يرسل؟</summary><p>اسمح للمتصفح باستخدام الموقع من إعدادات المتصفح.</p></details><details><summary>كيف أتابع الطلب؟</summary><p>افتح صفحة طلباتي وشاهد الحالة والعروض.</p></details></div></div>
-    </div>`;
-  };
-
-  window.supportPage = function(){ return window.v32SupportOnlyContent(); };
-
-  window.sendSupport = async function(e){
-    e.preventDefault();
-    const btn=e.submitter; if(btn){btn.disabled=true; btn.textContent='جاري الإرسال...';}
-    try{
-      const type=document.getElementById('supportType')?.value || 'عام';
-      const title=(document.getElementById('supportTitle')?.value||'').trim();
-      const body=(document.getElementById('supportBody')?.value||'').trim();
-      if(title.length<3 || body.length<10) throw new Error('اكتب عنوان وتفاصيل أوضح');
-      await api('/api/support',{method:'POST',body:JSON.stringify({type,title,body})});
-      toast?.('تم إرسال طلب الدعم للإدارة');
-      e.target.reset();
-    }catch(err){ toast?.(err.message || 'تعذر إرسال الدعم'); }
-    finally{ if(btn){btn.disabled=false; btn.textContent='إرسال للدعم';} }
-  };
-
-  window.v32RenderSupport = function(){
-    state.tab='support';
-    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات'],['support','الدعم الفني']];
-    const hero = (window.dashboardHero?dashboardHero('الدعم الفني','أرسل مشكلتك للإدارة مباشرة.',window.v20CustomerStats?.([])||[]):'');
-    window.layout('لوحة العميل', menu, hero + window.v32SupportOnlyContent());
-  };
-
-  // Keep old/global tickers out. The only strip is injected manually in طلب جديد below.
-  window.v13Ticker = function(){ return ''; };
-  window.v20LiveServicesStrip = function(){ return ''; };
-
-  window.v32RequestProfessionsStrip = function(){
-    const services=(state.meta&&Array.isArray(state.meta.services)&&state.meta.services.length)?state.meta.services:[{name:'كهربائي',icon:''},{name:'سباك',icon:''},{name:'تكييف',icon:''},{name:'نجار',icon:''}];
-    const cards=services.map(s=>{const name=esc(s.name||'خدمة'); const raw=String(s.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); return `<button type="button" class="v32-job-card" onclick="v31ChooseRequestService?.('${raw}')"><span>${esc(s.icon||'')}</span><b>${name}</b><small>متوفر الآن</small></button>`;}).join('');
-    return `<section class="v32-job-strip"><div class="v32-strip-head"><h2>شريط المهن</h2><p>كل مهنة يضيفها الأدمن تظهر هنا تلقائياً داخل صفحة طلب جديد.</p></div><div class="v32-marquee"><div class="v32-track">${cards}${cards}${cards}</div></div></section>`;
-  };
-
-  window.layout = function(title,menu,content){
-    document.body.classList.add('dashboard-mode');
-    const user=state.user||{};
-    const system = (menu||[]).some(m=>m[0]==='support') ? [['settings','الإعدادات']] : [['settings','الإعدادات'],['support','الدعم الفني']];
-    const makeBtn=(m)=>{
-      const isSupport=m[0]==='support' && user.role==='customer';
-      const click=isSupport ? "v32RenderSupport()" : `state.tab='${m[0]}';dashboard()`;
-      return `<button type="button" class="sidebtn ${state.tab===m[0]?'active':''}" onclick="${click}"><b>${cleanMenuText(m[1])}</b></button>`;
-    };
-    app.innerHTML=`<div class="admin-shell v32-shell"><aside class="admin-sidebar v32-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><button class="mobile-menu-close" onclick="document.body.classList.remove('sidebar-open')">×</button><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${(menu||[]).map(makeBtn).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu">${system.map(makeBtn).join('')}<button type="button" class="sidebtn logout-side" onclick="v15LogoutConfirm?.()||logout()"><b>تسجيل خروج</b></button></div><div class="admin-profile"><div class="avatar-sm">${esc((user.name||'ص').slice(0,1))}</div><div><b>${esc(user.name||'مستخدم')}</b><small>${esc(user.email||'')}</small></div></div></aside><main class="admin-main v32-main"><div class="admin-top"><button class="admin-icon-btn mobile-menu-open" onclick="document.body.classList.add('sidebar-open')">القائمة</button><div class="admin-search"><input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();}"></div><div class="admin-actions"><button class="admin-icon-btn" onclick="v24RefreshBadges?.()">التنبيهات</button><button class="admin-icon-btn" onclick="v10ToggleTheme?.()">الوضع</button><button class="admin-icon-btn clean-logout" onclick="v15LogoutConfirm?.()||logout()">تسجيل خروج</button></div></div><div class="v32-content">${content}</div></main></div>`;
-    window.v10ApplyTheme?.();
-  };
-
-  window.custDash = async function(){
-    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات'],['support','الدعم الفني']];
-    let content='';
-    if(state.tab==='support'){
-      content=(window.dashboardHero?dashboardHero('الدعم الفني','أرسل مشكلتك للإدارة مباشرة.',window.v20CustomerStats?.([])||[]): '') + window.v32SupportOnlyContent();
-    }else if(state.tab==='orders'){
-      const j=await api('/api/requests');
-      content=(window.dashboardHero?dashboardHero('طلباتي','تابع طلباتك والعروض والدردشات.',window.v20CustomerStats?.(j.requests||[])||[]): '') + `<div class="dash-card"><h2>طلباتي</h2>${typeof window.v18OrdersView==='function'?window.v18OrdersView(j.requests||[]):reqTable(j.requests||[])}</div>`;
-    }else if(state.tab==='chats'){
-      content=(window.dashboardHero?dashboardHero('الدردشات','كل المحادثات مع الفنيين هنا.',window.v20CustomerStats?.([])||[]): '') + await chatsPage();
-    }else if(state.tab==='near'){
-      content=(window.dashboardHero?dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد التقييم.',window.v20CustomerStats?.([])||[]): '') + (window.v20SearchPanel?window.v20SearchPanel():nearbyPage());
-    }else if(state.tab==='settings'){
-      content=(window.dashboardHero?dashboardHero('الإعدادات','عدّل بيانات حسابك.',window.v20CustomerStats?.([])||[]): '') + settingsPage();
-    }else{
-      const j=await api('/api/requests').catch(()=>({requests:[]}));
-      content=(window.dashboardHero?dashboardHero('لوحة العميل','انشر طلبك واستقبل عروض الفنيين مباشرة.',window.v20CustomerStats?.(j.requests||[])||[]): '') + window.v32RequestProfessionsStrip() + `<div class="v20-main-grid v24-customer-grid"><div>${requestForm()}</div><div>${window.v20SearchPanel?window.v20SearchPanel():nearbyPage()}</div></div>`;
-    }
-    window.layout('لوحة العميل',menu,content);
-    if(['dash','near'].includes(state.tab)){ window.bindAreaSelect?.('qcity','qarea','qareaOtherWrap'); window.bindAreaSelect?.('searchCity','searchArea'); }
-    if(state.tab==='near') setTimeout(()=>window.searchTechnicians?.(),100);
-    if(state.tab==='settings') window.bindAreaSelect?.('setCity','setArea');
-  };
-
-  window.dashboard = function(){
-    if(!state.user) return login();
-    if(state.user.role==='admin') return admin();
-    if(state.user.role==='technician') return techDash();
-    return window.custDash();
-  };
-
-  const st=document.createElement('style');
-  st.textContent=`
-    .v32-sidebar .mi,.v32-sidebar .sidebtn span.mi,.v32-sidebar .sidebtn>span:not(.badge){display:none!important}.v32-sidebar .sidebtn{justify-content:center!important;text-align:center!important}.v32-sidebar .sidebtn b{font-size:18px!important}.v32-content>.v20-live-strip,.v32-content>.v13-ticker{display:none!important}.v32-support-only{display:grid;grid-template-columns:1.35fr .8fr;gap:22px}.v32-support-card textarea{min-height:180px}.v32-job-strip{background:linear-gradient(135deg,#101d55,#6430d5);border-radius:28px;padding:24px;margin:18px 0 24px;color:#fff;overflow:hidden;box-shadow:0 18px 50px rgba(40,35,120,.18)}.v32-strip-head{margin-bottom:16px}.v32-strip-head h2{margin:0;font-size:28px}.v32-strip-head p{margin:6px 0 0;color:rgba(255,255,255,.78)}.v32-marquee{overflow:hidden}.v32-track{display:flex;gap:16px;width:max-content;animation:v32Scroll 75s linear infinite}.v32-job-card{min-width:245px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.10);color:#fff;border-radius:20px;padding:16px 18px;display:flex;align-items:center;gap:12px;cursor:pointer}.v32-job-card span{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:rgba(255,255,255,.13);font-size:22px}.v32-job-card b{font-size:18px}.v32-job-card small{color:#bdf7ff}@keyframes v32Scroll{from{transform:translateX(0)}to{transform:translateX(33.333%)}}@media(max-width:900px){.v32-support-only,.v20-main-grid,.v24-customer-grid{grid-template-columns:1fr!important}.v32-job-card{min-width:220px}.v32-job-strip{padding:18px;border-radius:22px}.admin-shell{display:block!important}.admin-sidebar{position:relative!important;width:100%!important;min-height:auto!important}.admin-main{padding:14px!important}.admin-menu{grid-template-columns:repeat(2,minmax(0,1fr))!important}.admin-top{grid-template-columns:1fr!important}.stats-grid,.hero-stats{grid-template-columns:1fr 1fr!important}}@media(max-width:520px){.v32-job-card{min-width:200px;padding:13px}.v32-track{animation-duration:85s}.stats-grid,.hero-stats{grid-template-columns:1fr!important}.admin-menu{grid-template-columns:1fr!important}.dash-card{padding:16px!important}.dashboard-hero{padding:18px!important}.admin-actions{display:grid!important;grid-template-columns:1fr!important}.admin-search input{width:100%!important}}
-  `;
-  document.head.appendChild(st);
-})();
-
-
-/* ===== V33 REAL FINAL OVERRIDE: customer support button opens support page, no cache confusion ===== */
 ;(function(){
   const esc = window.v15EscapeHtml || ((s)=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
   const cleanText = (s)=>String(s||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').trim();
@@ -2684,7 +1156,6 @@ window.sendLocation = async function(id){
 })();
 
 
-/* ===== V34 REAL MAPS FIX: Leaflet/OpenStreetMap, GPS feedback, no iframe dependency ===== */
 ;(function(){
   window.__SALLEHLY_MAP_PATCH_VERSION__ = 'v34-real-maps-fix';
   const esc = window.v15EscapeHtml || ((s)=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
@@ -2799,7 +1270,6 @@ window.sendLocation = async function(id){
 })();
 
 
-/* ===== V35 mobile navigation helper ===== */
 function v35ScrollToContent(){
   try{
     const main=document.querySelector('.admin-main,.v24-main');
@@ -2814,8 +1284,6 @@ window.addEventListener('error', function(e){
   }catch(_){}
 });
 
-
-/* ===== V37 REAL TRUE HAMBURGER DRAWER - FINAL OVERRIDE ===== */
 ;(function(){
   function safe(s){return String(s??'').replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]});}
   function icon(k){try{return (typeof menuIconV13==='function'?menuIconV13(k):(typeof menuIcon==='function'?menuIcon(k):''))||'';}catch(e){return ''}}
@@ -2886,7 +1354,6 @@ window.addEventListener('error', function(e){
 })();
 
 
-/* ===== V39 PUBLIC NAVIGATION FINAL FIX ===== */
 (function(){
   function publicClean(){
     document.body.classList.remove('open','sidebar-open','v37-menu-open','dashboard-mode','v37-dashboard');
@@ -2913,6 +1380,1175 @@ window.addEventListener('error', function(e){
   }, true);
 })();
 
+/* ===== V40 PREMIUM PUBLIC HOME + SLOW LIVE SERVICES ===== */
+(function(){
+  const safe = window.esc || ((v)=>String(v ?? ''));
+  const getServices = ()=>{
+    const fallback=[
+      {name:'كهربائي',icon:'⚡'}, {name:'سباك',icon:'🚰'}, {name:'تكييف',icon:'❄️'},
+      {name:'نجار',icon:'🪚'}, {name:'دهان',icon:'🎨'}, {name:'صيانة أجهزة',icon:'🔧'},
+      {name:'تركيب أثاث',icon:'🪑'}, {name:'تركيب زجاج',icon:'🪟'}
+    ];
+    return (state.meta && Array.isArray(state.meta.services) && state.meta.services.length ? state.meta.services : fallback)
+      .map((s,i)=>({name:s.name||fallback[i%fallback.length].name, icon:s.icon||fallback[i%fallback.length].icon}));
+  };
+  const chooseService = (name)=>{
+    localStorage.pendingService = String(name||'');
+    go(state.user ? 'dashboard' : 'register');
+  };
+  window.v40ChooseService = chooseService;
+  window.home = home = function(){
+    document.body.classList.remove('open','sidebar-open','v37-menu-open','dashboard-mode','v37-dashboard');
+    const services=getServices();
+    const cards=services.map((s,i)=>`<button class="v40-service-pill" onclick="v40ChooseService('${String(s.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')"><span>${safe(s.icon||'🛠️')}</span><b>${safe(s.name)}</b><small>${120+((i%9)*17)} طلب</small></button>`).join('');
+    const mainCards=services.slice(0,6).map((s,i)=>`<button class="v40-main-service" onclick="v40ChooseService('${String(s.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')"><span>${safe(s.icon||'🛠️')}</span><h3>${safe(s.name)}</h3><p>فنيين متاحين قريبين من منطقتك</p><em>ابحث عن فني</em></button>`).join('');
+    app.innerHTML=`
+    <section class="v40-home">
+      <div class="v40-bg-led l1"></div><div class="v40-bg-led l2"></div><div class="v40-bg-led l3"></div>
+      <div class="v40-hero-card">
+        <div class="v40-brand-big"><span><img src="/logo.png" alt="صلّحلي" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;"></span><div><b>صلّحلي</b><small>الفني الأقرب لك بضغطة زر</small></div></div>
+        <div class="v40-live-badge"><i></i> خدمات مباشرة الآن</div>
+        <h1>خدمات الصيانة صارت أسهل، أسرع، وأرتب</h1>
+        <p>اطلب الخدمة، حدّد موقعك، واستقبل عروض الفنيين الموثوقين حسب منطقتك وتقييماتهم.</p>
+        <div class="v40-actions">
+          <button class="btn big" onclick="go('${state.user?'dashboard':'register'}')">اطلب خدمة الآن</button>
+          <button class="btn ghost big" onclick="go('services')">استعرض الخدمات</button>
+        </div>
+        <div class="v40-stats"><div><b>GPS</b><small>تحديد موقع</small></div><div><b>24/7</b><small>طلبات مباشرة</small></div><div><b>4.8</b><small>تقييمات</small></div></div>
+      </div>
+      <div class="v40-phone-preview">
+        <div class="v40-phone-head"><span></span><b>صلّحلي</b><em>Live</em></div>
+        <div class="v40-phone-screen">
+          <div class="v40-mini-search">🔎 ابحث عن خدمة أو فني</div>
+          ${services.slice(0,3).map((s,i)=>`<div class="v40-tech-row"><span>${safe(s.icon||'🛠️')}</span><div><b>${safe(s.name)}</b><small>${stars(5-i/2)} • قريب منك</small></div><button>اختيار</button></div>`).join('')}
+          <div class="v40-map-card">📍 الفنيين الأقرب حسب منطقتك</div>
+        </div>
+      </div>
+    </section>
+    <section class="v40-live-strip">
+      <div class="v40-section-title"><span>LIVE</span><h2>الخدمات الأكثر طلباً</h2><p>شريط مباشر يتحرك تلقائياً بسرعة هادئة.</p></div>
+      <div class="v40-marquee"><div class="v40-track">${cards}${cards}${cards}</div></div>
+    </section>
+    <section class="v40-services-grid">
+      <div class="v40-section-title"><span>خدمات جاهزة</span><h2>اختار الخدمة وابدأ الطلب</h2><p>كل خدمة تظهر هنا تلقائياً من بيانات المشروع.</p></div>
+      <div class="v40-grid">${mainCards}</div>
+    </section>
+    <section class="v40-steps">
+      <div><b>01</b><h3>أنشئ طلب</h3><p>اكتب المشكلة وحدد المحافظة والموقع.</p></div>
+      <div><b>02</b><h3>استقبل عروض</h3><p>شاهد الفنيين والتقييمات واختر الأنسب.</p></div>
+      <div><b>03</b><h3>ادفع كاش وقيّم</h3><p>بعد انتهاء العمل قيّم الفني بسهولة.</p></div>
+    </section>`;
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+})();
+
+
+/* ===== Sallehly V50 - Premium Login Page ===== */
+;(function(){
+
+login = function(){
+  state.tab = 'dash';
+  document.body.classList.remove('dashboard-mode');
+  app.innerHTML = `
+  <div class="v50-login-page">
+    <div class="v50-login-bg">
+      <div class="v50-blob v50-blob1"></div>
+      <div class="v50-blob v50-blob2"></div>
+    </div>
+    <div class="v50-login-container">
+
+      <!-- Logo -->
+      <div class="v50-logo">
+        <div class="v50-logo-icon"><img src="/logo.png" alt="صلّحلي" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;"></div>
+        <span>صلّحلي</span>
+      </div>
+
+      <!-- Card -->
+      <div class="v50-card">
+        <h1 class="v50-title">مرحباً بعودتك 👋</h1>
+        <p class="v50-sub">سجّل دخولك للمتابعة</p>
+
+        <form class="v50-form" onsubmit="doLogin(event)">
+          <div class="v50-field">
+            <label>البريد الإلكتروني</label>
+            <div class="v50-input-wrap">
+              <span class="v50-input-icon">✉️</span>
+              <input id="email" type="email" autocomplete="email" placeholder="example@email.com" required>
+            </div>
+          </div>
+
+          <div class="v50-field">
+            <label>كلمة السر</label>
+            <div class="v50-input-wrap">
+              <span class="v50-input-icon">🔒</span>
+              <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+              <button type="button" class="v50-eye" onclick="
+                var inp=document.getElementById('password');
+                inp.type=inp.type==='password'?'text':'password';
+                this.textContent=inp.type==='password'?'👁️':'🙈';
+              ">👁️</button>
+            </div>
+          </div>
+
+          <button class="v50-btn-primary" type="submit">
+            <span>تسجيل الدخول</span>
+            <span class="v50-arrow">←</span>
+          </button>
+        </form>
+
+        <div class="v50-divider"><span>أو</span></div>
+
+        <button class="v50-btn-secondary" onclick="register('customer')">
+          إنشاء حساب جديد
+        </button>
+
+        <p class="v50-hint">🔐 حساب الإدارة يُضبط من السيرفر فقط</p>
+      </div>
+
+    </div>
+  </div>`;
+};
+
+// CSS
+const css = `
+.v50-login-page {
+  min-height: 100vh;
+  background: #0d0d1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.v50-login-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.v50-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+}
+.v50-blob1 {
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, #6c3dd6, #3b1fa8);
+  top: -100px; right: -100px;
+}
+.v50-blob2 {
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, #1e40af, #0ea5e9);
+  bottom: -80px; left: -80px;
+}
+.v50-login-container {
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+.v50-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+}
+.v50-logo-icon {
+  width: 46px; height: 46px;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 900; color: #fff;
+  box-shadow: 0 8px 24px rgba(124,58,237,0.4);
+}
+.v50-card {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px;
+  padding: 32px 28px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+}
+.v50-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 6px;
+  text-align: center;
+}
+.v50-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+  text-align: center;
+  margin: 0 0 28px;
+}
+.v50-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.v50-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.v50-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+}
+.v50-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.v50-input-icon {
+  position: absolute;
+  right: 14px;
+  font-size: 15px;
+  pointer-events: none;
+}
+.v50-input-wrap input {
+  width: 100%;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 13px 42px 13px 44px;
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+  font-family: inherit;
+  text-align: right;
+}
+.v50-input-wrap input:focus {
+  border-color: #7c3aed;
+  background: rgba(124,58,237,0.1);
+}
+.v50-input-wrap input::placeholder { color: rgba(255,255,255,0.25); }
+.v50-eye {
+  position: absolute;
+  left: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  line-height: 1;
+}
+.v50-btn-primary {
+  width: 100%;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 15px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+  box-shadow: 0 8px 24px rgba(124,58,237,0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+}
+.v50-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(124,58,237,0.5); }
+.v50-btn-primary:active { transform: translateY(0); }
+.v50-arrow { font-size: 18px; }
+.v50-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: rgba(255,255,255,0.25);
+  font-size: 13px;
+}
+.v50-divider::before,.v50-divider::after {
+  content:'';
+  flex: 1;
+  height: 1px;
+  background: rgba(255,255,255,0.1);
+}
+.v50-btn-secondary {
+  width: 100%;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.8);
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  font-family: inherit;
+}
+.v50-btn-secondary:hover {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.25);
+}
+.v50-hint {
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255,255,255,0.25);
+  margin: 16px 0 0;
+}
+`;
+
+const st = document.createElement('style');
+st.textContent = css;
+document.head.appendChild(st);
+
+})();
+
+function v21ResetSessionForRole(user){
+  state.user=user; state.tab='dash'; activeChatId=null;
+  if(chatTimer){ clearInterval(chatTimer); chatTimer=null; }
+}
+function v21El(id){ return document.getElementById(id); }
+
+
+function v21StatusCounts(rows){
+  return {
+    all: rows.length,
+    open: rows.filter(r=>['بانتظار العروض','وصلت عروض'].includes(r.status)).length,
+    active: rows.filter(r=>['تم اختيار عرض','قيد التنفيذ','بانتظار تأكيد الدفع'].includes(r.status)).length,
+    done: rows.filter(r=>r.status==='مكتمل').length
+  };
+}
+function v21RequestDetails(id){
+  api('/api/requests').then(j=>{
+    const r=(j.requests||[]).find(x=>String(x.id)===String(id));
+    if(!r) return toast('الطلب غير موجود');
+    const html=`<div class="v21-modal"><div class="v21-modal-card"><button class="welcome-close" onclick="this.closest('.v21-modal').remove()">×</button>
+      <h2>تفاصيل الطلب #${r.id}</h2>
+      <div class="request-meta v21-details">
+        <span>الخدمة: <b>${v15EscapeHtml(r.service||'-')}</b></span>
+        <span>الحالة: <b>${v15EscapeHtml(r.status||'-')}</b></span>
+        <span>العميل: <b>${v15EscapeHtml(r.customer_name||'-')}</b></span>
+        <span>الفني: <b>${v15EscapeHtml(r.technician_name||'-')}</b></span>
+        <span>المحافظة: <b>${v15EscapeHtml(r.city||'-')}</b></span>
+        <span>المنطقة: <b>${v15EscapeHtml(r.area||'-')}</b></span>
+        <span>السعر: <b>${r.offer_price? v15EscapeHtml(r.offer_price)+' د.أ':'-'}</b></span>
+        <span>المدة: <b>${v15EscapeHtml(r.arrival_time||'-')}</b></span>
+      </div>
+      ${r.problem_image_url?`<img class="problem-img big-preview" src="${_safeSrc(r.problem_image_url)}" alt="صورة المشكلة">`:''}
+      <p class="v21-desc">${v15EscapeHtml(r.description||'لا يوجد وصف')}</p>
+      <div class="actions"><button class="btn ghost" onclick="loadOffers(${r.id});this.closest('.v21-modal').remove();state.tab='orders';dashboard();setTimeout(()=>loadOffers(${r.id}),250)">عرض عروض الفنيين</button><button class="btn" onclick="chat(${r.id})">فتح المحادثة</button></div>
+    </div></div>`;
+    document.body.insertAdjacentHTML('beforeend',html);
+  }).catch(e=>toast(e.message));
+}
+
+const __v21OldActions = actions;
+actions=function(r){
+  let a='';
+  if(state.user?.role==='admin'){
+    a+=`<button class="btn" onclick="v21RequestDetails(${r.id})">فتح التفاصيل</button> `;
+    a+=`<button class="btn ghost" onclick="loadOffers(${r.id})">العروض</button> `;
+    a+=`<button class="btn ghost" onclick="chat(${r.id})">الشات</button> `;
+    if(r.status!=='مكتمل') a+=`<button class="btn green" onclick="setStatus(${r.id},'مكتمل')">إنهاء</button> `;
+    if(!['مكتمل','ملغي'].includes(r.status)) a+=`<button class="btn danger" onclick="setStatus(${r.id},'ملغي')">إلغاء</button>`;
+    return a;
+  }
+  return __v21OldActions(r);
+}
+
+const __v21OldReqTable=reqTable;
+reqTable=function(rows){
+  if(!rows || !rows.length) return '<div class="empty">لا توجد طلبات</div>';
+  return `<div class="request-list v21-request-list">${rows.map(r=>`<div class="request-card v21-request-card">
+    <div class="request-head"><div><b>#${r.id} - ${v15EscapeHtml(r.service||'-')}</b><p class="muted">${v15EscapeHtml(r.city||'-')}${r.area?' - '+v15EscapeHtml(r.area):''} • ${v15EscapeHtml(r.preferred_time||'بدون وقت محدد')}</p></div><span class="status">${v15EscapeHtml(r.status||'-')}</span></div>
+    ${r.problem_image_url?`<img class="problem-img" src="${_safeSrc(r.problem_image_url)}" alt="صورة المشكلة">`:''}
+    <p>${v15EscapeHtml(r.description||'')}</p>
+    <div class="request-meta"><span>الفني: ${v15EscapeHtml(r.technician_name||'-')}</span><span>العميل: ${v15EscapeHtml(r.customer_name||'-')}</span><span>السعر: ${r.offer_price? v15EscapeHtml(r.offer_price)+' د.أ':'-'}</span><span>المدة: ${v15EscapeHtml(r.arrival_time||'-')}</span></div>
+    <div class="actions">${actions(r)}</div><div id="offers-${r.id}" class="offers-box"></div>
+  </div>`).join('')}</div>`;
+}
+
+admin=async function(){
+  state.user = (await api('/api/me')).user;
+  const menu=[['dash','لوحة الإدارة'],['users','المستخدمين'],['orders','الطلبات'],['topups','شحن الفنيين'],['services','المهن والخدمات'],['packages','الباقات'],['support','الدعم'],['violations','محاولات الشات']];
+  let c='';
+  try{
+    if(state.tab==='users'){
+      const j=await api('/api/admin/users');
+      c=dashboardHero('إدارة المستخدمين','كل حسابات العملاء والفنيين مع التفعيل والتعطيل',[{label:'المستخدمين',value:j.users.length,up:'إجمالي',icon:'👥'},{label:'الفنيين',value:j.users.filter(u=>u.role==='technician').length,up:'فني',icon:'👨‍🔧'},{label:'العملاء',value:j.users.filter(u=>u.role==='customer').length,up:'عميل',icon:'🙂'},{label:'نشط',value:j.users.filter(u=>u.is_active).length,up:'حساب',icon:'✅'}])+usersTable(j.users);
+    }else if(state.tab==='orders'){
+      const j=await api('/api/requests'); const s=v21StatusCounts(j.requests||[]);
+      c=dashboardHero('إدارة الطلبات','افتح أي طلب، راجع العروض، الشات، الصورة، والحالة',[{label:'كل الطلبات',value:s.all,up:'إجمالي',icon:'🛒'},{label:'مفتوحة',value:s.open,up:'طلبات',icon:'⚡'},{label:'قيد التنفيذ',value:s.active,up:'طلبات',icon:'🔧'},{label:'مكتملة',value:s.done,up:'طلبات',icon:'✅'}])+`<div class="dash-card"><h2>كل الطلبات</h2>${reqTable(j.requests||[])}</div>`;
+    }else if(state.tab==='topups'){
+      const j=await api('/api/topups');
+      c=dashboardHero('شحن الفنيين','راجع إثباتات الدفع وفعّل الرصيد',[{label:'طلبات الشحن',value:j.topups.length,up:'إجمالي',icon:'🚚'},{label:'بانتظار',value:j.topups.filter(t=>t.status==='pending').length,up:'مراجعة',icon:'⏳'},{label:'موافق عليها',value:j.topups.filter(t=>t.status==='approved').length,up:'عملية',icon:'✅'},{label:'مرفوضة',value:j.topups.filter(t=>t.status==='rejected').length,up:'عملية',icon:'❌'}])+topupTable(j.topups);
+    }else if(state.tab==='services'){
+      c=dashboardHero('المهن والخدمات','أي مهنة تضيفها تظهر مباشرة في الشريط المتحرك والطلبات',[{label:'الخدمات',value:state.meta.services.length,up:'متاحة',icon:'💼'},{label:'الشريط',value:'Live',up:'مباشر',icon:'⚡'},{label:'بحث',value:'فعال',up:'للعميل',icon:'🔎'},{label:'حالة',value:'جاهز',up:'نظام',icon:'✅'}])+`<div class="dash-grid two"><div class="dash-card v6-form">${servicesAdmin()}</div>${promoBox('إضافة خدمة جديدة','بعد الإضافة ستظهر في القوائم وشريط المهن المباشر تلقائياً')}</div>${categoriesBox()}`;
+    }else if(state.tab==='packages'){
+      c=dashboardHero('إدارة الباقات','أنشئ باقات شحن للفنيين وحدد العمولة',[{label:'الباقات',value:state.meta.packages.length,up:'متاحة',icon:'📦'},{label:'الدفع',value:'بنكي',up:'تحويل',icon:'🏦'},{label:'العمولة',value:'2 د.أ',up:'افتراضي',icon:'💳'},{label:'حالة',value:'فعال',up:'جاهز',icon:'✅'}])+packagesAdmin();
+    }else if(state.tab==='support'){
+      const j=await api('/api/support');
+      c=dashboardHero('الدعم الفني','كل تذاكر الدعم من العملاء والفنيين',[{label:'التذاكر',value:j.tickets.length,up:'إجمالي',icon:'🎧'},{label:'مفتوحة',value:j.tickets.filter(t=>t.status==='open').length,up:'جديدة',icon:'📩'},{label:'مستخدمين',value:new Set(j.tickets.map(t=>t.user_id)).size,up:'تواصلوا',icon:'👥'},{label:'جاهز',value:'24/7',up:'دعم',icon:'✅'}])+`<div class="dash-card"><h2>تذاكر الدعم</h2>${j.tickets.length?`<div class="table-wrap"><table><thead><tr><th>#</th><th>المستخدم</th><th>النوع</th><th>العنوان</th><th>التفاصيل</th><th>التاريخ</th></tr></thead><tbody>${j.tickets.map(t=>`<tr><td>${t.id}</td><td>${v15EscapeHtml(t.user_name||'-')}<br><small>${v15EscapeHtml(t.email||'')}</small></td><td>${v15EscapeHtml(t.type||'-')}</td><td>${v15EscapeHtml(t.title||'-')}</td><td>${v15EscapeHtml(t.body||'-')}</td><td>${v15EscapeHtml(t.created_at||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر</div>'}</div>`;
+    }else if(state.tab==='violations'){
+      const j=await api('/api/chat-violations');
+      c=dashboardHero('محاولات التواصل الخارجي','أي رقم أو واتساب أو إيميل يتم تسجيله هنا',[{label:'المحاولات',value:j.violations.length,up:'آخر 200',icon:'🛡️'},{label:'الشات',value:'محمي',up:'فعال',icon:'💬'},{label:'العمولة',value:'محفوظة',up:'منصة',icon:'💰'},{label:'الأمان',value:'Live',up:'مباشر',icon:'⚡'}])+`<div class="dash-card"><h2>السجل</h2>${j.violations.length?`<div class="table-wrap"><table><thead><tr><th>#</th><th>المستخدم</th><th>الطلب</th><th>السبب</th><th>المحتوى</th><th>الوقت</th></tr></thead><tbody>${j.violations.map(v=>`<tr><td>${v.id}</td><td>${v15EscapeHtml(v.user_name||'-')}<br><small>${v15EscapeHtml(v.user_email||'')}</small></td><td>#${v.request_id}<br><small>${v15EscapeHtml(v.service||'')}</small></td><td>${v15EscapeHtml(v.reason||'')}</td><td>${v15EscapeHtml(v.body||'')}</td><td>${v15EscapeHtml(v.created_at||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">لا توجد محاولات ممنوعة</div>'}</div>`;
+    }else{
+      const j=await api('/api/admin/stats'); const s=j.stats;
+      c=dashboardHero('مرحباً بك في لوحة الإدارة','تحكم كامل في المنصة من مكان واحد',[{label:'العملاء',value:s.customers||0,up:'حساب',icon:'🙂'},{label:'الفنيين',value:s.technicians||0,up:'حساب',icon:'👨‍🔧'},{label:'الطلبات',value:s.requests||0,up:'إجمالي',icon:'🛒'},{label:'مكتملة',value:s.completed||0,up:'طلب',icon:'✅'}])+`<div class="dash-grid"><div>${activityBox()}</div><div class="dash-card v6-form">${servicesAdmin()}</div>${promoBox('لوحة إدارة جاهزة','المستخدمين، الطلبات، الشحن، الخدمات، الدعم، ومحاولات التواصل الخارجي')}</div>${categoriesBox()}${chartsBox()}`;
+    }
+  }catch(err){ c=`<div class="dash-card"><h2>حدث خطأ</h2><p class="muted">${v15EscapeHtml(err.message||'تعذر تحميل الصفحة')}</p><button class="btn" onclick="state.tab='dash';dashboard()">رجوع للوحة</button></div>`; }
+  layout('لوحة الإدارة',menu,c);
+}
+
+logout=async function(){
+  try{ await api('/api/auth/logout',{method:'POST'}); }catch(e){}
+  localStorage.removeItem('pendingService'); delete localStorage.token; state.user=null; state.tab='dash'; activeChatId=null;
+  if(chatTimer){ clearInterval(chatTimer); chatTimer=null; }
+  toast('تم تسجيل الخروج');
+  login();
+};
+
+
+function v22Money(n){ return (Number(n||0)).toFixed(2).replace('.00','')+' د.أ'; }
+function v22UnreadBadge(n){ n=Number(n||0); return n>0?`<span class="badge-dot">${n}</span>`:''; }
+function v22TechMetrics(me, requests=[]){
+  const open=requests.filter(r=>['بانتظار العروض','وصلت عروض'].includes(r.status)).length;
+  const active=requests.filter(r=>r.technician_id===me.id && !['مكتمل','ملغي'].includes(r.status)).length;
+  return [
+    {label:'طلبات متاحة',value:open,up:'Live',icon:'🛠️'},
+    {label:'دردشات',value:state.chatCount||0,up:'غير مقروءة',icon:'💬'},
+    {label:'الرصيد',value:v22Money(me.balance),up:'متاح',icon:'💳'},
+    {label:'طلب نشط',value:active,up:'قيد العمل',icon:'⚡'}
+  ];
+}
+function v22Safe(v){ return (typeof v15EscapeHtml==='function'?v15EscapeHtml(String(v??'')):String(v??'')); }
+async function v22Counters(){ try{ return await v17LoadCounters(); }catch(e){ return {requests:[],chats:[]}; } }
+function v22TechWelcome(me, requests){
+  return dashboardHero('لوحة الفني','كل شيء يعمل من هنا: الطلبات، الدردشات، الشحن، الرصيد والسجل.',v22TechMetrics(me,requests))+
+  v20LiveServicesStrip()+
+  `<div class="v22-grid">
+    <div class="dash-card v22-action" onclick="state.tab='orders';dashboard()"><span>🛠️</span><h3>الطلبات المتاحة</h3><p>شاهد الطلبات المناسبة لمهنتك ومناطقك وقدم عرض سعر ومدة.</p></div>
+    <div class="dash-card v22-action" onclick="state.tab='chats';dashboard()"><span>💬</span><h3>الدردشات ${v22UnreadBadge(state.chatCount)}</h3><p>كل محادثاتك مع العملاء تظهر هنا مع عداد الرسائل الجديدة.</p></div>
+    <div class="dash-card v22-action" onclick="state.tab='balance';dashboard()"><span>💳</span><h3>الرصيد والباقات</h3><p>اشحن رصيدك واختر باقة مناسبة لتفعيل استقبال الطلبات.</p></div>
+    <div class="dash-card v22-action" onclick="state.tab='ledger';dashboard()"><span>📘</span><h3>سجل الرصيد</h3><p>تابع خصم العمولة وعمليات الشحن بشكل واضح.</p></div>
+  </div><div class="dash-card"><h2>آخر الطلبات المناسبة</h2>${reqTable((requests||[]).slice(0,6))}</div>`;
+}
+function v22TechOrders(me, requests){
+  const split=typeof v18SplitRequests==='function'?v18SplitRequests(requests):{active:requests,done:[]};
+  const filter=state.orderFilter||'active';
+  const selected=filter==='done'?split.done:split.active;
+  return dashboardHero('طلبات الفني','طلبات العملاء تظهر هنا مباشرة. أرسل عرض السعر والمدة وانتظر موافقة العميل.',v22TechMetrics(me,requests))+
+    v20LiveServicesStrip()+
+    `<div class="dash-card"><div class="v22-head"><div><h2>الطلبات المتاحة والحالية</h2><p class="muted">إذا قبل العميل عرضك يفتح الشات ويتحول الطلب لقيد التنفيذ.</p></div><button class="btn ghost" onclick="dashboard()">تحديث الآن</button></div>
+    <div class="v18-tabs"><button class="btn ${filter==='active'?'':'ghost'}" onclick="state.orderFilter='active';dashboard()">نشطة ${v22UnreadBadge(split.active.length)}</button><button class="btn ${filter==='done'?'':'ghost'}" onclick="state.orderFilter='done';dashboard()">مكتملة/ملغية ${v22UnreadBadge(split.done.length)}</button></div>${reqTable(selected)}</div>`;
+}
+async function v22TechTopups(me){
+  const j=await api('/api/topups');
+  return dashboardHero('طلبات الشحن','تابع حالة طلبات الشحن وإثباتات الدفع التي رفعتها للإدارة.',[
+    {label:'طلبات الشحن',value:j.topups.length,up:'إجمالي',icon:'🚚'},
+    {label:'بانتظار',value:j.topups.filter(t=>t.status==='pending').length,up:'مراجعة',icon:'⏳'},
+    {label:'الرصيد',value:v22Money(me.balance),up:'حالي',icon:'💳'},
+    {label:'الباقات',value:state.meta.packages.length,up:'متاحة',icon:'📦'}
+  ])+`<div class="dash-card"><div class="v22-head"><h2>طلبات الشحن</h2><button class="btn" onclick="state.tab='balance';dashboard()">شحن جديد</button></div>${topupTable(j.topups)}</div>`;
+}
+async function v22TechLedger(me){
+  const j=await api('/api/ledger');
+  return dashboardHero('سجل الرصيد','كل عمليات الشحن والخصم والعمولة محفوظة هنا.',[
+    {label:'عمليات',value:j.ledger.length,up:'مسجلة',icon:'📘'},
+    {label:'الرصيد',value:v22Money(me.balance),up:'حالي',icon:'💳'},
+    {label:'أعمال مكتملة',value:me.completed_jobs||0,up:'طلب',icon:'✅'},
+    {label:'تقييم',value:stars(me.rating_avg),up:'فني',icon:'⭐'}
+  ])+`<div class="dash-card"><h2>السجل المالي</h2>${ledgerTable(j.ledger)}</div>`;
+}
+function v22TechBalance(me){
+  return dashboardHero('الرصيد والباقات','اشحن الرصيد من خلال باقة، ثم ارفع إثبات الدفع للإدارة.',[
+    {label:'رصيدك',value:v22Money(me.balance),up:'متاح',icon:'💳'},
+    {label:'طلبات مجانية',value:(me.free_quota_used ?? (me.free_orders_used||0))+'/2',up:'مستخدمة',icon:'🎁'},
+    {label:'الباقات',value:state.meta.packages.length,up:'متاحة',icon:'📦'},
+    {label:'حالة الحساب',value:'فعال',up:'جاهز',icon:'✅'}
+  ])+balancePage(me);
+}
+
+requestForm=function(){
+  return `<div class="card bluehint offer-request v22-request-form"><h2>طلب خدمة جديد</h2><p class="muted">حدد الخدمة والمنطقة، أضف وصف المشكلة، والصورة اختيارية لكنها تساعد الفني يعطيك سعر أدق.</p>
+  <form class="form two" onsubmit="createReq(event)">
+    <div class="field"><label>الخدمة</label><select id="qservice">${state.meta.services.map(s=>`<option>${v22Safe(s.name)}</option>`).join('')}</select></div>
+    <div class="field"><label>المحافظة</label><select id="qcity">${typeof governorateOptions==='function'?governorateOptions(state.user?.city||'عمان'):state.meta.cities.map(c=>`<option>${v22Safe(c)}</option>`).join('')}</select></div>
+    <div class="field"><label>منطقة السكن</label><select id="qarea"></select></div>
+    <div class="field"><label>الوقت المطلوب</label><input id="qtime" placeholder="مثال: اليوم مساءً"></div>
+    <div class="field" style="grid-column:1/-1"><label>وصف المشكلة</label><textarea id="qdesc" required minlength="10" placeholder="مثال: المكيف لا يبرد وأحتاج فني اليوم"></textarea></div>
+    <div class="field" style="grid-column:1/-1"><label>📷 صورة المشكلة <span class="muted">اختياري</span></label><label class="v22-upload"><input id="problemImage" type="file" accept="image/png,image/jpeg,image/webp" onchange="previewProblemImage()"><span>اضغط لاختيار صورة أو اسحبها هنا</span><small>JPG / PNG / WEBP حتى 3MB</small></label><div id="problemPreview"></div></div>
+    <div class="field" style="grid-column:1/-1"><button type="button" class="btn ghost" onclick="useGPS('request')">📍 تحديد موقعي الحالي</button><small class="muted">الموقع يساعد الفنيين على معرفة قربك قبل تقديم العرض.</small><div id="requestMap">${typeof mapBox==='function'?mapBox(state.gps?.lat,state.gps?.lng):''}</div></div>
+    <button class="btn big" type="submit">🚀 نشر الطلب واستقبال العروض</button>
+  </form></div>`;
+};
+createReq=async function(e){
+  e.preventDefault();
+  try{
+    const fd=new FormData();
+    fd.append('service',document.getElementById('qservice').value);
+    fd.append('city',document.getElementById('qcity').value);
+    fd.append('area',document.getElementById('qarea')?.value||'');
+    fd.append('preferred_time',document.getElementById('qtime').value||'');
+    fd.append('description',document.getElementById('qdesc').value.trim());
+    fd.append('lat',state.gps?.lat||''); fd.append('lng',state.gps?.lng||'');
+    const img=document.getElementById('problemImage')?.files?.[0];
+    if(img) fd.append('problem_image',img);
+    await api('/api/requests',{method:'POST',body:fd});
+    toast('تم نشر الطلب بنجاح، وسيظهر للفنيين مباشرة');
+    state.tab='orders'; state.orderFilter='active'; dashboard();
+  }catch(err){ toast(err.message); }
+};
+previewProblemImage=function(){
+  const file=document.getElementById('problemImage')?.files?.[0], box=document.getElementById('problemPreview');
+  if(!box) return; if(!file){ box.innerHTML=''; return; }
+  if(!['image/png','image/jpeg','image/webp'].includes(file.type)){ box.innerHTML=''; toast('نوع الصورة غير مسموح'); return; }
+  if(file.size>3*1024*1024){ box.innerHTML=''; toast('حجم الصورة كبير، الحد الأقصى 3MB'); return; }
+  box.innerHTML=`<img class="problem-preview v22-preview" src="${URL.createObjectURL(file)}" alt="معاينة صورة المشكلة"><button type="button" class="btn ghost mini" onclick="document.getElementById('problemImage').value='';document.getElementById('problemPreview').innerHTML=''">إزالة الصورة</button>`;
+};
+
+;(function(){
+  const V24 = {};
+  window.v24Safe = function(v){
+    try { return (typeof v15EscapeHtml==='function') ? v15EscapeHtml(String(v ?? '')) : String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
+    catch(e){ return String(v ?? ''); }
+  };
+  window.v24Badge = function(n){ n=Number(n||0); return n>0?`<span class="badge-dot v24-badge">${n>99?'99+':n}</span>`:''; };
+  window.v24Money = function(n){ return (Number(n||0)).toFixed(2).replace('.00','')+' د.أ'; };
+  window.v24BackToDashboard = function(){ activeChatId=null; if(chatTimer){clearInterval(chatTimer); chatTimer=null;} dashboard(); };
+
+  // More accurate chat guard: blocks outside-contact only, allows normal messages.
+  window.v24ChatBlockReason = function(text){
+    const raw=String(text||'');
+    if(/^\[location\]-?\d{1,2}\.\d+,-?\d{1,3}\.\d+$/.test(raw)) return '';
+    if(/^\[audio\]/.test(raw)) return '';
+    const ar='٠١٢٣٤٥٦٧٨٩', fa='۰۱۲۳۴۵۶۷۸۹';
+    const lower=raw.toLowerCase()
+      .replace(/[٠-٩]/g,ch=>String(ar.indexOf(ch)))
+      .replace(/[۰-۹]/g,ch=>String(fa.indexOf(ch)))
+      .replace(/[oO]/g,'0');
+    const compact=lower.replace(/[^0-9a-z\u0600-\u06FF+@.]/g,'');
+    const links=['wa.me','whatsapp','watsapp','واتساب','واتس','وتساب','telegram','t.me','تلجرام','تليجرام','تيليجرام','facebook','fb.com','messenger','instagram','insta','snapchat','discord','discord.gg'];
+    for(const w of links){ if(lower.includes(w) || compact.includes(String(w).toLowerCase().replace(/[^0-9a-z\u0600-\u06FF+@.]/g,''))) return 'وسيلة تواصل خارجية'; }
+    if(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(raw)) return 'بريد إلكتروني';
+    const digits=lower.replace(/[^0-9+]/g,'');
+    const plain=lower.replace(/[^0-9]/g,'');
+    if(/(\+?962|00962)?0?7[789]\d{7}/.test(digits)) return 'رقم هاتف';
+    if(/^(9627|009627|07|7)[789]?\d{7,8}$/.test(plain) && plain.length>=9) return 'رقم هاتف';
+    if(plain.length>=10 && /(07|9627|009627)/.test(plain)) return 'رقم هاتف';
+    return '';
+  };
+
+  window.v24Toast = function(msg){ try{ toast(msg); }catch(e){ alert(msg); } };
+
+  // Replace chat UI with guaranteed working open/read/send behavior for customer + technician.
+  window.chat = async function(id){
+    try{
+      activeChatId = Number(id);
+      if(chatTimer){ clearInterval(chatTimer); chatTimer=null; }
+      setupSocket?.();
+      if(socket){ socket.emit('join-request', activeChatId); }
+      const j = await api(`/api/requests/${activeChatId}/messages`);
+      app.innerHTML = `<div class="page chat-page v24-chat-page">
+        <button class="btn ghost" onclick="if(socket&&activeChatId)socket.emit('leave-request',activeChatId);v24BackToDashboard()">← رجوع</button>
+        <div class="card chat-card v24-chat-card">
+          <div class="v24-chat-head"><div><h2>المحادثة للطلب #${activeChatId}</h2><p class="muted">التواصل داخل صلّحلي فقط لحماية حق العميل والفني والمنصة.</p></div><span class="v24-live-pill"><i></i> Live</span></div>
+          <div class="chat-protection-note">🛡️ مسموح بالرسائل العادية. ممنوع فقط إرسال أرقام الهاتف، الإيميلات، واتساب، تيليجرام وروابط التواصل الخارجي.</div>
+          <div class="chat v24-chat-box" id="chatbox"></div>
+          <form class="chat-input-row v24-chat-form" onsubmit="sendMsg(event,${activeChatId})">
+            <input id="msg" autocomplete="off" placeholder="اكتب رسالة عادية داخل صلّحلي...">
+            <button class="btn send-text-btn" type="submit">إرسال</button>
+          </form>
+          <div class="chat-icon-tools v24-tools">
+            <button type="button" class="round-action location-action" onclick="sendLocation(${activeChatId})" title="إرسال الموقع">📍</button>
+            <button type="button" id="micBtn" class="round-action mic-action" onclick="toggleRec(${activeChatId})" title="تسجيل صوت">🎙️</button>
+            <button type="button" id="sendVoiceBtn" class="round-action send-voice-action hide" onclick="stopRec(${activeChatId})" title="إرسال الصوت">➤</button>
+            <span id="recordingLabel" class="recording-label hide">● جاري التسجيل...</span>
+          </div>
+        </div>
+      </div>`;
+      renderMessages(j.messages||[]);
+      await v24RefreshBadges();
+      chatTimer=setInterval(async()=>{ if(activeChatId) await refreshChat(); },2500);
+    }catch(err){
+      v24Toast('تعذر فتح المحادثة: '+(err.message||err));
+      dashboard();
+    }
+  };
+
+  window.sendMsg = async function(e,id){
+    e.preventDefault();
+    const input=document.getElementById('msg');
+    const text=(input?.value||'').trim();
+    if(!text) return;
+    const reason=v24ChatBlockReason(text);
+    if(reason){
+      input.classList.add('blocked-input'); setTimeout(()=>input.classList.remove('blocked-input'),900);
+      return v24Toast('⚠️ ممنوع إرسال '+reason+' داخل الشات. اكتب رسالتك داخل صلّحلي بدون وسائل تواصل خارجية.');
+    }
+    try{
+      input.value='';
+      const j=await api(`/api/requests/${id}/messages`,{method:'POST',body:JSON.stringify({body:text})});
+      renderMessages(j.messages||[]);
+      try{v10Sound?.('message')}catch(_){ }
+      await v24RefreshBadges();
+    }catch(err){ v24Toast(err.message||'تعذر إرسال الرسالة'); input.value=text; }
+  };
+
+  // If message body is plain, escape it. Only internal [audio]/[location] render specially.
+  window.messageBody = function(body){
+    body=String(body||'');
+    if(body.startsWith('[audio]')){let u=body.replace('[audio]','');return `<audio controls src="${v24Safe(u)}"></audio>`;}
+    if(body.startsWith('[location]')){let p=body.replace('[location]','').split(',');let lat=p[0],lng=p[1];return `📍 <a target="_blank" href="https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}">فتح الموقع على الخريطة</a><div>${mapBox(lat,lng)}</div>`;}
+    return v24Safe(body).replace(/(https?:\/\/\S+)/g,'<span class="muted">[رابط خارجي محجوب]</span>');
+  };
+
+  window.renderMessages = function(messages){
+    const box=document.getElementById('chatbox'); if(!box) return;
+    box.innerHTML=(messages||[]).map(m=>`<div class="msg ${Number(m.sender_id)===Number(state.user?.id)?'me':''}"><b>${v24Safe(m.sender_name||'مستخدم')}</b><br>${messageBody(m.body)}<br><small>${v24Safe(m.created_at||'')}</small></div>`).join('') || '<div class="empty">لا توجد رسائل بعد. ابدأ المحادثة من داخل صلّحلي.</div>';
+    box.scrollTop=box.scrollHeight;
+  };
+
+  window.v24RefreshBadges = async function(){
+    if(!state.user) return;
+    try{
+      const c=await api('/api/chats'); state.chatCount=Number(c.total_unread||0);
+      const r=await api('/api/requests').catch(()=>({requests:[]}));
+      const reqs=r.requests||[];
+      state.orderCount = state.user.role==='technician' ? reqs.filter(x=>['بانتظار العروض','وصلت عروض'].includes(x.status)).length : reqs.filter(x=>!['مكتمل','ملغي'].includes(x.status)).length;
+      document.querySelectorAll('[data-badge="chats"]').forEach(el=>el.innerHTML=v24Badge(state.chatCount));
+      document.querySelectorAll('[data-badge="orders"]').forEach(el=>el.innerHTML=v24Badge(state.orderCount));
+      document.querySelectorAll('.bell-btn').forEach(b=>b.innerHTML='🔔 '+v24Badge(state.chatCount));
+    }catch(_){ }
+  };
+
+  window.v24MenuIcon = function(k){ return ({dash:'🏠',near:'📍',orders:'🛒',chats:'💬',balance:'💳',topups:'🚚',ledger:'📘',settings:'⚙️',support:'🎧'}[k]||'•'); };
+
+  // Strong layout: tabs always clickable, mobile friendly, no hidden admin info.
+  window.layout = function(title,menu,content){
+    const user=state.user||{};
+    const allSystem=[['settings','الإعدادات'],['support','الدعم الفني']];
+    const sidebarBtn=(m)=>`<button type="button" class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${m[1]} <span data-badge="${m[0]==='chats'?'chats':m[0]==='orders'?'orders':''}">${m[0]==='chats'?v24Badge(state.chatCount):m[0]==='orders'?v24Badge(state.orderCount):''}</span></b><span class="mi">${v24MenuIcon(m[0])}</span></button>`;
+    app.innerHTML=`<div class="admin-shell v24-shell"><aside class="admin-sidebar v24-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><button class="mobile-menu-close" onclick="document.body.classList.remove('sidebar-open')">×</button><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${menu.map(sidebarBtn).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu">${allSystem.map(sidebarBtn).join('')}<button type="button" class="sidebtn logout-side v15-logout-side" onclick="v15LogoutConfirm?.()||logout()"><b>تسجيل خروج</b><span class="mi">🚪</span></button></div><div class="admin-profile"><div class="avatar-sm">${v24Safe((user.name||'ص').slice(0,1))}</div><div><b>${v24Safe(user.name||roleName?.()||'مستخدم')}</b><small>${v24Safe(user.email||'')}</small></div></div></aside><main class="admin-main v24-main"><div class="admin-top"><button class="admin-icon-btn mobile-menu-open" onclick="document.body.classList.add('sidebar-open')">☰</button><div class="admin-search">🔎 <input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();setTimeout(()=>{let q=document.getElementById('searchTechQ'); if(q){q.value=this.value; searchTechnicians?.();}},120)}"></div><div class="admin-actions"><button class="admin-icon-btn bell-btn" onclick="v24RefreshBadges()">🔔 ${v24Badge(state.chatCount)}</button><button class="admin-icon-btn" onclick="v10ToggleTheme?.()">🌙</button><button class="admin-icon-btn clean-logout v15-top-logout" onclick="v15LogoutConfirm?.()||logout()">🚪 تسجيل خروج</button></div></div>${typeof v20LiveServicesStrip==='function'?v20LiveServicesStrip():''}<div class="v24-content">${content}</div></main></div>`;
+    v10ApplyTheme?.(); v24RefreshBadges();
+  };
+
+  window.v24Metrics = function(me, reqs){
+    reqs=reqs||[]; const open=reqs.filter(r=>['بانتظار العروض','وصلت عروض'].includes(r.status)).length; const active=reqs.filter(r=>Number(r.technician_id)===Number(me.id)&&!['مكتمل','ملغي'].includes(r.status)).length;
+    return [{label:'طلبات متاحة',value:open,up:'Live',icon:'🛠️'},{label:'دردشات',value:state.chatCount||0,up:'غير مقروءة',icon:'💬'},{label:'الرصيد',value:v24Money(me.balance),up:'متاح',icon:'💳'},{label:'طلب نشط',value:active,up:'قيد العمل',icon:'⚡'}];
+  };
+
+  window.techDash = async function(){
+    try{
+      await v24RefreshBadges();
+      const me=(await api('/api/me')).user; state.user=me;
+      const menu=[['dash','الرئيسية'],['orders','الطلبات'],['chats','الدردشات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']];
+      let content='';
+      if(state.tab==='orders'){
+        const j=await api('/api/requests');
+        content=dashboardHero('طلبات الفني','الطلبات المناسبة تظهر مباشرة. قدم عرض سعر ومدة، وبعد موافقة العميل تفتح المحادثة.',v24Metrics(me,j.requests||[]))+`<div class="dash-card"><div class="v24-head"><h2>الطلبات المتاحة والحالية</h2><button class="btn ghost" onclick="dashboard()">تحديث الآن</button></div>${reqTable(j.requests||[])}</div>`;
+      }else if(state.tab==='chats'){
+        content=dashboardHero('الدردشات','كل محادثاتك مع العملاء هنا، والعداد الأحمر يختفي بعد قراءة المحادثة.',v24Metrics(me,[]))+await chatsPage();
+      }else if(state.tab==='balance'){
+        content=(typeof v22TechBalance==='function')?v22TechBalance(me):balancePage(me);
+      }else if(state.tab==='topups'){
+        const j=await api('/api/topups'); content=dashboardHero('طلبات الشحن','تابع طلبات شحن الرصيد.',v24Metrics(me,[]))+topupTable(j.topups||[]);
+      }else if(state.tab==='ledger'){
+        const j=await api('/api/ledger'); content=dashboardHero('سجل الرصيد','كل عمليات الرصيد والعمولة محفوظة.',v24Metrics(me,[]))+ledgerTable(j.ledger||[]);
+      }else if(state.tab==='settings'){
+        content=dashboardHero('الإعدادات','تعديل الاسم، الهاتف، المنطقة، وكلمة السر.',v24Metrics(me,[]))+settingsPage();
+      }else if(state.tab==='support'){
+        content=dashboardHero('الدعم الفني','تواصل مع إدارة صلحلي من داخل المنصة.',v24Metrics(me,[]))+supportPage();
+      }else{
+        const j=await api('/api/requests');
+        content=dashboardHero('لوحة الفني','إدارة احترافية للطلبات، العروض، الدردشات، الشحن والرصيد.',v24Metrics(me,j.requests||[]))+`<div class="v22-grid v24-grid"><div class="dash-card v22-action" onclick="state.tab='orders';dashboard()"><span>🛠️</span><h3>الطلبات</h3><p>شاهد الطلبات المناسبة وقدم عروض سعر.</p></div><div class="dash-card v22-action" onclick="state.tab='chats';dashboard()"><span>💬</span><h3>الدردشات ${v24Badge(state.chatCount)}</h3><p>افتح محادثات العملاء مباشرة.</p></div><div class="dash-card v22-action" onclick="state.tab='balance';dashboard()"><span>💳</span><h3>الرصيد</h3><p>اشحن الرصيد واختر الباقات.</p></div><div class="dash-card v22-action" onclick="state.tab='ledger';dashboard()"><span>📘</span><h3>السجل</h3><p>تابع الخصومات والعمولات.</p></div></div><div class="dash-card"><h2>آخر الطلبات</h2>${reqTable((j.requests||[]).slice(0,5))}</div>`;
+      }
+      layout('لوحة الفني',menu,content);
+      if(state.tab==='settings') bindAreaSelect?.('setCity','setArea');
+    }catch(err){
+      app.innerHTML=`<div class="page"><div class="card"><h2>حدث خطأ في لوحة الفني</h2><p>${v24Safe(err.message||err)}</p><button class="btn" onclick="dashboard()">إعادة المحاولة</button></div></div>`;
+    }
+  };
+
+  // Customer dashboard with clear upload image and nicer mobile layout.
+  window.custDash = async function(){
+    await v24RefreshBadges();
+    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات']];
+    let content='';
+    if(state.tab==='orders'){
+      const j=await api('/api/requests'); content=dashboardHero('طلباتي','تابع الطلبات والعروض والدردشات بشكل مباشر',v20CustomerStats?.(j.requests||[])||[])+`<div class="dash-card"><h2>طلباتي</h2>${typeof v18OrdersView==='function'?v18OrdersView(j.requests||[]):reqTable(j.requests||[])}</div>`;
+    }else if(state.tab==='chats'){
+      content=dashboardHero('الدردشات','كل محادثاتك مع الفنيين هنا.',v20CustomerStats?.([])||[])+await chatsPage();
+    }else if(state.tab==='near'){
+      content=dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد التقييم والملف قبل الطلب',v20CustomerStats?.([])||[])+v20SearchPanel();
+    }else if(state.tab==='settings'){
+      content=dashboardHero('الإعدادات','تغيير الاسم، المنطقة، الهاتف، وكلمة السر',v20CustomerStats?.([])||[])+settingsPage();
+    }else if(state.tab==='support'){
+      content=dashboardHero('الدعم الفني','أرسل مشكلة أو اقتراح لإدارة صلحلي.',v20CustomerStats?.([])||[])+supportPage();
+    }else{
+      const j=await api('/api/requests').catch(()=>({requests:[]}));
+      content=dashboardHero('لوحة العميل','انشر طلبك بصورة اختيارية واستقبل عروض الفنيين مباشرة',v20CustomerStats?.(j.requests||[])||[])+`<div class="v20-main-grid v24-customer-grid"><div>${requestForm()}</div><div>${v20SearchPanel()}</div></div>`;
+    }
+    layout('لوحة العميل',menu,content);
+    if(['dash','near'].includes(state.tab)){ bindAreaSelect?.('qcity','qarea','qareaOtherWrap'); bindAreaSelect?.('searchCity','searchArea'); }
+    if(state.tab==='near') setTimeout(()=>searchTechnicians?.(),100);
+    if(state.tab==='settings') bindAreaSelect?.('setCity','setArea');
+  };
+
+  // Bind socket live updates once.
+  window.v24BindRealtime = function(){
+    setupSocket?.(); if(!socket || socket.__v24Bound) return; socket.__v24Bound=true;
+    socket.on('messages-updated', data=>{ if(activeChatId && Number(data.requestId)===Number(activeChatId)){ renderMessages(data.messages||[]); } v24RefreshBadges(); });
+    socket.on('chat-badges-updated', ()=>v24RefreshBadges());
+    socket.on('requests-updated', ()=>{ if(state.user && !activeChatId) { v24RefreshBadges(); if(['orders','dash'].includes(state.tab)) dashboard(); } });
+    socket.on('request-status-updated', ()=>{ if(state.user && !activeChatId) { v24RefreshBadges(); if(['orders','dash','chats'].includes(state.tab)) dashboard(); } });
+  };
+  const oldDashboard=window.dashboard;
+  window.dashboard=function(){ v24BindRealtime(); return oldDashboard(); };
+  const oldInit=window.init;
+  window.init=async function(){ await oldInit(); v24BindRealtime(); setInterval(()=>{ if(state.user && !activeChatId) v24RefreshBadges(); },3000); };
+
+  const css=`
+  .mobile-menu-open,.mobile-menu-close{display:none}.v24-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.v24-chat-card{max-width:980px;margin:auto}.v24-chat-head{display:flex;justify-content:space-between;align-items:center;gap:14px}.v24-live-pill{display:inline-flex;gap:8px;align-items:center;background:#eef8ff;border:1px solid #bdd9ff;color:#1d47d8;padding:8px 12px;border-radius:999px;font-weight:900}.v24-live-pill i{width:9px;height:9px;background:#16c784;border-radius:50%;box-shadow:0 0 0 5px rgba(22,199,132,.12)}.v24-chat-box{height:430px}.blocked-input{animation:v24Shake .35s;border-color:#f43f5e!important}@keyframes v24Shake{0%,100%{transform:translateX(0)}25%{transform:translateX(6px)}75%{transform:translateX(-6px)}}.v24-badge{vertical-align:middle}.v24-content{min-width:0}.v24-grid .dash-card{cursor:pointer}.chat-protection-note{margin:12px 0;padding:12px;border-radius:16px;background:#eef6ff;border:1px solid #cfe0ff;color:#1640a6;font-weight:800}.chat-input-row input{min-height:54px}.chat-input-row button{min-height:54px}.v24-sidebar .sidebtn{cursor:pointer}.v24-sidebar .sidebtn:hover{transform:translateX(-2px)}.problem-img,.problem-preview{max-width:320px;width:100%;border-radius:18px;object-fit:cover;border:1px solid #d9e5f8}.v22-upload{transition:.2s}.v22-upload:hover{transform:translateY(-2px);box-shadow:0 18px 44px rgba(47,104,255,.14)}
+  @media(max-width:900px){body{overflow-x:hidden}.v24-shell{display:block!important}.v24-sidebar{position:fixed!important;top:0;right:0;bottom:0;width:min(86vw,340px)!important;z-index:999;transform:translateX(110%);transition:.25s;border-radius:0!important;overflow:auto}.sidebar-open .v24-sidebar{transform:translateX(0)}.sidebar-open:before{content:'';position:fixed;inset:0;background:rgba(3,10,31,.42);z-index:998}.mobile-menu-close{display:grid;position:absolute;left:16px;top:14px;width:38px;height:38px;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;font-size:26px}.mobile-menu-open{display:grid!important}.v24-main{padding:12px!important}.admin-top{grid-template-columns:auto 1fr!important;gap:10px!important}.admin-search{grid-column:1/-1;order:2}.admin-actions{grid-column:1/-1;order:3;display:grid!important;grid-template-columns:repeat(3,1fr);gap:8px}.admin-actions .admin-icon-btn{width:100%;justify-content:center}.dashboard-hero,.v6-hero{border-radius:24px!important;padding:20px!important}.hero-stats,.stats-grid,.cards4{grid-template-columns:1fr 1fr!important}.v20-main-grid,.v24-customer-grid,.dash-grid,.grid,.form.two{grid-template-columns:1fr!important}.v24-chat-box{height:52vh}.v24-chat-form{display:grid!important;grid-template-columns:1fr!important}.request-card,.v21-request-card{padding:14px!important}.request-head{display:block!important}.request-meta{grid-template-columns:1fr!important}.v20-live-card{min-width:210px!important}.v22-grid{grid-template-columns:1fr!important}.admin-profile{margin-bottom:20px}.table{min-width:700px}.table-wrap{overflow:auto}.chat-icon-tools{justify-content:center}.problem-img,.problem-preview{max-width:100%}}
+  @media(max-width:520px){.hero-stats,.stats-grid,.cards4{grid-template-columns:1fr!important}.dashboard-hero h1{font-size:32px!important}.admin-actions{grid-template-columns:1fr 1fr}.admin-actions .clean-logout{grid-column:1/-1}.btn,.admin-icon-btn{min-height:48px}.v24-chat-head{display:block}.chat-protection-note{font-size:13px}.v20-live-card{min-width:185px!important}.auth-card{padding:20px!important}.sidebtn{min-height:54px!important}.v24-main{padding-bottom:80px!important}}
+  `;
+  const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
+})();
+
+;(function(){
+  window.v25Esc = window.v24Safe || function(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))};
+
+  window.v25InsufficientBalanceModal = function(msg){
+    document.querySelectorAll('.v25-modal-backdrop').forEach(x=>x.remove());
+    const d=document.createElement('div');
+    d.className='v25-modal-backdrop';
+    d.innerHTML=`<div class="v25-balance-modal">
+      <div class="v25-modal-icon">💳</div>
+      <h2>رصيدك غير كافي</h2>
+      <p>${v25Esc(msg||'بعد أول طلبين مجانيين يجب شحن الرصيد قبل تقديم عرض جديد.')}</p>
+      <div class="v25-modal-actions">
+        <button class="btn ghost" onclick="document.querySelector('.v25-modal-backdrop')?.remove()">لاحقاً</button>
+        <button class="btn" onclick="document.querySelector('.v25-modal-backdrop')?.remove();state.tab='balance';dashboard()">الانتقال إلى الباقات والشحن</button>
+      </div>
+      <small>سيتم تحويلك تلقائياً خلال ثواني إذا لم تضغط أي خيار.</small>
+    </div>`;
+    document.body.appendChild(d);
+    setTimeout(()=>{ if(document.body.contains(d)){ d.remove(); state.tab='balance'; dashboard(); } }, 2600);
+  };
+
+  window.sendOffer = async function(e,id){
+    e.preventDefault();
+    const btn=e.submitter || e.target.querySelector('button[type="submit"],button.btn');
+    if(btn){btn.disabled=true;btn.textContent='جاري إرسال العرض...';}
+    try{
+      await api(`/api/requests/${id}/offer`,{method:'POST',body:JSON.stringify({offer_price:offerPrice.value,duration:arrivalTime.value,note:offerNote.value||''})});
+      toast('تم إرسال العرض، بانتظار موافقة العميل');
+      state.tab='orders';
+      dashboard();
+    }catch(err){
+      const m=err.message||'حدث خطأ';
+      if(m.includes('رصيدك غير كافي') || m.includes('غير كاف')) v25InsufficientBalanceModal(m);
+      else toast(m);
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='إرسال العرض للعميل';}
+    }
+  };
+
+  window.v25TopServicesTicker = function(){
+    const base=(state.meta.services&&state.meta.services.length?state.meta.services:[{name:'كهربائي',icon:'⚡'},{name:'سباك',icon:'🚰'},{name:'تكييف',icon:'❄️'}]);
+    const services=[...base,...base,...base];
+    return `<div class="v25-top-services">
+      <div class="v25-top-head"><div><span class="eyebrow">Live</span><h2>الخدمات الأكثر طلباً</h2><p>تتحرك مباشرة وتحدث حسب المهن المضافة من الأدمن.</p></div><b>🔥 الأكثر نشاطاً</b></div>
+      <div class="v25-top-marquee"><div class="v25-top-track">
+        ${services.map((s,i)=>`<div class="v25-top-card" onclick="state.tab=state.user?.role==='customer'?'dash':'orders';dashboard()"><span>${v25Esc(s.icon||'🛠️')}</span><div><b>${v25Esc(s.name||s)}</b><small>${320-((i%8)*19)} طلب هذا الشهر • فنيين متاحين</small></div></div>`).join('')}
+      </div></div>
+    </div>`;
+  };
+
+  const oldCharts = window.chartsBox;
+  window.chartsBox = function(){
+    return v25TopServicesTicker()+`<div class="dash-grid"><div class="dash-card"><h2>أداء الشهر</h2><div class="chart-fake"></div></div><div class="dash-card"><h2>توزيع الطلبات</h2><div class="donut-fake"></div><div class="mini-list" style="margin-top:18px"><div class="mini-list-row"><span>مكتملة</span><b>65%</b></div><div class="mini-list-row"><span>قيد التنفيذ</span><b>25%</b></div><div class="mini-list-row"><span>ملغاة</span><b>10%</b></div></div></div></div>`;
+  };
+
+  const oldV20Strip = window.v20LiveServicesStrip;
+  window.v20LiveServicesStrip = function(){
+    const html = oldV20Strip ? oldV20Strip() : '';
+    return html.replace('v20-marquee-track','v20-marquee-track v25-slow-strip');
+  };
+
+  const oldTechBalance = window.v22TechBalance;
+  window.v22TechBalance = function(me){
+    return `<div class="v25-balance-alert-sm">⚠️ <b>أول طلبين مجاناً</b> — بعدها يلزم رصيد لتقديم عروض.</div>` + (oldTechBalance ? oldTechBalance(me) : balancePage(me));
+  };
+})();
+
+/* V26 location sender override */
+window.sendLocation = async function(id){
+  if(!navigator.geolocation) return toast('المتصفح لا يدعم تحديد الموقع');
+  toast('جاري تحديد موقعك...');
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const lat=pos.coords.latitude.toFixed(6), lng=pos.coords.longitude.toFixed(6);
+    try{
+      const j=await api(`/api/requests/${id}/messages`,{method:'POST',body:JSON.stringify({body:`[location]${lat},${lng}`})});
+      renderMessages(j.messages||[]);
+      toast('تم إرسال الموقع داخل الشات');
+    }catch(e){ toast(e.message||'تعذر إرسال الموقع'); }
+  },()=>toast('لم يتم السماح بالوصول للموقع. فعّل Location من المتصفح.'),{enableHighAccuracy:true,timeout:12000});
+};
+
+
+;(function(){
+  const esc = window.v15EscapeHtml || ((s)=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
+  const cleanText = (s)=>String(s||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').trim();
+
+  window.__SALLEHLY_PATCH_VERSION__ = 'v33-support-real-final';
+
+  window.sallehlySupportContentV33 = function(){
+    return `<section class="v33-support-page">
+      <div class="dash-card v33-support-main">
+        <span class="eyebrow">مركز الدعم</span>
+        <h2>الدعم الفني</h2>
+        <p class="muted">هذه صفحة الدعم الخاصة بالعميل. ليست صفحة طلب جديد. اكتب المشكلة وسيتم إرسالها للإدارة.</p>
+        <form class="form v33-support-form" onsubmit="sendSupport(event)">
+          <div class="field"><label>نوع المشكلة</label><select id="supportType"><option value="مشكلة طلب">مشكلة طلب</option><option value="مشكلة حساب">مشكلة حساب</option><option value="مشكلة دفع أو رصيد">مشكلة دفع أو رصيد</option><option value="مشكلة في الموقع">مشكلة في الموقع</option><option value="اقتراح تحسين">اقتراح تحسين</option></select></div>
+          <div class="field"><label>عنوان المشكلة</label><input id="supportTitle" required minlength="3" maxlength="120" placeholder="مثال: زر الدردشة لا يعمل"></div>
+          <div class="field full"><label>التفاصيل</label><textarea id="supportBody" required minlength="10" maxlength="2000" placeholder="اشرح المشكلة بشكل واضح..."></textarea></div>
+          <button class="btn" type="submit">إرسال طلب الدعم</button>
+        </form>
+      </div>
+      <div class="dash-card v33-support-side">
+        <h2>مساعدة سريعة</h2>
+        <div class="faq-list">
+          <details open><summary>كيف أتابع الطلب؟</summary><p>من صفحة طلباتي يمكنك مشاهدة الحالة والعروض والدردشة.</p></details>
+          <details><summary>الدردشة لا تظهر؟</summary><p>الدردشة تظهر بعد قبول عرض الفني.</p></details>
+          <details><summary>الموقع لا يرسل؟</summary><p>اسمح للمتصفح باستخدام الموقع ثم جرّب مرة أخرى.</p></details>
+        </div>
+      </div>
+    </section>`;
+  };
+
+  window.supportPage = function(){ return window.sallehlySupportContentV33(); };
+
+  window.sendSupport = async function(e){
+    e.preventDefault();
+    const btn=e.submitter;
+    try{
+      if(btn){btn.disabled=true; btn.textContent='جاري الإرسال...';}
+      const type=document.getElementById('supportType')?.value || 'عام';
+      const title=(document.getElementById('supportTitle')?.value||'').trim();
+      const body=(document.getElementById('supportBody')?.value||'').trim();
+      if(title.length<3) throw new Error('اكتب عنوان المشكلة');
+      if(body.length<10) throw new Error('اكتب تفاصيل أوضح');
+      await api('/api/support',{method:'POST',body:JSON.stringify({type,title,body})});
+      toast?.('تم إرسال طلب الدعم للإدارة بنجاح');
+      e.target.reset();
+    }catch(err){ toast?.(err.message || 'تعذر إرسال طلب الدعم'); }
+    finally{ if(btn){btn.disabled=false; btn.textContent='إرسال طلب الدعم';} }
+  };
+
+  window.renderCustomerSupportV33 = function(){
+    state.tab='support';
+    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات'],['support','الدعم الفني']];
+    const content = (window.dashboardHero ? dashboardHero('الدعم الفني','أرسل مشكلتك للإدارة مباشرة.',[]) : '') + window.sallehlySupportContentV33();
+    window.layout('لوحة العميل', menu, content);
+  };
+
+  window.v13Ticker = function(){ return ''; };
+  window.v20LiveServicesStrip = function(){ return ''; };
+
+  window.v33RequestJobsStrip = function(){
+    const services=(state.meta&&Array.isArray(state.meta.services)&&state.meta.services.length)?state.meta.services:[];
+    const safe=services.length?services:[{name:'كهربائي',icon:''},{name:'سباك',icon:''},{name:'تكييف',icon:''},{name:'نجار',icon:''}];
+    const cards=safe.map(s=>{const name=esc(s.name||'خدمة'); const raw=String(s.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); return `<button type="button" class="v33-job-card" onclick="if(document.getElementById('qservice')){document.getElementById('qservice').value='${raw}';document.getElementById('qservice').scrollIntoView({behavior:'smooth',block:'center'});}"><span>${esc(s.icon||'')}</span><b>${name}</b><small>متوفر الآن</small></button>`;}).join('');
+    return `<section class="v33-job-strip"><div class="v33-strip-head"><h2>شريط المهن</h2><p>كل مهنة يضيفها الأدمن تظهر هنا تلقائياً داخل صفحة طلب جديد.</p></div><div class="v33-marquee"><div class="v33-track">${cards}${cards}${cards}</div></div></section>`;
+  };
+
+  window.layout = function(title,menu,content){
+    document.body.classList.add('dashboard-mode');
+    const user=state.user||{};
+    const hasSupport=(menu||[]).some(m=>m[0]==='support');
+    const system = hasSupport ? [['settings','الإعدادات']] : [['settings','الإعدادات'],['support','الدعم الفني']];
+    const btn=(m)=>{
+      const isSupport=m[0]==='support' && user.role==='customer';
+      const click=isSupport ? 'renderCustomerSupportV33()' : `state.tab='${m[0]}';dashboard()`;
+      return `<button type="button" class="sidebtn ${state.tab===m[0]?'active':''}" onclick="${click}"><b>${cleanText(m[1])}</b></button>`;
+    };
+    app.innerHTML=`<div class="admin-shell v33-shell"><aside class="admin-sidebar v33-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><button class="mobile-menu-close" onclick="document.body.classList.remove('sidebar-open')">×</button><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${(menu||[]).map(btn).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu">${system.map(btn).join('')}<button type="button" class="sidebtn logout-side" onclick="v15LogoutConfirm?.()||logout()"><b>تسجيل خروج</b></button></div><div class="admin-profile"><div class="avatar-sm">${esc((user.name||'ص').slice(0,1))}</div><div><b>${esc(user.name||'مستخدم')}</b><small>${esc(user.email||'')}</small></div></div></aside><main class="admin-main v33-main"><div class="admin-top"><button class="admin-icon-btn mobile-menu-open" onclick="document.body.classList.add('sidebar-open')">القائمة</button><div class="admin-search"><input placeholder="بحث عن فني أو خدمة أو طلب..."></div><div class="admin-actions"><button class="admin-icon-btn" onclick="v24RefreshBadges?.()">التنبيهات</button><button class="admin-icon-btn" onclick="v10ToggleTheme?.()">الوضع</button><button class="admin-icon-btn clean-logout" onclick="v15LogoutConfirm?.()||logout()">تسجيل خروج</button></div></div><div class="v33-content">${content}</div></main></div>`;
+    window.v10ApplyTheme?.();
+  };
+
+  window.custDash = async function(){
+    const menu=[['dash','طلب جديد'],['near','البحث عن فني'],['orders','طلباتي'],['chats','الدردشات'],['support','الدعم الفني']];
+    let content='';
+    if(state.tab==='support'){
+      content=(window.dashboardHero?dashboardHero('الدعم الفني','أرسل مشكلتك للإدارة مباشرة.',[]): '') + window.sallehlySupportContentV33();
+    }else if(state.tab==='orders'){
+      const j=await api('/api/requests');
+      content=(window.dashboardHero?dashboardHero('طلباتي','تابع طلباتك والعروض والدردشات.',window.v20CustomerStats?.(j.requests||[])||[]): '') + `<div class="dash-card"><h2>طلباتي</h2>${typeof window.v18OrdersView==='function'?window.v18OrdersView(j.requests||[]):reqTable(j.requests||[])}</div>`;
+    }else if(state.tab==='chats'){
+      content=(window.dashboardHero?dashboardHero('الدردشات','كل المحادثات مع الفنيين هنا.',[]): '') + await chatsPage();
+    }else if(state.tab==='near'){
+      content=(window.dashboardHero?dashboardHero('البحث عن فني','ابحث حسب الخدمة والمنطقة وشاهد التقييم.',[]): '') + (window.v20SearchPanel?window.v20SearchPanel():nearbyPage());
+    }else if(state.tab==='settings'){
+      content=(window.dashboardHero?dashboardHero('الإعدادات','عدّل بيانات حسابك.',[]): '') + settingsPage();
+    }else{
+      const j=await api('/api/requests').catch(()=>({requests:[]}));
+      content=(window.dashboardHero?dashboardHero('لوحة العميل','انشر طلبك واستقبل عروض الفنيين مباشرة.',window.v20CustomerStats?.(j.requests||[])||[]): '') + window.v33RequestJobsStrip() + `<div class="v20-main-grid v24-customer-grid"><div>${requestForm()}</div><div>${window.v20SearchPanel?window.v20SearchPanel():nearbyPage()}</div></div>`;
+    }
+    window.layout('لوحة العميل', menu, content);
+    if(['dash','near'].includes(state.tab)){ window.bindAreaSelect?.('qcity','qarea','qareaOtherWrap'); window.bindAreaSelect?.('searchCity','searchArea'); }
+    if(state.tab==='near') setTimeout(()=>window.searchTechnicians?.(),100);
+    if(state.tab==='settings') window.bindAreaSelect?.('setCity','setArea');
+  };
+
+  window.dashboard = function(){
+    if(!state.user) return login();
+    if(state.user.role==='admin') return admin();
+    if(state.user.role==='technician') return techDash();
+    return window.custDash();
+  };
+
+  const st=document.createElement('style');
+  st.textContent=`
+    .v33-sidebar .mi,.v33-sidebar .sidebtn span.mi,.v33-sidebar .sidebtn>span:not(.badge){display:none!important}.v33-sidebar .sidebtn{justify-content:center!important;text-align:center!important}.v33-sidebar .sidebtn b{font-size:18px!important}.v33-content>.v20-live-strip,.v33-content>.v13-ticker,.v33-content>.v31-job-strip,.v33-content>.v32-job-strip{display:none!important}.v33-support-page{display:grid;grid-template-columns:1.35fr .85fr;gap:22px}.v33-support-main textarea{min-height:190px}.v33-support-form .full{grid-column:1/-1}.v33-job-strip{background:linear-gradient(135deg,#101d55,#6430d5);border-radius:28px;padding:24px;margin:18px 0 24px;color:#fff;overflow:hidden;box-shadow:0 18px 50px rgba(40,35,120,.18)}.v33-strip-head{margin-bottom:16px}.v33-strip-head h2{margin:0;font-size:28px}.v33-strip-head p{margin:6px 0 0;color:rgba(255,255,255,.78)}.v33-marquee{overflow:hidden}.v33-track{display:flex;gap:16px;width:max-content;animation:v33Scroll 85s linear infinite}.v33-job-card{min-width:245px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.10);color:#fff;border-radius:20px;padding:16px 18px;display:flex;align-items:center;gap:12px;cursor:pointer}.v33-job-card span{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:rgba(255,255,255,.13);font-size:22px}.v33-job-card b{font-size:18px}.v33-job-card small{color:#bdf7ff}@keyframes v33Scroll{from{transform:translateX(0)}to{transform:translateX(33.333%)}}@media(max-width:900px){.v33-support-page,.v20-main-grid,.v24-customer-grid{grid-template-columns:1fr!important}.v33-job-card{min-width:220px}.v33-job-strip{padding:18px;border-radius:22px}.admin-shell{display:block!important}.admin-sidebar{position:relative!important;width:100%!important;min-height:auto!important}.admin-main{padding:14px!important}.admin-menu{grid-template-columns:repeat(2,minmax(0,1fr))!important}.admin-top{grid-template-columns:1fr!important}.stats-grid,.hero-stats{grid-template-columns:1fr 1fr!important}}@media(max-width:520px){.v33-job-card{min-width:200px;padding:13px}.v33-track{animation-duration:95s}.stats-grid,.hero-stats{grid-template-columns:1fr!important}.admin-menu{grid-template-columns:1fr!important}.dash-card{padding:16px!important}.dashboard-hero{padding:18px!important}.admin-actions{display:grid!important;grid-template-columns:1fr!important}.admin-search input{width:100%!important}}
+  `;
+  document.head.appendChild(st);
+})();
+
+
+;(function(){
+  window.__SALLEHLY_MAP_PATCH_VERSION__ = 'v34-real-maps-fix';
+  const esc = window.v15EscapeHtml || ((s)=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
+  const maps = window.__sallehlyLeafletMaps = window.__sallehlyLeafletMaps || {};
+  const jordanCenter = [31.9539, 35.9106];
+
+  function validCoord(lat,lng){
+    lat = Number(lat); lng = Number(lng);
+    return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  }
+  function mapsUrl(lat,lng){ return `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`; }
+
+  window.sallehlyInitMap = function(id, lat, lng, label){
+    setTimeout(()=>{
+      const el = document.getElementById(id);
+      if(!el || !validCoord(lat,lng)) return;
+      if(typeof L === 'undefined'){
+        el.innerHTML = `<div class="map-fallback"><b>تعذر تحميل الخريطة</b><small>تأكد أن السيرفر يسمح بتحميل Leaflet/OpenStreetMap.</small><a target="_blank" rel="noopener" href="${mapsUrl(lat,lng)}">فتح الموقع على Google Maps</a></div>`;
+        return;
+      }
+      try{
+        if(maps[id]){ maps[id].remove(); delete maps[id]; }
+        const map = L.map(id, {scrollWheelZoom:false, zoomControl:true}).setView([Number(lat), Number(lng)], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        L.marker([Number(lat), Number(lng)]).addTo(map).bindPopup(esc(label || 'الموقع المحدد'));
+        maps[id] = map;
+        setTimeout(()=>map.invalidateSize(), 120);
+      }catch(e){
+        console.error('Sallehly map error:', e);
+        el.innerHTML = `<div class="map-fallback"><b>حدث خطأ في عرض الخريطة</b><a target="_blank" rel="noopener" href="${mapsUrl(lat,lng)}">فتح الموقع على Google Maps</a></div>`;
+      }
+    }, 80);
+  };
+
+  window.mapBox = function(lat,lng,label='موقع العميل'){
+    if(!validCoord(lat,lng)) return `<div class="mapbox empty">لم يتم تحديد الموقع بعد</div>`;
+    const safeLat = Number(lat).toFixed(6), safeLng = Number(lng).toFixed(6);
+    const id = 'map_' + Math.random().toString(36).slice(2,10);
+    setTimeout(()=>window.sallehlyInitMap(id, safeLat, safeLng, label), 0);
+    return `<div class="map-wrap"><div id="${id}" class="mapbox real-map" data-lat="${safeLat}" data-lng="${safeLng}"></div><div class="map-actions"><a class="maplink" target="_blank" rel="noopener" href="${mapsUrl(safeLat,safeLng)}">فتح الموقع على خرائط Google</a></div></div>`;
+  };
+
+  window.useGPS = function(mode='near'){
+    if(!navigator.geolocation){ toast?.('المتصفح لا يدعم تحديد الموقع GPS'); return; }
+    if(location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'){
+      toast?.('تحديد الموقع يحتاج HTTPS عند رفع الموقع على السيرفر');
+    }
+    toast?.('جاري تحديد موقعك... اسمح للمتصفح باستخدام الموقع');
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const lat = Number(pos.coords.latitude).toFixed(6);
+      const lng = Number(pos.coords.longitude).toFixed(6);
+      state.gps = {lat,lng};
+      try{ localStorage.sallehly_last_gps = JSON.stringify(state.gps); }catch(e){}
+      const c = typeof cityFromGPS==='function' ? cityFromGPS(Number(lat), Number(lng)) : 'عمان';
+      const ncity=document.getElementById('ncity'), qcity=document.getElementById('qcity');
+      if(ncity) ncity.value=c;
+      if(qcity) qcity.value=c;
+      const nearMap=document.getElementById('nearMap'), requestMap=document.getElementById('requestMap');
+      if(nearMap) nearMap.innerHTML = window.mapBox(lat,lng,'موقعك الحالي');
+      if(requestMap) requestMap.innerHTML = window.mapBox(lat,lng,'موقع العميل');
+      toast?.('تم تحديد موقعك وعرض الخريطة بنجاح');
+      if(mode==='near') window.loadNearby?.();
+    }, err=>{
+      const messages={1:'لم يتم السماح بالوصول للموقع. فعّل Location من المتصفح.',2:'تعذر معرفة موقعك حاليًا.',3:'انتهت مهلة تحديد الموقع، جرّب مرة ثانية.'};
+      toast?.(messages[err.code] || 'تعذر تحديد الموقع');
+    }, {enableHighAccuracy:true, timeout:15000, maximumAge:60000});
+  };
+
+  const oldRequestForm = window.requestForm;
+  window.requestForm = function(){
+    const html = oldRequestForm ? oldRequestForm() : '';
+    setTimeout(()=>{
+      try{
+        if(!state.gps && localStorage.sallehly_last_gps) state.gps = JSON.parse(localStorage.sallehly_last_gps);
+        if(state.gps && document.getElementById('requestMap')) document.getElementById('requestMap').innerHTML = window.mapBox(state.gps.lat,state.gps.lng,'موقع العميل');
+      }catch(e){}
+    },100);
+    return html;
+  };
+
+  const oldNearbyPage = window.nearbyPage;
+  window.nearbyPage = function(){
+    const html = oldNearbyPage ? oldNearbyPage() : '';
+    setTimeout(()=>{
+      try{
+        if(!state.gps && localStorage.sallehly_last_gps) state.gps = JSON.parse(localStorage.sallehly_last_gps);
+        if(state.gps && document.getElementById('nearMap')) document.getElementById('nearMap').innerHTML = window.mapBox(state.gps.lat,state.gps.lng,'موقعك الحالي');
+      }catch(e){}
+    },100);
+    return html;
+  };
+
+  const oldMsgBody = window.messageBody;
+  window.messageBody = function(body){
+    body=String(body||'');
+    if(body.startsWith('[location]')){
+      const p=body.replace('[location]','').split(',');
+      const lat=p[0], lng=p[1];
+      return validCoord(lat,lng) ? `📍 تم إرسال موقع<div>${window.mapBox(lat,lng,'موقع مرسل في المحادثة')}</div>` : '📍 موقع غير صالح';
+    }
+    return oldMsgBody ? oldMsgBody(body) : esc(body);
+  };
+
+  const st=document.createElement('style');
+  st.textContent=`
+    .map-wrap{width:100%;margin-top:12px}.mapbox.real-map{width:100%;height:270px;min-height:230px;border:1px solid var(--line,#dbe4f0);border-radius:18px;overflow:hidden;background:#eef5ff;position:relative;z-index:1}.map-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px}.maplink{font-weight:900;color:var(--blue,#2563eb);text-decoration:none}.map-fallback{height:100%;min-height:190px;display:grid;place-items:center;text-align:center;gap:8px;padding:16px;background:#f8fafc;border-radius:18px;color:#0f172a}.map-fallback a{color:#2563eb;font-weight:900}.leaflet-container{font-family:Tajawal,Arial,sans-serif}.msg .mapbox.real-map{height:210px;min-height:190px}@media(max-width:700px){.mapbox.real-map{height:230px;min-height:210px}.msg .mapbox.real-map{height:190px}}
+  `;
+  document.head.appendChild(st);
+})();
+
+
+function v35ScrollToContent(){
+  try{
+    const main=document.querySelector('.admin-main,.v24-main');
+    if(main && window.innerWidth<=900) main.scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){}
+}
+window.addEventListener('error', function(e){
+  try{
+    if(String(e.message||'').includes('Failed to fetch')){
+      toast('تأكد أنك مشغل المشروع من npm start وليس Live Server فقط');
+    }
+  }catch(_){}
+});
+
+;(function(){
+  function safe(s){return String(s??'').replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]});}
+  function icon(k){try{return (typeof menuIconV13==='function'?menuIconV13(k):(typeof menuIcon==='function'?menuIcon(k):''))||'';}catch(e){return ''}}
+  window.v37CloseDrawer=function(){document.body.classList.remove('v37-menu-open','sidebar-open','open')};
+  window.v37OpenDrawer=function(){document.body.classList.add('v37-menu-open')};
+  window.v37Go=function(tab){state.tab=tab; v37CloseDrawer(); dashboard(); setTimeout(function(){try{document.querySelector('.v37-content,.admin-main')?.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}},80)};
+
+  layout=function(title, menu, content){
+    document.body.classList.add('dashboard-mode','v37-dashboard');
+    const user=state.user||{};
+    const sys=[['settings','الإعدادات'],['support','الدعم الفني']];
+    const make=function(m){
+      const key=String(m[0]); const label=String(m[1]);
+      let badge=''; try{ if(key==='chats' && typeof v13Badge==='function') badge=' '+v13Badge(state.chatCount); }catch(e){}
+      return `<button type="button" class="sidebtn ${state.tab===key?'active':''}" onclick="v37Go('${safe(key)}')"><b>${safe(label)}${badge}</b><span class="mi">${icon(key)}</span></button>`;
+    };
+    app.innerHTML=`
+      <div class="v37-overlay" onclick="v37CloseDrawer()"></div>
+      <div class="admin-shell v37-shell">
+        <header class="v37-mobile-header">
+          <button type="button" class="v37-menu-btn" onclick="v37OpenDrawer()" aria-label="فتح القائمة">☰</button>
+          <div class="v37-brand"><img src="/logo.png" alt="صلّحلي" class="logo-img"><b>صلّحلي</b></div>
+          <div class="v37-header-actions">
+            <button type="button" onclick="toast('لا توجد إشعارات جديدة')">🔔</button>
+            <button type="button" onclick="typeof v10ToggleTheme==='function'?v10ToggleTheme():document.body.classList.toggle('dark-dash')">🌙</button>
+          </div>
+        </header>
+
+        <aside class="admin-sidebar v37-drawer">
+          <div class="v37-drawer-title">
+            <div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div>
+            <button type="button" class="v37-close" onclick="v37CloseDrawer()">×</button>
+          </div>
+          <div class="admin-section-label">الرئيسية</div>
+          <div class="admin-menu">${(menu||[]).map(make).join('')}</div>
+          <div class="admin-section-label">النظام</div>
+          <div class="admin-menu">${sys.map(make).join('')}<button type="button" class="sidebtn logout-side" onclick="v37CloseDrawer();(typeof v15LogoutConfirm==='function'?v15LogoutConfirm():logout())"><b>تسجيل خروج</b><span class="mi">🚪</span></button></div>
+          <div class="admin-profile"><div class="avatar-sm">${safe((user.name||'ص').slice(0,1))}</div><div><b>${safe(user.name||roleName())}</b><small>${safe(user.email||roleName())}</small></div></div>
+        </aside>
+
+        <main class="admin-main v37-main">
+          <div class="admin-top v37-search-row">
+            <div class="admin-search">🔎 <input placeholder="بحث عن فني أو خدمة أو طلب..." onkeydown="if(event.key==='Enter'){state.tab=state.user.role==='customer'?'near':'orders';dashboard();setTimeout(()=>{let q=document.getElementById('searchTechQ');if(q){q.value=this.value;if(typeof searchTechnicians==='function')searchTechnicians();}},120)}"></div>
+          </div>
+          <div class="v37-content">${content}</div>
+        </main>
+      </div>`;
+    try{ if(typeof v10ApplyTheme==='function') v10ApplyTheme(); }catch(e){}
+  };
+
+  const css=`
+  body.v37-dashboard{overflow-x:hidden!important;background:#eef4ff!important}
+  body.v37-dashboard .admin-shell.v37-shell{display:block!important;grid-template-columns:1fr!important;min-height:100vh!important;background:#eef4ff!important}
+  body.v37-dashboard .v37-mobile-header{position:sticky!important;top:0!important;z-index:950!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;padding:12px 14px!important;background:#071331!important;color:#fff!important;border-radius:0 0 24px 24px!important;box-shadow:0 15px 40px rgba(2,6,23,.20)!important;direction:rtl!important}
+  .v37-menu-btn{width:48px!important;height:48px!important;border:0!important;border-radius:15px!important;background:linear-gradient(135deg,#7c3aed,#2563eb)!important;color:#fff!important;font-size:27px!important;font-weight:900!important;display:grid!important;place-items:center!important;cursor:pointer!important}
+  .v37-brand{display:flex!important;align-items:center!important;gap:9px!important;font-size:23px!important;font-weight:900!important}.v37-brand span,.v37-drawer .admin-logo span{width:42px!important;height:42px!important;border-radius:14px!important;display:grid!important;place-items:center!important;background:linear-gradient(135deg,#7c3aed,#2563eb)!important;color:#fff!important}.v37-header-actions{display:flex!important;gap:8px!important}.v37-header-actions button,.v37-close{width:42px!important;height:42px!important;border:0!important;border-radius:14px!important;background:rgba(255,255,255,.14)!important;color:#fff!important;font-size:20px!important;font-weight:900!important}
+  body.v37-dashboard .admin-sidebar.v37-drawer{position:fixed!important;top:0!important;right:-340px!important;left:auto!important;width:min(86vw,330px)!important;height:100vh!important;min-height:100vh!important;max-height:100vh!important;z-index:1002!important;padding:16px!important;background:linear-gradient(180deg,#071331,#0b1a42)!important;border-radius:24px 0 0 24px!important;overflow-y:auto!important;transition:right .28s ease!important;box-shadow:-25px 0 80px rgba(2,6,23,.45)!important;display:block!important}
+  body.v37-menu-open .admin-sidebar.v37-drawer{right:0!important}
+  .v37-overlay{display:none!important;position:fixed!important;inset:0!important;z-index:1001!important;background:rgba(2,6,23,.48)!important;backdrop-filter:blur(4px)!important}body.v37-menu-open .v37-overlay{display:block!important}
+  .v37-drawer-title{display:flex!important;align-items:center!important;justify-content:space-between!important;margin-bottom:12px!important}.v37-drawer .admin-logo{margin:0!important;font-size:24px!important;justify-content:flex-start!important;display:flex!important;align-items:center!important;gap:9px!important}
+  body.v37-dashboard .admin-sidebar.v37-drawer .admin-menu{display:grid!important;grid-template-columns:1fr!important;gap:9px!important}.v37-drawer .sidebtn{height:55px!important;min-height:55px!important;border-radius:16px!important;font-size:16px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;padding:0 16px!important;text-align:right!important}.v37-drawer .sidebtn b{font-size:16px!important;white-space:nowrap!important}.v37-drawer .admin-section-label{text-align:right!important;margin:18px 8px 9px!important;color:#8da0cc!important}.v37-drawer .admin-profile{position:static!important;display:flex!important;margin-top:18px!important}
+  body.v37-dashboard .admin-main.v37-main{width:100%!important;max-width:430px!important;margin:0 auto!important;padding:10px 10px 18px!important;display:block!important}.v37-search-row{position:relative!important;display:flex!important;height:auto!important;padding:0!important;margin:8px 0 16px!important;background:transparent!important;box-shadow:none!important;border:0!important}.v37-search-row .admin-search{width:100%!important}
+  body.v37-dashboard .admin-shell > .admin-sidebar:not(.v37-drawer){display:none!important}body.v37-dashboard .admin-menu:not(.v37-drawer .admin-menu){grid-template-columns:1fr!important}
+  @media(max-width:900px){body.v37-dashboard .admin-shell{display:block!important}.v37-mobile-header{display:flex!important}.admin-main.v37-main{padding:10px!important}.admin-menu{grid-template-columns:1fr!important}.admin-top{grid-template-columns:1fr!important}.dash-card{max-width:100%!important}.dashboard-hero{margin-top:0!important}}
+  @media(min-width:901px){body.v37-dashboard .admin-main.v37-main{max-width:1180px!important}.v37-mobile-header{border-radius:0!important}.v37-search-row{max-width:700px!important;margin:16px auto!important}}
+  `;
+  const st=document.createElement('style'); st.id='v37-true-hamburger-css'; st.textContent=css; document.head.appendChild(st);
+})();
+
+
+(function(){
+  function publicClean(){
+    document.body.classList.remove('open','sidebar-open','v37-menu-open','dashboard-mode','v37-dashboard');
+  }
+  const oldGo = window.go;
+  window.go = function(p){
+    p = String(p || 'home');
+    if(['home','services','how','tech','contact','login','register'].includes(p)) publicClean();
+    if(p==='home') return home();
+    if(p==='services') return servicesPage();
+    if(p==='how') return howPage();
+    if(p==='tech') return techPage();
+    if(p==='contact') return contact();
+    if(p==='login') return login();
+    if(p==='register') return register();
+    if(p==='dashboard') return dashboard();
+    if(typeof oldGo==='function') return oldGo(p);
+  };
+  document.addEventListener('click', function(e){
+    const el = e.target.closest('[data-route]');
+    if(!el) return;
+    e.preventDefault();
+    window.go(el.getAttribute('data-route') || 'home');
+  }, true);
+})();
 
 /* ===== V40 PREMIUM PUBLIC HOME + SLOW LIVE SERVICES ===== */
 (function(){
