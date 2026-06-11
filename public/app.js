@@ -101,6 +101,7 @@ async function doLogin(e){
 register = window.register = function(role='customer'){
   state.tab = 'dash';
   document.body.classList.remove('dashboard-mode','v37-dashboard','sidebar-open','open');
+  const safe = window.esc || ((v)=>String(v??''));
 
   const cities = typeof governorateOptions === 'function'
     ? governorateOptions('عمان')
@@ -233,18 +234,18 @@ register = window.register = function(role='customer'){
                 </div>
               </div>
               <div class="v60-field">
-                <label class="v60-label">مناطق العمل</label>
-                <div class="v60-input-wrap">
-                  <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-                  <select id="areas" class="v60-input v60-select" multiple size="3"></select>
-                </div>
+                <label class="v60-label">مناطق العمل <span style="color:rgba(255,255,255,0.3);font-size:11px">اختر مناطقك</span></label>
+                <div class="v61-pills-wrap" id="v61AreasWrap" style="max-height:160px;overflow-y:auto"></div>
+                <select id="areas" style="display:none" multiple></select>
               </div>
             </div>
 
             <div class="v60-field">
-              <label class="v60-label">الخدمات</label>
-              <select id="srv" class="v60-input v60-select" multiple size="4">${services}</select>
-              <small style="color:rgba(255,255,255,0.3);font-size:12px;margin-top:4px">اضغط Ctrl لاختيار أكثر من خدمة</small>
+              <label class="v60-label">الخدمات <span style="color:rgba(255,255,255,0.3);font-size:11px">اختر كل ما تتقنه</span></label>
+              <div class="v61-pills-wrap" id="v61SrvWrap">
+                ${(state.meta.services||[]).map(s=>`<label class="v61-pill-check"><input type="checkbox" name="srv" value="${safe(s.name)}" style="display:none"><span>${safe(s.icon||'🛠️')} ${safe(s.name)}</span></label>`).join('')}
+              </div>
+              <select id="srv" style="display:none" multiple></select>
             </div>
           </div>
 
@@ -300,6 +301,16 @@ window.v60SwitchRole = function(role){
   techFields.forEach(el => el.style.display = role === 'technician' ? 'block' : 'none');
   document.getElementById('v60TabCust')?.classList.toggle('active', role === 'customer');
   document.getElementById('v60TabTech')?.classList.toggle('active', role === 'technician');
+  // Build areas pills when switching to technician
+  if(role === 'technician'){
+    const areasWrap = document.getElementById('v61AreasWrap');
+    if(areasWrap && !areasWrap.children.length){
+      const allAreas = typeof JORDAN_AREAS !== 'undefined'
+        ? Object.values(JORDAN_AREAS).flat()
+        : (state.meta.cities||[]);
+      areasWrap.innerHTML = allAreas.map(a=>`<label class="v61-pill-check"><input type="checkbox" name="area_cb" value="${a}" style="display:none"><span>📍 ${a}</span></label>`).join('');
+    }
+  }
 };
 
 window.v60ClearRegError = function(){
@@ -339,11 +350,10 @@ window.v60DoRegister = async function(e){
     fd.append('password', document.getElementById('rpassword')?.value || '');
     fd.append('city', document.getElementById('city')?.value || '');
     fd.append('national_number', document.getElementById('national')?.value.trim() || '');
-    fd.append('services', (typeof vals==='function' ? vals('#srv') : []).join(','));
+    fd.append('services', Array.from(document.querySelectorAll('#v61SrvWrap input:checked')).map(i=>i.value).join(','));
     fd.append('areas',
-      typeof selectedArea === 'function'
-        ? selectedArea('regArea', 'regAreaOther') || document.getElementById('regArea')?.value || ''
-        : document.getElementById('areas') ? Array.from(document.getElementById('areas').selectedOptions).map(o=>o.value).join(',') : ''
+      Array.from(document.querySelectorAll('#v61AreasWrap input:checked')).map(i=>i.value).join(',') ||
+      (typeof selectedArea === 'function' ? selectedArea('regArea','regAreaOther') || document.getElementById('regArea')?.value || '' : '')
     );
     if(role === 'technician'){
       const avatar = document.getElementById('avatar')?.files?.[0];
@@ -417,7 +427,11 @@ rst.textContent = `
 .v60r-upload{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:20px;border:2px dashed rgba(124,58,237,0.3);border-radius:14px;cursor:pointer;transition:all 0.25s;color:rgba(255,255,255,0.5);font-size:13px;text-align:center}
 .v60r-upload:hover{border-color:#7c3aed;background:rgba(124,58,237,0.08);color:#a78bfa}
 .v60r-upload svg{color:#7c3aed}
-.v60r-upload small{color:rgba(255,255,255,0.25);font-size:11px}
+.v61-pills-wrap{display:flex;flex-wrap:wrap;gap:8px;padding:4px 0}
+.v61-pill-check{cursor:pointer}
+.v61-pill-check input:checked + span{background:linear-gradient(135deg,rgba(124,58,237,0.5),rgba(37,99,235,0.5));border-color:#7c3aed;color:#fff;box-shadow:0 0 0 1px rgba(124,58,237,0.5)}
+.v61-pill-check span{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:999px;color:rgba(255,255,255,0.6);font-size:13px;transition:all 0.2s;user-select:none}
+.v61-pill-check span:hover{background:rgba(124,58,237,0.2);border-color:rgba(124,58,237,0.4);color:#fff}
 @media(max-width:560px){.v60r-grid{grid-template-columns:1fr}.v60r-card{padding:24px 18px;border-radius:20px}.v60r-wrap{max-width:100%}}
 `;
 
@@ -1727,66 +1741,260 @@ window.addEventListener('error', function(e){
 })();
 
 /* ===== V40 PREMIUM PUBLIC HOME + SLOW LIVE SERVICES ===== */
-(function(){
+// ── V61: Premium Home Page — Dark Theme ──
+;(function(){
+
   const safe = window.esc || ((v)=>String(v ?? ''));
+
   const getServices = ()=>{
     const fallback=[
-      {name:'كهربائي',icon:'⚡'}, {name:'سباك',icon:'🚰'}, {name:'تكييف',icon:'❄️'},
-      {name:'نجار',icon:'🪚'}, {name:'دهان',icon:'🎨'}, {name:'صيانة أجهزة',icon:'🔧'},
-      {name:'تركيب أثاث',icon:'🪑'}, {name:'تركيب زجاج',icon:'🪟'}
+      {name:'كهربائي',icon:'⚡'},{name:'سباك',icon:'🚰'},{name:'تكييف',icon:'❄️'},
+      {name:'نجار',icon:'🪚'},{name:'دهان',icon:'🎨'},{name:'صيانة أجهزة',icon:'📺'},
+      {name:'تركيب أثاث',icon:'🪑'},{name:'تركيب زجاج',icon:'🪟'}
     ];
-    return (state.meta && Array.isArray(state.meta.services) && state.meta.services.length ? state.meta.services : fallback)
-      .map((s,i)=>({name:s.name||fallback[i%fallback.length].name, icon:s.icon||fallback[i%fallback.length].icon}));
+    return (state.meta && Array.isArray(state.meta.services) && state.meta.services.length)
+      ? state.meta.services.map((s,i)=>({name:s.name||fallback[i%fallback.length].name, icon:s.icon||fallback[i%fallback.length].icon}))
+      : fallback;
   };
+
   const chooseService = (name)=>{
     localStorage.pendingService = String(name||'');
     go(state.user ? 'dashboard' : 'register');
   };
   window.v40ChooseService = chooseService;
+
   window.home = home = function(){
     document.body.classList.remove('open','sidebar-open','v37-menu-open','dashboard-mode','v37-dashboard');
-    const services=getServices();
-    const cards=services.map((s,i)=>`<button class="v40-service-pill" onclick="v40ChooseService('${String(s.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')"><span>${safe(s.icon||'🛠️')}</span><b>${safe(s.name)}</b><small>${120+((i%9)*17)} طلب</small></button>`).join('');
-    const mainCards=services.slice(0,6).map((s,i)=>`<button class="v40-main-service" onclick="v40ChooseService('${String(s.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')"><span>${safe(s.icon||'🛠️')}</span><h3>${safe(s.name)}</h3><p>فنيين متاحين قريبين من منطقتك</p><em>ابحث عن فني</em></button>`).join('');
-    app.innerHTML=`
-    <section class="v40-home">
-      <div class="v40-bg-led l1"></div><div class="v40-bg-led l2"></div><div class="v40-bg-led l3"></div>
-      <div class="v40-hero-card">
-        <div class="v40-brand-big"><span><img src="/logo.png" alt="صلّحلي" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;"></span><div><b>صلّحلي</b><small>الفني الأقرب لك بضغطة زر</small></div></div>
-        <div class="v40-live-badge"><i></i> خدمات مباشرة الآن</div>
-        <h1>خدمات الصيانة صارت أسهل، أسرع، وأرتب</h1>
-        <p>اطلب الخدمة، حدّد موقعك، واستقبل عروض الفنيين الموثوقين حسب منطقتك وتقييماتهم.</p>
-        <div class="v40-actions">
-          <button class="btn big" onclick="go('${state.user?'dashboard':'register'}')">اطلب خدمة الآن</button>
-          <button class="btn ghost big" onclick="go('services')">استعرض الخدمات</button>
+    const services = getServices();
+    const pills = services.map((s,i)=>`<button class="v61-pill" onclick="v40ChooseService('${String(s.name).replace(/'/g,"\\'")}')"><span>${safe(s.icon||'🛠️')}</span><b>${safe(s.name)}</b></button>`).join('');
+    const mainCards = services.slice(0,6).map((s,i)=>`<button class="v61-service-card" onclick="v40ChooseService('${String(s.name).replace(/'/g,"\\'")}')"><div class="v61-service-icon">${safe(s.icon||'🛠️')}</div><h3>${safe(s.name)}</h3><p>فنيين متاحين قريبين منك</p><span class="v61-service-cta">ابحث عن فني ←</span></button>`).join('');
+
+    app.innerHTML = `
+    <div class="v61-home">
+
+      <!-- Particles -->
+      <canvas class="v60-canvas" id="v61Canvas"></canvas>
+      <div class="v61-bg-gradient"></div>
+
+      <!-- HERO -->
+      <section class="v61-hero">
+        <div class="v61-hero-content">
+
+          <div class="v61-badge">
+            <i class="v61-live-dot"></i>
+            خدمات صيانة مباشرة في الأردن
+          </div>
+
+          <h1 class="v61-h1">
+            خدمات الصيانة<br>
+            <span class="v61-gradient-text">صارت أسهل وأرتب</span>
+          </h1>
+
+          <p class="v61-lead">اطلب الخدمة، حدّد موقعك، واستقبل عروض الفنيين الموثوقين حسب منطقتك وتقييماتهم.</p>
+
+          <div class="v61-actions">
+            <button class="v61-btn-primary" onclick="go('${state.user?'dashboard':'register'}')">
+              اطلب خدمة الآن
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+            <button class="v61-btn-ghost" onclick="register('technician')">
+              انضم كفني 🔧
+            </button>
+          </div>
+
+          <div class="v61-stats">
+            <div class="v61-stat"><b>⭐ 4.8</b><small>تقييم الفنيين</small></div>
+            <div class="v61-stat-div"></div>
+            <div class="v61-stat"><b>24/7</b><small>طلبات مباشرة</small></div>
+            <div class="v61-stat-div"></div>
+            <div class="v61-stat"><b>GPS</b><small>تحديد موقع</small></div>
+          </div>
         </div>
-        <div class="v40-stats"><div><b>GPS</b><small>تحديد موقع</small></div><div><b>24/7</b><small>طلبات مباشرة</small></div><div><b>4.8</b><small>تقييمات</small></div></div>
-      </div>
-      <div class="v40-phone-preview">
-        <div class="v40-phone-head"><span></span><b>صلّحلي</b><em>Live</em></div>
-        <div class="v40-phone-screen">
-          <div class="v40-mini-search">🔎 ابحث عن خدمة أو فني</div>
-          ${services.slice(0,3).map((s,i)=>`<div class="v40-tech-row"><span>${safe(s.icon||'🛠️')}</span><div><b>${safe(s.name)}</b><small>${stars(5-i/2)} • قريب منك</small></div><button>اختيار</button></div>`).join('')}
-          <div class="v40-map-card">📍 الفنيين الأقرب حسب منطقتك</div>
+
+        <!-- Phone mockup -->
+        <div class="v61-phone">
+          <div class="v61-phone-glow"></div>
+          <div class="v61-phone-inner">
+            <div class="v61-phone-header">
+              <div class="v61-phone-dot"></div>
+              <span>صلّحلي</span>
+              <span class="v61-phone-live">Live</span>
+            </div>
+            <div class="v61-phone-search">🔎 ابحث عن خدمة أو فني</div>
+            ${services.slice(0,3).map((s,i)=>`
+            <div class="v61-phone-row">
+              <div class="v61-phone-avatar">${safe(s.icon||'🛠️')}</div>
+              <div>
+                <b>${safe(s.name)}</b>
+                <small>${['★★★★★','★★★★½','★★★★☆'][i]} • قريب منك</small>
+              </div>
+              <button class="v61-phone-btn">اختيار</button>
+            </div>`).join('')}
+            <div class="v61-phone-map">📍 الفنيين الأقرب حسب منطقتك</div>
+          </div>
         </div>
-      </div>
-    </section>
-    <section class="v40-live-strip">
-      <div class="v40-section-title"><span>LIVE</span><h2>الخدمات الأكثر طلباً</h2><p>شريط مباشر يتحرك تلقائياً بسرعة هادئة.</p></div>
-      <div class="v40-marquee"><div class="v40-track">${cards}${cards}${cards}</div></div>
-    </section>
-    <section class="v40-services-grid">
-      <div class="v40-section-title"><span>خدمات جاهزة</span><h2>اختار الخدمة وابدأ الطلب</h2><p>كل خدمة تظهر هنا تلقائياً من بيانات المشروع.</p></div>
-      <div class="v40-grid">${mainCards}</div>
-    </section>
-    <section class="v40-steps">
-      <div><b>01</b><h3>أنشئ طلب</h3><p>اكتب المشكلة وحدد المحافظة والموقع.</p></div>
-      <div><b>02</b><h3>استقبل عروض</h3><p>شاهد الفنيين والتقييمات واختر الأنسب.</p></div>
-      <div><b>03</b><h3>ادفع كاش وقيّم</h3><p>بعد انتهاء العمل قيّم الفني بسهولة.</p></div>
-    </section>`;
+      </section>
+
+      <!-- Live strip -->
+      <section class="v61-strip">
+        <div class="v61-strip-label">🔴 مباشر</div>
+        <div class="v61-marquee"><div class="v61-track">${pills}${pills}${pills}</div></div>
+      </section>
+
+      <!-- Services grid -->
+      <section class="v61-services">
+        <div class="v61-section-head">
+          <span class="v61-eyebrow">خدمات جاهزة</span>
+          <h2>اختار الخدمة وابدأ الطلب</h2>
+          <p>كل خدمة تعرض الفنيين المتاحين حسب منطقتك وتقييماتهم</p>
+        </div>
+        <div class="v61-services-grid">${mainCards}</div>
+      </section>
+
+      <!-- Steps -->
+      <section class="v61-steps">
+        <div class="v61-section-head">
+          <span class="v61-eyebrow">كيف يعمل؟</span>
+          <h2>ثلاث خطوات بسيطة</h2>
+        </div>
+        <div class="v61-steps-grid">
+          <div class="v61-step"><span>01</span><h3>أنشئ طلب</h3><p>اكتب المشكلة وحدد المحافظة والموقع</p></div>
+          <div class="v61-step"><span>02</span><h3>اختر الفني</h3><p>شاهد الفنيين والتقييمات واختر الأنسب</p></div>
+          <div class="v61-step"><span>03</span><h3>ادفع وقيّم</h3><p>بعد الإنجاز ادفع كاش وقيّم الفني</p></div>
+        </div>
+      </section>
+
+      <!-- CTA -->
+      <section class="v61-cta">
+        <div class="v61-cta-card">
+          <div class="v61-cta-glow"></div>
+          <span class="v61-eyebrow">جاهز للبدء؟</span>
+          <h2>ابدأ تجربتك مع صلّحلي الآن</h2>
+          <p>انضم للمنصة وتواصل مع أفضل الفنيين في منطقتك</p>
+          <button class="v61-btn-primary" onclick="go('${state.user?'dashboard':'register'}')">
+            ابدأ الآن مجاناً
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </section>
+
+    </div>`;
+
+    // Particles
+    v61StartParticles();
     window.scrollTo({top:0,behavior:'smooth'});
   };
+
+  function v61StartParticles(){
+    const canvas = document.getElementById('v61Canvas');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let W, H, P = [];
+    function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+    resize();
+    window.addEventListener('resize', resize);
+    function Pt(){ this.x=Math.random()*W; this.y=Math.random()*H; this.r=Math.random()*1.5+0.3; this.dx=(Math.random()-0.5)*0.3; this.dy=(Math.random()-0.5)*0.3; this.a=Math.random()*0.4+0.05; this.c=Math.random()>0.5?'124,58,237':'37,99,235'; }
+    for(let i=0;i<60;i++) P.push(new Pt());
+    let id;
+    function draw(){
+      if(!document.getElementById('v61Canvas')){ cancelAnimationFrame(id); return; }
+      ctx.clearRect(0,0,W,H);
+      P.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fillStyle=`rgba(${p.c},${p.a})`; ctx.fill(); p.x+=p.dx; p.y+=p.dy; if(p.x<0||p.x>W)p.dx*=-1; if(p.y<0||p.y>H)p.dy*=-1; });
+      for(let i=0;i<P.length;i++) for(let j=i+1;j<P.length;j++){ const d=Math.hypot(P[i].x-P[j].x,P[i].y-P[j].y); if(d<120){ ctx.beginPath(); ctx.moveTo(P[i].x,P[i].y); ctx.lineTo(P[j].x,P[j].y); ctx.strokeStyle=`rgba(124,58,237,${0.06*(1-d/120)})`; ctx.lineWidth=0.5; ctx.stroke(); } }
+      id=requestAnimationFrame(draw);
+    }
+    draw();
+  }
+
+  // CSS
+  const s = document.createElement('style');
+  s.id = 'v61-css';
+  if(!document.getElementById('v61-css')) document.head.appendChild(s);
+  s.textContent = `
+.v61-home{min-height:100vh;background:#080818;color:#fff;direction:rtl;font-family:'Tajawal','Segoe UI',sans-serif;position:relative;overflow-x:hidden}
+.v60-canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
+.v61-bg-gradient{position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(124,58,237,0.12) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(37,99,235,0.10) 0%,transparent 50%);pointer-events:none;z-index:0}
+
+/* HERO */
+.v61-hero{position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:space-between;gap:40px;padding:100px 6% 60px;max-width:1200px;margin:0 auto}
+.v61-hero-content{flex:1;max-width:560px}
+.v61-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:#a78bfa;padding:8px 16px;border-radius:999px;font-size:13px;font-weight:600;margin-bottom:24px}
+.v61-live-dot{width:8px;height:8px;background:#10b981;border-radius:50%;animation:v61Pulse 2s infinite;flex-shrink:0}
+@keyframes v61Pulse{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.4)}50%{box-shadow:0 0 0 6px rgba(16,185,129,0)}}
+.v61-h1{font-size:clamp(36px,5vw,58px);font-weight:900;line-height:1.15;margin:0 0 20px;letter-spacing:-1px}
+.v61-gradient-text{background:linear-gradient(135deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.v61-lead{color:rgba(255,255,255,0.55);font-size:17px;line-height:1.7;margin:0 0 32px}
+.v61-actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:36px}
+.v61-btn-primary{display:inline-flex;align-items:center;gap:8px;padding:0 28px;height:52px;background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 8px 28px rgba(124,58,237,0.4);transition:all 0.25s}
+.v61-btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(124,58,237,0.55)}
+.v61-btn-ghost{padding:0 24px;height:52px;background:transparent;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.8);border-radius:14px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.25s}
+.v61-btn-ghost:hover{background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.3);color:#fff}
+.v61-stats{display:flex;align-items:center;gap:16px}
+.v61-stat{text-align:center}.v61-stat b{display:block;color:#fff;font-size:20px;font-weight:900}.v61-stat small{color:rgba(255,255,255,0.4);font-size:12px}
+.v61-stat-div{width:1px;height:36px;background:rgba(255,255,255,0.1)}
+
+/* PHONE */
+.v61-phone{position:relative;flex-shrink:0;width:280px}
+.v61-phone-glow{position:absolute;inset:-20px;background:radial-gradient(circle,rgba(124,58,237,0.2),transparent 70%);pointer-events:none}
+.v61-phone-inner{background:rgba(255,255,255,0.06);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.1);border-radius:28px;padding:20px;display:flex;flex-direction:column;gap:10px;box-shadow:0 24px 60px rgba(0,0,0,0.4)}
+.v61-phone-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.v61-phone-dot{width:10px;height:10px;background:#10b981;border-radius:50%}
+.v61-phone-header span:nth-child(2){font-weight:900;flex:1}
+.v61-phone-live{background:rgba(16,185,129,0.2);color:#10b981;font-size:11px;padding:2px 8px;border-radius:999px}
+.v61-phone-search{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:10px 14px;color:rgba(255,255,255,0.4);font-size:13px}
+.v61-phone-row{display:flex;align-items:center;gap:10px;padding:8px;background:rgba(255,255,255,0.04);border-radius:12px}
+.v61-phone-avatar{width:36px;height:36px;background:linear-gradient(135deg,rgba(124,58,237,0.3),rgba(37,99,235,0.3));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.v61-phone-row div{flex:1}.v61-phone-row b{display:block;font-size:13px}.v61-phone-row small{color:rgba(255,255,255,0.4);font-size:11px}
+.v61-phone-btn{background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-family:inherit;cursor:pointer;flex-shrink:0}
+.v61-phone-map{background:rgba(37,99,235,0.15);border:1px solid rgba(37,99,235,0.25);border-radius:12px;padding:10px 14px;color:#60a5fa;font-size:13px;text-align:center}
+
+/* STRIP */
+.v61-strip{position:relative;z-index:1;padding:24px 0;border-top:1px solid rgba(255,255,255,0.06);border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);display:flex;align-items:center;gap:20px;overflow:hidden}
+.v61-strip-label{flex-shrink:0;color:#ef4444;font-size:12px;font-weight:800;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);padding:4px 12px;border-radius:999px;margin-right:20px;margin-left:16px}
+.v61-marquee{overflow:hidden;flex:1}
+.v61-track{display:flex;gap:10px;animation:v61Scroll 30s linear infinite;width:max-content}
+@keyframes v61Scroll{from{transform:translateX(0)}to{transform:translateX(-33.33%)}}
+.v61-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:999px;color:rgba(255,255,255,0.7);font-size:13px;font-family:inherit;cursor:pointer;white-space:nowrap;transition:all 0.2s;flex-shrink:0}
+.v61-pill:hover{background:rgba(124,58,237,0.2);border-color:rgba(124,58,237,0.4);color:#fff}
+
+/* SERVICES */
+.v61-services{position:relative;z-index:1;padding:80px 6%;max-width:1200px;margin:0 auto}
+.v61-section-head{text-align:center;margin-bottom:48px}
+.v61-eyebrow{display:inline-block;background:linear-gradient(135deg,rgba(124,58,237,0.2),rgba(37,99,235,0.2));border:1px solid rgba(124,58,237,0.3);color:#a78bfa;padding:5px 14px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:1px;margin-bottom:14px}
+.v61-section-head h2{font-size:clamp(24px,3.5vw,38px);font-weight:900;margin:0 0 12px;letter-spacing:-0.5px}
+.v61-section-head p{color:rgba(255,255,255,0.45);font-size:15px}
+.v61-services-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px}
+.v61-service-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:24px 18px;text-align:center;cursor:pointer;transition:all 0.25s;font-family:inherit;color:#fff;display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;overflow:hidden}
+.v61-service-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(124,58,237,0),rgba(37,99,235,0));transition:0.3s}
+.v61-service-card:hover{background:rgba(124,58,237,0.12);border-color:rgba(124,58,237,0.3);transform:translateY(-4px);box-shadow:0 16px 40px rgba(124,58,237,0.2)}
+.v61-service-icon{font-size:36px;width:64px;height:64px;background:rgba(255,255,255,0.08);border-radius:18px;display:flex;align-items:center;justify-content:center}
+.v61-service-card h3{font-size:15px;font-weight:700;margin:0}
+.v61-service-card p{color:rgba(255,255,255,0.4);font-size:12px;margin:0;line-height:1.5}
+.v61-service-cta{color:#7c3aed;font-size:12px;font-weight:700}
+
+/* STEPS */
+.v61-steps{position:relative;z-index:1;padding:60px 6%;max-width:900px;margin:0 auto}
+.v61-steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:40px}
+.v61-step{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:28px 22px;text-align:center}
+.v61-step span{display:inline-block;font-size:32px;font-weight:900;background:linear-gradient(135deg,#7c3aed,#2563eb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:10px}
+.v61-step h3{font-size:17px;font-weight:700;margin:0 0 8px}
+.v61-step p{color:rgba(255,255,255,0.4);font-size:13px;margin:0;line-height:1.6}
+
+/* CTA */
+.v61-cta{position:relative;z-index:1;padding:60px 6% 100px}
+.v61-cta-card{max-width:680px;margin:0 auto;background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);border-radius:28px;padding:48px 40px;text-align:center;position:relative;overflow:hidden}
+.v61-cta-glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:300px;height:300px;background:radial-gradient(circle,rgba(124,58,237,0.2),transparent 70%);pointer-events:none}
+.v61-cta-card h2{font-size:clamp(22px,3vw,32px);font-weight:900;margin:12px 0 14px}
+.v61-cta-card p{color:rgba(255,255,255,0.5);font-size:15px;margin:0 0 28px}
+.v61-cta-card .v61-btn-primary{margin:0 auto}
+
+/* Responsive */
+@media(max-width:900px){.v61-hero{flex-direction:column;padding:100px 5% 48px;text-align:center}.v61-hero-content{max-width:100%}.v61-phone{width:100%;max-width:320px}.v61-actions{justify-content:center}.v61-stats{justify-content:center}}
+@media(max-width:600px){.v61-steps-grid{grid-template-columns:1fr}.v61-services-grid{grid-template-columns:repeat(2,1fr)}.v61-cta-card{padding:32px 20px}}
+`;
+
 })();
+
 
 
 // ── V60: Premium Login — Stripe/Vercel level ──
