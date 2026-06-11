@@ -2093,9 +2093,9 @@ window.addEventListener('error', function(e){
       </section>
 
       <!-- Live strip -->
-      <section class="v61-strip">
+      <section class="v61-strip" id="v61Strip">
         <div class="v61-strip-label">🔴 مباشر</div>
-        <div class="v61-marquee"><div class="v61-track">${pills}${pills}${pills}</div></div>
+        <div class="v61-marquee"><div class="v61-track" id="v61Track">${pills}${pills}${pills}</div></div>
       </section>
 
       <!-- Services grid -->
@@ -2140,6 +2140,16 @@ window.addEventListener('error', function(e){
     // Particles
     v61StartParticles();
     window.scrollTo({top:0,behavior:'smooth'});
+    // rebuild strip after meta loads if it was empty
+    if(!state.meta.services || !state.meta.services.length){
+      setTimeout(()=>{
+        const track = document.getElementById('v61Track');
+        if(track && state.meta.services && state.meta.services.length){
+          const newPills = getServices().map(s=>`<button class="v61-pill" onclick="v40ChooseService('${String(s.name).replace(/'/g,"\\'")}')"><span>${safe(s.icon||'🛠️')}</span><b>${safe(s.name)}</b></button>`).join('');
+          track.innerHTML = newPills + newPills + newPills;
+        }
+      }, 1500);
+    }
   };
 
   function v61StartParticles(){
@@ -2208,10 +2218,10 @@ window.addEventListener('error', function(e){
 /* STRIP */
 .v61-strip{position:relative;z-index:1;padding:24px 0;border-top:1px solid rgba(255,255,255,0.06);border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);display:flex;align-items:center;gap:20px;overflow:hidden}
 .v61-strip-label{flex-shrink:0;color:#ef4444;font-size:12px;font-weight:800;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);padding:4px 12px;border-radius:999px;margin-right:20px;margin-left:16px}
-.v61-marquee{overflow:hidden;flex:1}
-.v61-track{display:flex;gap:10px;animation:v61Scroll 30s linear infinite;width:max-content}
+.v61-marquee{overflow:hidden;flex:1;direction:ltr}
+.v61-track{display:flex;gap:10px;animation:v61Scroll 30s linear infinite;width:max-content;will-change:transform}
 @keyframes v61Scroll{from{transform:translateX(0)}to{transform:translateX(-33.33%)}}
-.v61-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:999px;color:rgba(255,255,255,0.7);font-size:13px;font-family:inherit;cursor:pointer;white-space:nowrap;transition:all 0.2s;flex-shrink:0}
+.v61-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:999px;color:rgba(255,255,255,0.7);font-size:13px;font-family:inherit;cursor:pointer;white-space:nowrap;transition:all 0.2s;flex-shrink:0;direction:rtl}
 .v61-pill:hover{background:rgba(124,58,237,0.2);border-color:rgba(124,58,237,0.4);color:#fff}
 
 /* SERVICES */
