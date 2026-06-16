@@ -1,4 +1,6 @@
 require('dotenv').config?.();
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -209,10 +211,39 @@ CREATE TABLE IF NOT EXISTS complaints(
   status TEXT DEFAULT 'open',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS otp_codes(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  code TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS pending_users(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  role TEXT NOT NULL,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  phone TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  national_number TEXT,
+  avatar_url TEXT,
+  city TEXT,
+  areas TEXT,
+  services TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS support_tickets(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  type TEXT DEFAULT 'عام',
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  status TEXT DEFAULT 'open',
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 `);
 
-
-// تحديث قواعد البيانات القديمة بدون حذف البيانات
 try { db.prepare('ALTER TABLE requests ADD COLUMN lat REAL').run(); } catch(e) {}
 try { db.prepare('ALTER TABLE requests ADD COLUMN lng REAL').run(); } catch(e) {}
 try { db.prepare('ALTER TABLE requests ADD COLUMN problem_image_url TEXT').run(); } catch(e) {}
@@ -227,8 +258,6 @@ if (db.prepare('SELECT COUNT(*) c FROM payment_methods').get().c === 0) {
   db.prepare('INSERT INTO payment_methods(bank_name,account_name,account_number,phone,instructions) VALUES(?,?,?,?,?)')
     .run('البنك العربي','شركة صلّحلي للخدمات','JO00 ARAB 0000 0000 0000 0000 00','0790000000','حوّل قيمة الباقة كاملة ثم ارفع صورة إثبات الدفع. سيتم مراجعتها من الإدارة.');
 }
-// إنشاء حساب الإدارة يتم فقط من متغيرات البيئة، ولا توجد بيانات افتراضية داخل الكود أو الواجهة.
-// قبل التشغيل الحقيقي أضف ADMIN_EMAIL و ADMIN_PASSWORD داخل ملف .env.
 if (!db.prepare('SELECT id FROM users WHERE role=?').get('admin')) {
   if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
     const pass = bcrypt.hashSync(process.env.ADMIN_PASSWORD, 12);
@@ -240,7 +269,6 @@ if (!db.prepare('SELECT id FROM users WHERE role=?').get('admin')) {
   }
 }
 
-// V9 demo technicians: visible for customer search and testing. Safe INSERT OR IGNORE by email.
 try {
   const demoPass = bcrypt.hashSync('Tech@12345', 12);
   const demoTechs = [
@@ -253,6 +281,31 @@ try {
   const ins = db.prepare(`INSERT OR IGNORE INTO users(role,name,email,phone,password_hash,city,services,areas,avatar_url,rating_avg,rating_count,completed_jobs,balance,is_active) VALUES('technician',?,?,?,?,?,?,?,?,?,?,?,?,1)`);
   demoTechs.forEach(t => ins.run(t[0], t[1], t[2], demoPass, t[3], t[4], t[5], t[9], t[6], t[7], t[8], 20));
 } catch(e) { console.warn('demo tech seed skipped', e.message); }
+
+async function sendOtpEmail(email, code, name) {
+  try {
+    await resend.emails.send({
+      from: 'تحقق من صلّحلي <no-reply@sallehly.com>',
+      to: email,
+      subject: 'كود التحقق من حسابك في صلّحلي',
+      html: `
+        <div dir="rtl" style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;background:#0d0d1a;color:#fff;border-radius:12px;">
+          <h2 style="color:#8B5CF6;text-align:center;">صلّحلي 🔧</h2>
+          <p>مرحباً <strong>${name}</strong>،</p>
+          <p>كود التحقق من بريدك الإلكتروني هو:</p>
+          <div style="text-align:center;margin:24px 0;">
+            <span style="font-size:36px;font-weight:bold;letter-spacing:12px;color:#06B6D4;">${code}</span>
+          </div>
+          <p style="color:#aaa;font-size:13px;">صالح لمدة 10 دقائق فقط. لا تشاركه مع أحد.</p>
+        </div>
+      `
+    });
+    return true;
+  } catch(e) {
+    console.error('Email send error:', e.message);
+    return false;
+  }
+}
 
 function sign(user){ return jwt.sign({ id:user.id, role:user.role, name:user.name }, JWT_SECRET, { expiresIn:'7d' }); }
 function auth(req,res,next){
@@ -277,9 +330,6 @@ function markChatRead(requestId, userId){
   db.prepare(`INSERT INTO chat_reads(request_id,user_id,last_read_message_id,updated_at) VALUES(?,?,?,CURRENT_TIMESTAMP)
     ON CONFLICT(request_id,user_id) DO UPDATE SET last_read_message_id=excluded.last_read_message_id, updated_at=CURRENT_TIMESTAMP`).run(requestId, userId, last);
 }
-function unreadCountSql(alias='r'){
-  return `(SELECT COUNT(*) FROM messages m LEFT JOIN chat_reads cr ON cr.request_id=m.request_id AND cr.user_id=? WHERE m.request_id=${alias}.id AND m.sender_id<>? AND m.id>COALESCE(cr.last_read_message_id,0))`;
-}
 
 io.on('connection', (socket)=>{
   socket.on('join-request', (requestId)=>{ if(requestId) socket.join(String(requestId)); });
@@ -295,7 +345,8 @@ app.get('/api/meta', (req,res)=>{
   });
 });
 
-app.post('/api/auth/register', upload.single('avatar'), (req,res)=>{
+// ✅ التسجيل — يحفظ في pending_users ويبعت OTP
+app.post('/api/auth/register', upload.single('avatar'), async (req,res)=>{
   const role = clean(req.body.role);
   const name = clean(req.body.name || req.body.full_name || req.body.fullName || req.body.username);
   const email = clean(req.body.email).toLowerCase();
@@ -313,17 +364,68 @@ app.post('/api/auth/register', upload.single('avatar'), (req,res)=>{
   if(!/^07\d{8}$/.test(phone)) return res.status(400).json({error:'رقم الهاتف يجب أن يبدأ 07 ويتكون من 10 أرقام'});
   if(password.length < 8) return res.status(400).json({error:'كلمة السر يجب أن تكون 8 أحرف على الأقل'});
   if(role==='technician' && !/^\d{10}$/.test(national_number)) return res.status(400).json({error:'الرقم الوطني يجب أن يكون 10 أرقام'});
+  const existUser = db.prepare('SELECT id FROM users WHERE email=? OR phone=?').get(email, phone);
+  if(existUser) return res.status(409).json({error:'البريد أو رقم الهاتف مستخدم مسبقاً'});
+  if(role==='technician' && national_number){
+    const existNat = db.prepare('SELECT id FROM users WHERE national_number=?').get(national_number);
+    if(existNat) return res.status(409).json({error:'الرقم الوطني مستخدم مسبقاً'});
+  }
   try{
     const hash = bcrypt.hashSync(password, 12);
-    const info = db.prepare('INSERT INTO users(role,name,email,phone,password_hash,national_number,city,services,areas,avatar_url) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    db.prepare('INSERT OR REPLACE INTO pending_users(role,name,email,phone,password_hash,national_number,city,services,areas,avatar_url) VALUES(?,?,?,?,?,?,?,?,?,?)')
       .run(role,name,email,phone,hash, role==='technician'?national_number:null, city, services, areas, avatar_url);
-    const user = db.prepare('SELECT * FROM users WHERE id=?').get(info.lastInsertRowid);
-    const token = sign(user); res.cookie('token', token, { httpOnly:true, sameSite:'strict' }); res.json({token,user:userPublic(user)});
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expires = Date.now() + 10 * 60 * 1000;
+    db.prepare('DELETE FROM otp_codes WHERE email=?').run(email);
+    db.prepare('INSERT INTO otp_codes(email,code,expires_at) VALUES(?,?,?)').run(email, code, expires);
+    await sendOtpEmail(email, code, name);
+    res.json({ok:true, message:'تم إرسال كود التحقق إلى بريدك الإلكتروني', email});
   } catch(e){
+    console.error('Register error:', e.message);
     if(String(e.message).includes('UNIQUE')) return res.status(409).json({error:'البريد أو رقم الهاتف أو الرقم الوطني مستخدم مسبقاً'});
     res.status(500).json({error:'تعذر إنشاء الحساب'});
   }
 });
+
+// ✅ التحقق من OTP
+app.post('/api/auth/verify', (req,res)=>{
+  const email = clean(req.body.email).toLowerCase();
+  const code = clean(req.body.code);
+  if(!email || !code) return res.status(400).json({error:'البريد والكود مطلوبان'});
+  const otp = db.prepare('SELECT * FROM otp_codes WHERE email=? AND used=0 ORDER BY id DESC LIMIT 1').get(email);
+  if(!otp) return res.status(400).json({error:'لم يتم إرسال كود لهذا البريد، سجّل مجدداً'});
+  if(Date.now() > otp.expires_at) return res.status(400).json({error:'انتهت صلاحية الكود، اضغط إعادة الإرسال'});
+  if(otp.code !== code) return res.status(400).json({error:'الكود غير صحيح'});
+  db.prepare('UPDATE otp_codes SET used=1 WHERE id=?').run(otp.id);
+  const pending = db.prepare('SELECT * FROM pending_users WHERE email=?').get(email);
+  if(!pending) return res.status(400).json({error:'بيانات التسجيل غير موجودة، سجّل مجدداً'});
+  try{
+    const info = db.prepare('INSERT INTO users(role,name,email,phone,password_hash,national_number,city,services,areas,avatar_url) VALUES(?,?,?,?,?,?,?,?,?,?)')
+      .run(pending.role,pending.name,pending.email,pending.phone,pending.password_hash,pending.national_number,pending.city,pending.services,pending.areas,pending.avatar_url);
+    db.prepare('DELETE FROM pending_users WHERE email=?').run(email);
+    const user = db.prepare('SELECT * FROM users WHERE id=?').get(info.lastInsertRowid);
+    const token = sign(user);
+    res.cookie('token', token, { httpOnly:true, sameSite:'strict' });
+    res.json({ok:true, token, user:userPublic(user)});
+  }catch(e){
+    if(String(e.message).includes('UNIQUE')) return res.status(409).json({error:'الحساب موجود مسبقاً'});
+    res.status(500).json({error:'تعذر إنشاء الحساب'});
+  }
+});
+
+// 🔄 إعادة إرسال OTP
+app.post('/api/auth/resend-otp', async (req,res)=>{
+  const email = clean(req.body.email).toLowerCase();
+  const pending = db.prepare('SELECT * FROM pending_users WHERE email=?').get(email);
+  if(!pending) return res.status(400).json({error:'لا يوجد طلب تسجيل لهذا البريد'});
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const expires = Date.now() + 10 * 60 * 1000;
+  db.prepare('DELETE FROM otp_codes WHERE email=?').run(email);
+  db.prepare('INSERT INTO otp_codes(email,code,expires_at) VALUES(?,?,?)').run(email, code, expires);
+  await sendOtpEmail(email, code, pending.name);
+  res.json({ok:true, message:'تم إعادة إرسال الكود'});
+});
+
 app.post('/api/auth/login', (req,res)=>{
   const email = clean(req.body.email).toLowerCase(); const password = String(req.body.password||'');
   const user = db.prepare('SELECT * FROM users WHERE email=?').get(email);
@@ -600,7 +702,6 @@ app.post('/api/me/profile', auth, (req,res)=>{
   db.prepare('UPDATE users SET name=?, phone=?, city=?, areas=? WHERE id=?').run(name, phone, city, areas, req.user.id);
   res.json({user:userPublic(db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id))});
 });
-
 app.post('/api/me/password', auth, (req,res)=>{
   const current = String(req.body.current_password || '');
   const next = String(req.body.new_password || '');
@@ -633,15 +734,11 @@ app.post('/api/admin/services', auth, requireRole('admin'), (req,res)=>{
 
 app.post('/api/admin/packages', auth, requireRole('admin'), (req,res)=>{ const {name,amount,bonus,commission_per_order}=req.body; const info=db.prepare('INSERT INTO packages(name,amount,bonus,commission_per_order) VALUES(?,?,?,?)').run(clean(name),Number(amount),Number(bonus||0),Number(commission_per_order||2)); res.json({package:db.prepare('SELECT * FROM packages WHERE id=?').get(info.lastInsertRowid)}); });
 
-
-
-
 app.get('/api/chat-violations', auth, requireRole('admin'), (req,res)=>{
   const rows=db.prepare(`SELECT v.*,u.name user_name,u.email user_email,r.service,r.status FROM chat_violations v LEFT JOIN users u ON u.id=v.user_id LEFT JOIN requests r ON r.id=v.request_id ORDER BY v.id DESC LIMIT 200`).all();
   res.json({violations:rows});
 });
 
-// V13 chats center and support center
 app.get('/api/chats', auth, (req,res)=>{
   let rows=[];
   if(req.user.role==='customer'){
@@ -664,6 +761,7 @@ app.get('/api/chats', auth, (req,res)=>{
   const total=rows.reduce((a,b)=>a+Number(b.unread_count||0),0);
   res.json({chats:rows,total_unread:total});
 });
+
 app.post('/api/support', auth, (req,res)=>{
   const {type,title,body}=req.body||{};
   if(!title || !body || String(body).length<10) return res.status(400).json({error:'اكتب عنوان وتفاصيل واضحة للدعم'});
@@ -674,8 +772,6 @@ app.get('/api/support', auth, requireRole('admin'), (req,res)=>{
   res.json({tickets:db.prepare(`SELECT t.*,u.name user_name,u.role user_role,u.email FROM support_tickets t LEFT JOIN users u ON u.id=t.user_id ORDER BY t.id DESC`).all()});
 });
 
-
-// V21 friendly upload/API error handler
 app.use((err, req, res, next)=>{
   if(err){
     const msg = err.message || 'حدث خطأ في الخادم';
@@ -686,4 +782,4 @@ app.use((err, req, res, next)=>{
 });
 
 app.get('*', (req,res)=> res.sendFile(path.join(BASE,'public','index.html')));
-server.listen(PORT, ()=> console.log(`صلّحلي V5 يعمل على http://localhost:${PORT}`));
+server.listen(PORT, ()=> console.log(`صلّحلي يعمل على http://localhost:${PORT}`));
