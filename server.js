@@ -177,6 +177,75 @@ function createDbBackup(){
 }
 if(process.env.NODE_ENV === 'production') setInterval(createDbBackup, 6 * 60 * 60 * 1000).unref();
 
+// تنظيف دوري للملفات المرفوعة غير المستخدمة (orphan files) في public/uploads.
+// لا تحذف أي شيء له مرجع في قاعدة البيانات؛ تحذف فقط الملفات التي لم يعد لها أي استخدام
+// (مثل صور إيصالات دفع مرفوضة قديمة، أو ملفات تسجيل توقفت في منتصف الطريق)
+// وتجاوزت 24 ساعة على الأقل لتجنب حذف ملف يُرفع حالياً وما زال قيد المعالجة.
+function cleanupOrphanUploads(){
+  try{
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const folders = [
+      { dir: path.join(UPLOAD_DIR, 'avatars'), prefix: '/uploads/avatars/' },
+      { dir: path.join(UPLOAD_DIR, 'payments'), prefix: '/uploads/payments/' },
+      { dir: path.join(UPLOAD_DIR, 'requests'), prefix: '/uploads/requests/' },
+      { dir: path.join(UPLOAD_DIR, 'audios'), prefix: '/uploads/audios/' }
+    ];
+    const usedAvatarFiles = new Set(
+      db.prepare("SELECT avatar_url FROM users WHERE avatar_url IS NOT NULL AND avatar_url<>''").all()
+        .map(r => path.basename(r.avatar_url))
+    );
+    const usedPendingAvatarFiles = new Set(
+      db.prepare("SELECT avatar_filename FROM pending_users WHERE avatar_filename IS NOT NULL AND avatar_filename<>''").all()
+        .map(r => r.avatar_filename)
+    );
+    const usedPaymentFiles = new Set(
+      db.prepare("SELECT receipt_url FROM topups WHERE receipt_url IS NOT NULL AND receipt_url<>''").all()
+        .map(r => path.basename(r.receipt_url))
+    );
+    const usedRequestImageFiles = new Set(
+      db.prepare("SELECT problem_image_url FROM requests WHERE problem_image_url IS NOT NULL AND problem_image_url<>''").all()
+        .map(r => path.basename(r.problem_image_url))
+    );
+    const usedAudioFiles = new Set(
+      db.prepare("SELECT body FROM messages WHERE body LIKE '[audio]%'").all()
+        .map(r => path.basename(String(r.body).replace('[audio]','')))
+    );
+    const usedByFolder = {
+      avatars: new Set([...usedAvatarFiles, ...usedPendingAvatarFiles]),
+      payments: usedPaymentFiles,
+      requests: usedRequestImageFiles,
+      audios: usedAudioFiles
+    };
+    folders.forEach(({dir}) => {
+      const folderName = path.basename(dir);
+      const used = usedByFolder[folderName] || new Set();
+      let files = [];
+      try { files = fs.readdirSync(dir); } catch(e) { return; }
+      files.forEach(file => {
+        try{
+          if(used.has(file)) return;
+          const fullPath = path.join(dir, file);
+          const stat = fs.statSync(fullPath);
+          if(!stat.isFile()) return;
+          if(now - stat.mtimeMs < ONE_DAY_MS) return; // ملف حديث، قد يكون قيد الاستخدام الآن
+          fs.unlinkSync(fullPath);
+        }catch(e){ /* تجاهل أي ملف لا يمكن فحصه أو حذفه */ }
+      });
+    });
+  }catch(e){ console.error('cleanup uploads failed:', e.message); }
+}
+if(process.env.NODE_ENV === 'production') setInterval(cleanupOrphanUploads, 6 * 60 * 60 * 1000).unref();
+
+// تنظيف دوري لطلبات التسجيل التي انتهت صلاحية كود التحقق (OTP) خاصتها ولم يكمل
+// صاحبها التحقق ولا عاد إليها، بدل أن تبقى محفوظة في قاعدة البيانات إلى الأبد.
+function cleanupExpiredPendingUsers(){
+  try{
+    db.prepare('DELETE FROM pending_users WHERE otp_expires < ?').run(Date.now());
+  }catch(e){ console.error('cleanup pending_users failed:', e.message); }
+}
+if(process.env.NODE_ENV === 'production') setInterval(cleanupExpiredPendingUsers, 60 * 60 * 1000).unref();
+
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS users(
@@ -197,6 +266,7 @@ CREATE TABLE IF NOT EXISTS users(
   rating_avg REAL DEFAULT 0,
   rating_count INTEGER DEFAULT 0,
   completed_jobs INTEGER DEFAULT 0,
+  active_commission REAL DEFAULT 2,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS service_categories(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, icon TEXT DEFAULT '🔧');
@@ -352,8 +422,11 @@ try { db.prepare('ALTER TABLE requests ADD COLUMN lng REAL').run(); } catch(e) {
 try { db.prepare('ALTER TABLE requests ADD COLUMN problem_image_url TEXT').run(); } catch(e) {}
 try { db.prepare("ALTER TABLE support_tickets ADD COLUMN status TEXT DEFAULT 'open'").run(); } catch(e) {}
 try { db.prepare('CREATE INDEX IF NOT EXISTS idx_requests_technician ON requests(technician_id)').run(); } catch(e) {}
+try { db.prepare('ALTER TABLE users ADD COLUMN active_commission REAL DEFAULT 2').run(); } catch(e) {}
 try { db.prepare('CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_id)').run(); } catch(e) {}
-try { db.prepare("UPDATE users SET is_active=1 WHERE role='technician' AND is_active=0").run(); } catch(e) {}
+// تمت إزالة سطر إعادة تفعيل الفنيين الموقوفين تلقائياً عند كل تشغيل للسيرفر.
+// كان هذا السطر يلغي قرار إيقاف أي فني من الإدارة (بسبب شكوى أو مخالفة) في كل مرة يعاد تشغيل السيرفر أو يتم نشر تحديث جديد.
+// إيقاف/تفعيل الفنيين أصبح بالكامل بيد الإدارة فقط عبر /api/admin/users/:id/toggle.
 
 
 const services = ['كهربائي','سباك','فني تكييف','نجار','فني أجهزة كهربائية','دهان','صيانة عامة','حداد','فني كاميرات مراقبة','فني شبكات','فني إنترنت','صيانة حواسيب','صيانة لابتوبات','صيانة هواتف','تنظيف منازل','تنظيف خزانات','مكافحة حشرات','تركيب ستالايت','تركيب أثاث','صيانة أبواب','صيانة ألمنيوم','صيانة مطابخ','صيانة سخانات','صيانة غسالات','صيانة ثلاجات','صيانة أفران','تركيب زجاج','عزل أسطح','تنسيق حدائق'];
@@ -593,6 +666,59 @@ app.post('/api/auth/login', loginLimiter, (req,res)=>{
   const token = sign(user); res.cookie('token', token, COOKIE_OPTS); res.json({user:userPublic(user)});
 });
 app.post('/api/auth/logout', (req,res)=>{ res.clearCookie('token'); res.json({ok:true}); });
+
+// ── Forgot Password: خطوة 1 — إرسال OTP لإعادة التعيين ──────────────────
+app.post('/api/auth/forgot-password', otpLimiter, async (req,res)=>{
+  const email = clean(req.body.email||'').toLowerCase();
+  if(!validator.isEmail(email)) return res.status(400).json({error:'البريد غير صحيح'});
+  const user = db.prepare('SELECT * FROM users WHERE email=?').get(email);
+  // نرد بنجاح دائماً لمنع تخمين الإيميلات
+  if(!user){ return res.json({ok:true, message:'إذا كان البريد مسجلاً، ستصلك رسالة خلال دقائق'}); }
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const otp_expires = Date.now() + 10 * 60 * 1000;
+  // نخزن في pending_users مع type='reset'
+  db.prepare('DELETE FROM pending_users WHERE email=?').run(email);
+  db.prepare('INSERT INTO pending_users(email,otp,otp_expires,data,avatar_filename) VALUES(?,?,?,?,?)')
+    .run(email, otp, otp_expires, JSON.stringify({type:'reset', userId:user.id}), '');
+  const sent = await sendOtpEmail(email, otp, user.name);
+  if(!sent) return res.status(500).json({error:'تعذر إرسال البريد، حاول مرة أخرى'});
+  res.json({ok:true, message:'إذا كان البريد مسجلاً، ستصلك رسالة خلال دقائق'});
+});
+
+// ── Forgot Password: خطوة 2 — التحقق وإعادة التعيين ─────────────────────
+app.post('/api/auth/reset-password', (req,res)=>{
+  const email = clean(req.body.email||'').toLowerCase();
+  const otp = clean(req.body.otp||'');
+  const newPassword = String(req.body.new_password||'');
+  if(!validator.isEmail(email)) return res.status(400).json({error:'البريد غير صحيح'});
+  if(newPassword.length < 8) return res.status(400).json({error:'كلمة السر يجب أن تكون 8 أحرف على الأقل'});
+  if(newPassword.length > 72) return res.status(400).json({error:'كلمة السر طويلة جداً'});
+  const pending = db.prepare('SELECT * FROM pending_users WHERE email=?').get(email);
+  if(!pending) return res.status(400).json({error:'انتهت صلاحية الكود أو لم تطلبه، أعد المحاولة'});
+  if(Date.now() > pending.otp_expires){
+    db.prepare('DELETE FROM pending_users WHERE email=?').run(email);
+    return res.status(400).json({error:'انتهت صلاحية الكود، اطلب كوداً جديداً'});
+  }
+  if(pending.attempts >= 5){
+    db.prepare('DELETE FROM pending_users WHERE email=?').run(email);
+    return res.status(400).json({error:'محاولات كثيرة، اطلب كوداً جديداً'});
+  }
+  if(pending.otp !== otp){
+    db.prepare('UPDATE pending_users SET attempts=attempts+1 WHERE email=?').run(email);
+    const left = 5 - (pending.attempts + 1);
+    return res.status(400).json({error:`الكود غير صحيح. تبقى لك ${left} محاولات`});
+  }
+  try{
+    const d = JSON.parse(pending.data);
+    if(d.type !== 'reset') return res.status(400).json({error:'طلب غير صحيح'});
+    const hash = bcrypt.hashSync(newPassword, 12);
+    db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hash, d.userId);
+    db.prepare('DELETE FROM pending_users WHERE email=?').run(email);
+    res.json({ok:true, message:'تم تغيير كلمة السر بنجاح. يمكنك الدخول الآن.'});
+  }catch(e){
+    res.status(500).json({error:'تعذر تحديث كلمة السر'});
+  }
+});
 app.get('/api/me', auth, (req,res)=> {
   const user=userPublic(db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id));
   if(user && user.role==='technician'){
@@ -601,6 +727,16 @@ app.get('/api/me', auth, (req,res)=> {
     user.free_quota_used=Math.max(Number(user.free_orders_used||0), Number(user.completed_jobs||0), Number(oc||0));
   }
   res.json({user});
+});
+
+// ── بروفايل الفني العام ───────────────────────────────────────────────────
+app.get('/api/technicians/:id/profile', auth, (req,res)=>{
+  const id = parseInt(req.params.id, 10);
+  if(isNaN(id)) return res.status(400).json({error:'معرّف غير صحيح'});
+  const tech = db.prepare(`SELECT id,name,city,areas,services,avatar_url,rating_avg,rating_count,completed_jobs,is_active,created_at FROM users WHERE id=? AND role='technician'`).get(id);
+  if(!tech) return res.status(404).json({error:'الفني غير موجود'});
+  const reviews = db.prepare(`SELECT r.stars,r.comment,r.created_at,u.name customer_name FROM ratings r JOIN users u ON u.id=r.customer_id WHERE r.technician_id=? ORDER BY r.id DESC LIMIT 10`).all(id);
+  res.json({tech, reviews});
 });
 
 app.get('/api/technicians', auth, (req,res)=>{
@@ -653,6 +789,11 @@ app.get('/api/requests', auth, (req,res)=>{
     const sv = (me.services||'').split(',').filter(Boolean);
     rows = db.prepare('SELECT r.*, c.name customer_name FROM requests r JOIN users c ON c.id=r.customer_id ORDER BY r.id DESC').all()
       .filter(r => r.technician_id===req.user.id || (['بانتظار العروض','وصلت عروض'].includes(r.status) && sv.includes(r.service) && ((me.areas||'').includes(r.city) || (r.area && (me.areas||'').includes(r.area)) || me.city===r.city)));
+    // نضيف _myOfferId لكل طلب قدّم عليه الفني عرض
+    rows = rows.map(r => {
+      const myOffer = db.prepare("SELECT id FROM offers WHERE request_id=? AND technician_id=? AND status='pending' LIMIT 1").get(r.id, req.user.id);
+      return myOffer ? {...r, _myOfferId: myOffer.id} : r;
+    });
   }
   res.json({requests: rows});
 });
@@ -660,6 +801,11 @@ app.delete('/api/requests/:id', auth, requireRole('customer'), (req,res)=>{
   const r=db.prepare('SELECT * FROM requests WHERE id=? AND customer_id=?').get(req.params.id, req.user.id);
   if(!r) return res.status(404).json({error:'الطلب غير موجود'});
   if(['مكتمل'].includes(r.status)) return res.status(400).json({error:'لا يمكن حذف طلب مكتمل من السجل'});
+  // منع إلغاء الطلب بعد أن يقبل العميل عرض فني وتبدأ الإدارة الفعلية للطلب،
+  // لحماية الفني من إلغاء مفاجئ بعد أن يكون قد بدأ التنفيذ أو هو في الطريق.
+  if(['تم اختيار عرض','قيد التنفيذ','بانتظار تأكيد الدفع'].includes(r.status)){
+    return res.status(400).json({error:'لا يمكن إلغاء الطلب بعد قبول عرض الفني. تواصل مع الدعم الفني إذا واجهت مشكلة.'});
+  }
   db.prepare("UPDATE offers SET status='rejected', updated_at=CURRENT_TIMESTAMP WHERE request_id=? AND status='pending'").run(r.id);
   db.prepare("UPDATE requests SET status='ملغي', updated_at=CURRENT_TIMESTAMP WHERE id=?").run(r.id);
   const request=db.prepare('SELECT * FROM requests WHERE id=?').get(r.id);
@@ -674,9 +820,8 @@ app.post('/api/requests/:id/offer', auth, requireRole('technician'), (req,res)=>
   if(r.technician_id && Number(r.technician_id)!==Number(req.user.id)) return res.status(403).json({error:'هذا الطلب مباشر لفني آخر'});
   const active = db.prepare("SELECT id, service FROM requests WHERE technician_id=? AND status IN ('تم اختيار عرض','قيد التنفيذ','بانتظار تأكيد الدفع') AND id<>? ORDER BY id DESC LIMIT 1").get(req.user.id, r.id);
   if(active) return res.status(409).json({error:`لا يمكنك إرسال عرض جديد قبل إنهاء طلبك الحالي رقم ${active.id} - ${active.service}`});
-  const tech = db.prepare('SELECT id,balance,free_orders_used,completed_jobs FROM users WHERE id=? AND role=\'technician\'').get(req.user.id);
-  const commissionRow = db.prepare('SELECT commission_per_order FROM packages WHERE is_active=1 ORDER BY amount ASC LIMIT 1').get();
-  const requiredBalance = Number(commissionRow?.commission_per_order || 2);
+  const tech = db.prepare('SELECT id,balance,free_orders_used,completed_jobs,active_commission FROM users WHERE id=? AND role=\'technician\'').get(req.user.id);
+  const requiredBalance = Number(tech?.active_commission ?? 2);
   const oldOffer = db.prepare('SELECT id FROM offers WHERE request_id=? AND technician_id=? LIMIT 1').get(r.id, req.user.id);
   const sentOffers = db.prepare('SELECT COUNT(DISTINCT request_id) c FROM offers WHERE technician_id=?').get(req.user.id).c || 0;
   const quotaUsed = Math.max(Number(tech?.free_orders_used||0), Number(tech?.completed_jobs||0), Number(sentOffers||0));
@@ -748,8 +893,38 @@ app.post('/api/offers/:id/decision', auth, requireRole('customer'), (req,res)=>{
   const offers = db.prepare('SELECT * FROM offers WHERE request_id=? ORDER BY id DESC').all(offer.request_id);
   io.emit('requests-updated', { request });
   safeEmit(offer.request_id, 'request-status-updated', { request });
+  // إشعار خاص للفني بقبول عرضه
+  if(decision === 'accepted'){
+    io.emit('offer-accepted', {
+      requestId: offer.request_id,
+      technicianId: offer.technician_id,
+      offerId: offer.id,
+      service: request.service
+    });
+  }
   res.json({request, offers});
 });
+
+// ── سحب العرض: الفني يسحب عرضه قبل قبول العميل ─────────────────────────
+app.delete('/api/offers/:id', auth, requireRole('technician'), (req,res)=>{
+  const offer = db.prepare('SELECT o.*, r.status request_status, r.technician_id request_tech FROM offers o JOIN requests r ON r.id=o.request_id WHERE o.id=?').get(req.params.id);
+  if(!offer) return res.status(404).json({error:'العرض غير موجود'});
+  if(offer.technician_id !== req.user.id) return res.status(403).json({error:'هذا العرض لا يخصك'});
+  if(offer.status !== 'pending') return res.status(400).json({error:'لا يمكن سحب عرض تم قبوله أو رفضه'});
+  if(offer.request_status !== 'بانتظار العروض' && offer.request_status !== 'وصلت عروض'){
+    return res.status(400).json({error:'لا يمكن سحب العرض بعد اختيار الفني'});
+  }
+  db.prepare('DELETE FROM offers WHERE id=?').run(offer.id);
+  // إعادة حالة الطلب إذا ما في عروض معلقة غيره
+  const remaining = db.prepare("SELECT COUNT(*) c FROM offers WHERE request_id=? AND status='pending'").get(offer.request_id).c;
+  db.prepare("UPDATE requests SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?")
+    .run(remaining ? 'وصلت عروض' : 'بانتظار العروض', offer.request_id);
+  const request = db.prepare('SELECT * FROM requests WHERE id=?').get(offer.request_id);
+  io.emit('requests-updated', { request });
+  safeEmit(offer.request_id, 'request-status-updated', { request });
+  res.json({ok:true, message:'تم سحب العرض بنجاح'});
+});
+
 app.post('/api/requests/:id/status', auth, (req,res)=>{
   const r = db.prepare('SELECT * FROM requests WHERE id=?').get(req.params.id);
   if(!r) return res.status(404).json({error:'الطلب غير موجود'});
@@ -758,12 +933,14 @@ app.post('/api/requests/:id/status', auth, (req,res)=>{
   if(!allowed.includes(status)) return res.status(400).json({error:'حالة غير صحيحة'});
   if(req.user.role!=='admin' && req.user.id!==r.customer_id && req.user.id!==r.technician_id) return res.status(403).json({error:'لا تملك صلاحية'});
   if(status==='ملغي' && req.user.role!=='admin' && req.user.id!==r.customer_id) return res.status(403).json({error:'إلغاء الطلب يكون من العميل أو الإدارة فقط'});
+  if(status==='ملغي' && req.user.role==='customer' && ['تم اختيار عرض','قيد التنفيذ','بانتظار تأكيد الدفع'].includes(r.status)){
+    return res.status(400).json({error:'لا يمكن إلغاء الطلب بعد قبول عرض الفني. تواصل مع الدعم الفني إذا واجهت مشكلة.'});
+  }
   if(status==='مكتمل' && req.user.role!=='admin' && req.user.id!==r.customer_id) return res.status(403).json({error:'إكمال الطلب يكون من العميل فقط'});
   if(status==='مكتمل' && r.technician_id && r.commission_charged === null){
     const doComplete = db.transaction(()=>{
       const tech = db.prepare('SELECT * FROM users WHERE id=?').get(r.technician_id);
-      const commRow = db.prepare('SELECT commission_per_order FROM packages WHERE is_active=1 ORDER BY amount ASC LIMIT 1').get();
-      const COMMISSION = Number(commRow?.commission_per_order || 2);
+      const COMMISSION = Number(tech?.active_commission ?? 2);
       let charge = 0;
       if(tech.free_orders_used < 2){
         db.prepare('UPDATE users SET free_orders_used=free_orders_used+1, completed_jobs=completed_jobs+1 WHERE id=?').run(tech.id);
@@ -845,7 +1022,7 @@ app.post('/api/requests/:id/messages', auth, messagesLimiter, (req,res)=>{
   db.prepare('INSERT INTO messages(request_id,sender_id,body) VALUES(?,?,?)').run(r.id,req.user.id,body);
   markChatRead(r.id, req.user.id);
   const messages = getMessages(r.id);
-  safeEmit(r.id, 'messages-updated', { requestId:r.id, messages });
+  safeEmit(r.id, 'messages-updated', { requestId:r.id, messages, senderId:Number(req.user.id) });
 
 const payload = {
   requestId: Number(r.id),
@@ -872,7 +1049,7 @@ app.post('/api/requests/:id/audio', auth, messagesLimiter, uploadAudio.single('a
   db.prepare('INSERT INTO messages(request_id,sender_id,body) VALUES(?,?,?)').run(r.id,req.user.id,body);
   markChatRead(r.id, req.user.id);
   const messages = getMessages(r.id);
-  safeEmit(r.id, 'messages-updated', { requestId:r.id, messages });
+  safeEmit(r.id, 'messages-updated', { requestId:r.id, messages, senderId:Number(req.user.id) });
   io.emit('chat-badges-updated', { requestId:r.id });
   res.json({messages});
 });
@@ -927,7 +1104,9 @@ app.post('/api/admin/topups/:id/review', auth, requireRole('admin'), (req,res)=>
     if(status==='approved'){
       const tech=db.prepare('SELECT * FROM users WHERE id=?').get(t.technician_id);
       const add=Number(t.amount)+Number(t.bonus||0); const after=Number((tech.balance+add).toFixed(2));
-      db.prepare('UPDATE users SET balance=? WHERE id=?').run(after, tech.id);
+      const pkg = db.prepare('SELECT commission_per_order FROM packages WHERE id=?').get(t.package_id);
+      const newCommission = Number(pkg?.commission_per_order ?? tech.active_commission ?? 2);
+      db.prepare('UPDATE users SET balance=?, active_commission=? WHERE id=?').run(after, newCommission, tech.id);
       db.prepare('INSERT INTO ledger(user_id,type,amount,balance_after,note) VALUES(?,?,?,?,?)').run(tech.id,'شحن رصيد',add,after,`موافقة على طلب شحن رقم ${t.id}`);
     }
     db.prepare('UPDATE topups SET status=?, admin_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?').run(status, adminNote, t.id);
@@ -945,7 +1124,7 @@ app.get('/api/ledger', auth, (req,res)=>{
   }
   res.json({ledger: db.prepare('SELECT * FROM ledger WHERE user_id=? ORDER BY id DESC').all(id)});
 });
-app.post('/api/me/profile', auth, (req,res)=>{
+app.post('/api/me/profile', auth, upload.single('avatar'), (req,res)=>{
   const name = clean(req.body.name);
   const phone = clean(req.body.phone);
   const city = clean(req.body.city);
@@ -957,10 +1136,23 @@ app.post('/api/me/profile', auth, (req,res)=>{
   if(areas.length > 500) return res.status(400).json({error:'المناطق طويلة جداً، الحد الأقصى 500 حرف'});
   if(services && services.length > 500) return res.status(400).json({error:'الخدمات طويلة جداً، الحد الأقصى 500 حرف'});
   if(!/^07\d{8}$/.test(phone)) return res.status(400).json({error:'رقم الهاتف يجب أن يبدأ 07 ويتكون من 10 أرقام'});
+  // معالجة الصورة الجديدة
+  let avatarUpdate = '';
+  let avatarParams = [];
+  if(req.file && req.user.role === 'technician'){
+    const newAvatarUrl = '/uploads/avatars/' + req.file.filename;
+    // حذف الصورة القديمة
+    const oldUser = db.prepare('SELECT avatar_url FROM users WHERE id=?').get(req.user.id);
+    if(oldUser?.avatar_url){
+      try{ fs.unlinkSync(path.join(BASE,'public',oldUser.avatar_url)); }catch(e){}
+    }
+    avatarUpdate = ', avatar_url=?';
+    avatarParams = [newAvatarUrl];
+  }
   if(req.user.role === 'technician' && services !== null){
-    db.prepare('UPDATE users SET name=?, phone=?, city=?, areas=?, services=? WHERE id=?').run(name, phone, city, areas, services, req.user.id);
+    db.prepare(`UPDATE users SET name=?, phone=?, city=?, areas=?, services=?${avatarUpdate} WHERE id=?`).run(name, phone, city, areas, services, ...avatarParams, req.user.id);
   } else {
-    db.prepare('UPDATE users SET name=?, phone=?, city=?, areas=? WHERE id=?').run(name, phone, city, areas, req.user.id);
+    db.prepare(`UPDATE users SET name=?, phone=?, city=?, areas=?${avatarUpdate} WHERE id=?`).run(name, phone, city, areas, ...avatarParams, req.user.id);
   }
   res.json({user:userPublic(db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id))});
 });
@@ -984,7 +1176,23 @@ app.post('/api/admin/backup', auth, requireRole('admin'), (req,res)=>{
 
 app.get('/api/admin/stats', auth, requireRole('admin'), (req,res)=>{
   const one = q => db.prepare(q).get().c;
-  res.json({stats:{customers:one("SELECT COUNT(*) c FROM users WHERE role='customer'"), technicians:one("SELECT COUNT(*) c FROM users WHERE role='technician'"), requests:one('SELECT COUNT(*) c FROM requests'), pendingTopups:one("SELECT COUNT(*) c FROM topups WHERE status='pending'"), completed:one("SELECT COUNT(*) c FROM requests WHERE status='مكتمل'")}});
+  const revenue = db.prepare("SELECT COALESCE(SUM(ABS(amount)),0) total FROM ledger WHERE type='خصم عمولة طلب'").get().total || 0;
+  const cancelled = one("SELECT COUNT(*) c FROM requests WHERE status='ملغي'");
+  const total = one('SELECT COUNT(*) c FROM requests');
+  const topServices = db.prepare("SELECT service, COUNT(*) cnt FROM requests GROUP BY service ORDER BY cnt DESC LIMIT 5").all();
+  const topTechs = db.prepare("SELECT u.name, u.completed_jobs, u.rating_avg FROM users u WHERE u.role='technician' AND u.is_active=1 ORDER BY u.completed_jobs DESC, u.rating_avg DESC LIMIT 5").all();
+  res.json({stats:{
+    customers: one("SELECT COUNT(*) c FROM users WHERE role='customer'"),
+    technicians: one("SELECT COUNT(*) c FROM users WHERE role='technician'"),
+    requests: total,
+    pendingTopups: one("SELECT COUNT(*) c FROM topups WHERE status='pending'"),
+    completed: one("SELECT COUNT(*) c FROM requests WHERE status='مكتمل'"),
+    cancelled,
+    cancelRate: total > 0 ? ((cancelled/total)*100).toFixed(1) : '0',
+    revenue: Number(revenue).toFixed(2),
+    topServices,
+    topTechs
+  }});
 });
 app.get('/api/admin/users', auth, requireRole('admin'), (req,res)=> res.json({users: db.prepare('SELECT id,role,name,email,phone,national_number,city,areas,services,is_active,balance,free_orders_used,rating_avg,rating_count,completed_jobs,created_at FROM users ORDER BY id DESC').all()}));
 app.post('/api/admin/users/:id/toggle', auth, requireRole('admin'), (req,res)=>{
@@ -1025,6 +1233,15 @@ app.post('/api/admin/packages', auth, requireRole('admin'), (req,res)=>{
 
 
 
+
+app.delete('/api/admin/packages/:id', auth, requireRole('admin'), (req,res)=>{
+  const id = parseInt(req.params.id, 10);
+  if(isNaN(id)) return res.status(400).json({error:'معرّف غير صحيح'});
+  const pkg = db.prepare('SELECT * FROM packages WHERE id=?').get(id);
+  if(!pkg) return res.status(404).json({error:'الباقة غير موجودة'});
+  db.prepare('DELETE FROM packages WHERE id=?').run(id);
+  res.json({ok:true});
+});
 
 app.get('/api/chat-violations', auth, requireRole('admin'), (req,res)=>{
   const rows=db.prepare(`SELECT v.*,u.name user_name,u.email user_email,r.service,r.status FROM chat_violations v LEFT JOIN users u ON u.id=v.user_id LEFT JOIN requests r ON r.id=v.request_id ORDER BY v.id DESC LIMIT 200`).all();
@@ -1133,6 +1350,11 @@ app.post('/api/support/:id/messages', auth, (req,res)=>{
   io.emit('support-message',{
     ticketId:Number(req.params.id),
     ticketUserId:ticket.user_id,
+    senderId:req.user.id
+  });
+  // إشعار تحديث فوري للمحادثة المفتوحة
+  io.emit('support-message-refresh', {
+    ticketId:Number(req.params.id),
     senderId:req.user.id
   });
   res.json({success:true});

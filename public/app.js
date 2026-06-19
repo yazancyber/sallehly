@@ -76,16 +76,21 @@ function setupSocket(){
   });
 
   socket.on('messages-updated', data=>{
+    // تحديث الرسائل لو الشات مفتوح
     if(activeChatId && Number(data.requestId)===Number(activeChatId)){
       renderMessages(data.messages || []);
     }
-  
+
     if(state.user){
+      // لا إشعار للمُرسِل نفسه
+      if(data.senderId && Number(data.senderId) === Number(state.user.id)) return;
+      // لو داخل نفس الشات ما يحتاج إشعار
+      if(activeChatId && Number(data.requestId) === Number(activeChatId)) return;
+
       v10Sound('notify');
-      v24RefreshBadges();
-  
+      v24RefreshBadges?.();
+
       state.notifications = state.notifications.filter(n=>n.type!=='chat');
-  
       state.notifications.unshift({
         id: Date.now(),
         type:'chat',
@@ -95,12 +100,10 @@ function setupSocket(){
         read:false,
         time:new Date().toLocaleTimeString('ar-JO',{hour:'2-digit',minute:'2-digit'})
       });
-  
+
       state.unread = state.notifications.filter(n=>!n.read).length;
-  
-      renderBellBadge();
-      setTimeout(renderBellBadge,150);
-  
+      renderBellBadge?.();
+      setTimeout(()=>renderBellBadge?.(), 150);
       toast('وصلتك رسالة جديدة');
     }
   });
@@ -1159,18 +1162,39 @@ function messageBody(body){
 }
 
 function renderMessages(messages){
-  let box=$('#chatbox');
-  if(!box)return;
-  box.innerHTML=messages.map(m=>`
-    <div class="msg ${m.sender_id===state.user.id?'me':''}">
-      <b>${escapeHtml(m.sender_name)}</b><br>
-      ${messageBody(m.body)}
-      <br><small>${escapeHtml(m.created_at)}</small>
-    </div>
-  `).join('');
+  const box = $('#chatbox');
+  if(!box) return;
+  const isAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  const existing = new Set([...box.querySelectorAll('[data-mid]')].map(el=>el.dataset.mid));
+  let added = 0;
+  (messages||[]).forEach(m=>{
+    const mid = String(m.id || m.created_at);
+    if(existing.has(mid)) return;
+    const div = document.createElement('div');
+    div.className = `msg ${Number(m.sender_id)===Number(state.user?.id)?'me':''}`;
+    div.dataset.mid = mid;
+    div.innerHTML = `<b>${escapeHtml(m.sender_name||'مستخدم')}</b><br>${messageBody(m.body)}<br><small>${escapeHtml(m.created_at||'')}</small>`;
+    const empty = box.querySelector('.empty-chat');
+    if(empty) empty.remove();
+    box.appendChild(div);
+    added++;
+  });
+  if(added > 0 && isAtBottom) box.scrollTop = box.scrollHeight;
+  if(!box.children.length){
+    box.innerHTML = '<div class="empty-chat empty">لا توجد رسائل بعد. ابدأ المحادثة.</div>';
+  }
 }
 async function refreshChat(){if(!activeChatId)return; try{let j=await api(`/api/requests/${activeChatId}/messages`);renderMessages(j.messages)}catch(e){}}
-async function chat(id){activeChatId=id; setupSocket(); if(socket) socket.emit('join-request', id); if(chatTimer)clearInterval(chatTimer);let j=await api(`/api/requests/${id}/messages`);app.innerHTML=`<div class="page chat-page"><button class="btn ghost" onclick="if(socket&&activeChatId)socket.emit('leave-request',activeChatId);activeChatId=null;if(chatTimer)clearInterval(chatTimer);dashboard()">رجوع</button><div class="card chat-card"><h2>المحادثة للطلب #${id}</h2><div class="chat" id="chatbox"></div><form class="chat-input-row" onsubmit="sendMsg(event,${id})"><input id="msg" autocomplete="off" placeholder="اكتب رسالة"><button class="btn send-text-btn">إرسال</button></form><div class="chat-icon-tools"><button class="round-action location-action" onclick="sendLocation(${id})" title="إرسال الموقع">📍</button><button id="micBtn" class="round-action mic-action" onclick="toggleRec(${id})" title="تسجيل صوت">🎙️</button><button id="sendVoiceBtn" class="round-action send-voice-action hide" onclick="stopRec(${id})" title="إرسال الصوت">➤</button><span id="recordingLabel" class="recording-label hide">● جاري التسجيل...</span></div><small class="muted">المحادثة تتحدث تلقائياً، ويمكنك إرسال صوت أو موقعك بضغطة زر.</small></div></div>`;renderMessages(j.messages);chatTimer=setInterval(refreshChat,5000)}
+async function chat(id){
+  activeChatId=id;
+  setupSocket();
+  if(socket) socket.emit('join-request', id);
+  if(chatTimer){ clearInterval(chatTimer); chatTimer=null; }
+  let j=await api(`/api/requests/${id}/messages`);
+  app.innerHTML=`<div class="page chat-page"><button class="btn ghost" onclick="if(socket&&activeChatId)socket.emit('leave-request',activeChatId);activeChatId=null;if(chatTimer)clearInterval(chatTimer);dashboard()">رجوع</button><div class="card chat-card"><h2>المحادثة للطلب #${id}</h2><div class="chat" id="chatbox"></div><form class="chat-input-row" onsubmit="sendMsg(event,${id})"><input id="msg" autocomplete="off" placeholder="اكتب رسالة"><button class="btn send-text-btn">إرسال</button></form><div class="chat-icon-tools"><button class="round-action location-action" onclick="sendLocation(${id})" title="إرسال الموقع">📍</button><button id="micBtn" class="round-action mic-action" onclick="toggleRec(${id})" title="تسجيل صوت">🎙️</button><button id="sendVoiceBtn" class="round-action send-voice-action hide" onclick="stopRec(${id})" title="إرسال الصوت">➤</button><span id="recordingLabel" class="recording-label hide">● جاري التسجيل...</span></div><small class="muted">المحادثة تتحدث تلقائياً عبر Socket.</small></div></div>`;
+  renderMessages(j.messages);
+  // لا polling — Socket يكفي
+}
 async function sendMsg(e,id){e.preventDefault();try{let text=msg.value.trim();if(!text)return;msg.value='';let j=await api(`/api/requests/${id}/messages`,{method:'POST',body:JSON.stringify({body:text})});renderMessages(j.messages)}catch(err){toast(err.message)}}
 
 async function toggleRec(id){
@@ -1178,7 +1202,7 @@ async function toggleRec(id){
   return startRec(id);
 }
 async function startRec(id){try{let stream=await navigator.mediaDevices.getUserMedia({audio:true});audioChunks=[];recordingId=id;recorder=new MediaRecorder(stream);recorder.ondataavailable=e=>audioChunks.push(e.data);recorder.start();$('#micBtn')?.classList.add('recording');$('#sendVoiceBtn')?.classList.remove('hide');$('#recordingLabel')?.classList.remove('hide');toast('بدأ التسجيل الصوتي')}catch(e){toast('لم يتم السماح باستخدام الميكروفون')}}
-async function stopRec(id){try{if(!recorder||recorder.state!=='recording')return toast('لا يوجد تسجيل يعمل');recorder.onstop=async()=>{let blob=new Blob(audioChunks,{type:'audio/webm'});let fd=new FormData();fd.append('audio',blob,'voice.webm');let j=await api(`/api/requests/${id}/audio`,{method:'POST',body:fd});renderMessages(j.messages);$('#micBtn')?.classList.remove('recording');$('#sendVoiceBtn')?.classList.add('hide');$('#recordingLabel')?.classList.add('hide');toast('تم إرسال التسجيل الصوتي')};recorder.stop()}catch(e){toast(e.message)}}
+async function stopRec(id){try{if(!recorder||recorder.state!=='recording')return toast('لا يوجد تسجيل يعمل');recorder.onstop=async()=>{let blob=new Blob(audioChunks,{type:'audio/webm'});let fd=new FormData();fd.append('audio',blob,'voice.webm');let j=await api(`/api/requests/${id}/audio`,{method:'POST',body:fd});renderMessages(j.messages||[]);$('#micBtn')?.classList.remove('recording');$('#sendVoiceBtn')?.classList.add('hide');$('#recordingLabel')?.classList.add('hide');toast('تم إرسال التسجيل الصوتي')};recorder.stop()}catch(e){toast(e.message)}}
 async function sendLocation(id){if(!navigator.geolocation)return toast('المتصفح لا يدعم تحديد الموقع');navigator.geolocation.getCurrentPosition(async pos=>{let lat=pos.coords.latitude.toFixed(6),lng=pos.coords.longitude.toFixed(6);try{let j=await api(`/api/requests/${id}/messages`,{method:'POST',body:JSON.stringify({body:`[location]${lat},${lng}`})});renderMessages(j.messages);toast('تم إرسال الموقع')}catch(e){toast(e.message)}},()=>toast('لم يتم السماح بالوصول للموقع'),{enableHighAccuracy:true,timeout:10000})}
 
 async function techDash(){let me=(await api('/api/me')).user;state.user=me;let menu=[['dash','الرئيسية'],['orders','الطلبات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']];let c='';if(state.tab==='orders'){let j=await api('/api/requests');c=`<div class="card"><h2>الطلبات المناسبة</h2>${reqTable(j.requests)}</div>`}else if(state.tab==='balance'){c=balancePage(me)}else if(state.tab==='topups'){let j=await api('/api/topups');c=topupTable(j.topups)}else if(state.tab==='ledger'){let j=await api('/api/ledger');c=ledgerTable(j.ledger)}else c=`<div class="cards4"><div class="stat"><span>الرصيد</span><br><b>${me.balance} د.أ</b></div><div class="stat"><span>طلبات مجانية مستخدمة</span><br><b>${me.free_orders_used}/2</b></div><div class="stat"><span>التقييم</span><br><b>${stars(me.rating_avg)}</b></div><div class="stat"><span>الأعمال</span><br><b>${me.completed_jobs}</b></div></div>`;layout('لوحة الفني',menu,c)}
@@ -1186,39 +1210,53 @@ function balancePage(me){
   const pm = (state.meta.paymentMethods && state.meta.paymentMethods[0]) || {};
   const packages = state.meta.packages || [];
 
-  return `
-    <div class="card">
-      <h2>رصيدك الحالي: ${me.balance || 0} د.أ</h2>
-      <p class="muted">
-        اختر الباقة المناسبة، حوّل المبلغ على الحساب البنكي، ثم ارفع صورة وصل الدفع.
-        الإدارة تراجع الطلب وتضيف الرصيد بعد الموافقة.
-      </p>
-    </div>
-
-    <br>
-
-    <div class="cards2">
-      ${packages.map(p => `
-        <div class="card package">
-          <h3>${p.name}</h3>
-          <strong>${p.amount} د.أ</strong>
-          <p>بونص: ${p.bonus || 0} د.أ</p>
-          <button class="btn" onclick="topupForm(${p.id})">
-            اختيار الباقة
-          </button>
+  const pkgsHtml = packages.length ? packages.map(p=>`
+    <div class="dash-card" style="display:flex;flex-direction:column;gap:14px;padding:24px;position:relative;overflow:hidden;transition:.22s;cursor:pointer" onclick="topupForm(${p.id})">
+      <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(124,58,237,.07),rgba(37,99,235,.04));pointer-events:none"></div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div>
+          <h3 style="margin:0 0 6px;font-size:20px">${v15EscapeHtml(p.name||'')}</h3>
+          <span style="font-size:34px;font-weight:900;background:linear-gradient(135deg,#7c3aed,#2563eb);-webkit-background-clip:text;background-clip:text;color:transparent">${Number(p.amount||0)} د.أ</span>
         </div>
-      `).join('')}
+        <div style="background:linear-gradient(135deg,#7c3aed,#2563eb);border-radius:16px;width:52px;height:52px;display:grid;place-items:center;font-size:26px;box-shadow:0 12px 28px rgba(124,58,237,.3)">📦</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${Number(p.bonus||0) > 0 ? `<span style="background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#10b981;border-radius:999px;padding:6px 12px;font-weight:900;font-size:13px">🎁 بونص ${Number(p.bonus)} د.أ</span>` : ''}
+        <span style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.2);color:#3b82f6;border-radius:999px;padding:6px 12px;font-weight:900;font-size:13px">✂️ خصم ${Number(p.commission_per_order||2)} د.أ/طلب</span>
+      </div>
+      <button class="btn" style="width:100%;margin-top:4px">اختيار هذه الباقة</button>
+    </div>
+  `).join('') : '<div class="dash-card empty">لا توجد باقات متاحة حالياً</div>';
+
+  return `
+    <div class="dash-card" style="margin-bottom:4px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div>
+          <h2 style="margin:0 0 6px">رصيدك الحالي</h2>
+          <span style="font-size:42px;font-weight:900;background:linear-gradient(135deg,#7c3aed,#2563eb);-webkit-background-clip:text;background-clip:text;color:transparent">${Number(me.balance||0)} د.أ</span>
+        </div>
+        <div style="background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(37,99,235,.08));border:1px solid rgba(124,58,237,.2);border-radius:20px;padding:16px 20px;text-align:center">
+          <div style="font-size:13px;color:var(--muted);font-weight:800">طلبات مجانية</div>
+          <div style="font-size:26px;font-weight:900">${me.free_quota_used ?? (me.free_orders_used||0)}/2</div>
+        </div>
+      </div>
+      <p class="muted" style="margin:14px 0 0">اختر الباقة المناسبة، حوّل المبلغ على الحساب البنكي، ثم ارفع صورة وصل الدفع. الإدارة تراجع الطلب وتضيف الرصيد بعد الموافقة.</p>
     </div>
 
-    <br>
+    <h2 style="margin:22px 0 14px">الباقات المتاحة</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:22px">
+      ${pkgsHtml}
+    </div>
 
-    <div class="card">
-      <h3>بيانات الدفع</h3>
-      <p><b>البنك:</b> ${pm.bank_name || '-'}</p>
-      <p><b>اسم الحساب:</b> ${pm.account_name || '-'}</p>
-      <p><b>رقم الحساب / IBAN:</b> ${pm.account_number || '-'}</p>
-      <p><b>رقم التواصل:</b> ${pm.phone || '-'}</p>
-      <p class="muted">${pm.instructions || ''}</p>
+    <div class="dash-card">
+      <h3 style="margin:0 0 16px;display:flex;align-items:center;gap:8px">🏦 بيانات التحويل البنكي</h3>
+      <div class="mini-list">
+        <div class="mini-list-row"><span>البنك</span><b>${v15EscapeHtml(pm.bank_name||'-')}</b></div>
+        <div class="mini-list-row"><span>اسم الحساب</span><b>${v15EscapeHtml(pm.account_name||'-')}</b></div>
+        <div class="mini-list-row"><span>رقم الحساب / IBAN</span><b>${v15EscapeHtml(pm.account_number||'-')}</b></div>
+        <div class="mini-list-row"><span>رقم التواصل</span><b>${v15EscapeHtml(pm.phone||'-')}</b></div>
+      </div>
+      ${pm.instructions ? `<p class="muted" style="margin-top:14px">${v15EscapeHtml(pm.instructions)}</p>` : ''}
     </div>
   `;
 }
@@ -1297,14 +1335,53 @@ async function sendTopup(e,pid){
 function topupTable(rows){return `<div class="card"><h2>طلبات الشحن</h2>${!rows.length?'<div class="empty">لا يوجد</div>':`<table class="table"><tr><th>#</th><th>الفني</th><th>الباقة</th><th>المبلغ</th><th>الصورة</th><th>الحالة</th><th>إجراء</th></tr>${rows.map(t=>`<tr><td>${t.id}</td><td>${_x(t.technician_name||'-')}</td><td>${_x(t.package_name||'-')}</td><td>${_x(String(t.amount||0))}</td><td>${_safeSrc(t.receipt_url)?`<a target="_blank" rel="noopener noreferrer" href="${_safeSrc(t.receipt_url)}">فتح</a>`:'—'}</td><td><span class="status ${_x(t.status)}">${_x(t.status||'')}</span></td><td>${state.user.role==='admin'&&t.status==='pending'?`<button class="btn green" onclick="reviewTopup(${t.id},'approved')">موافقة</button> <button class="btn red" onclick="reviewTopup(${t.id},'rejected')">رفض</button>`:''}</td></tr>`).join('')}</table>`}</div>`}
 async function reviewTopup(id,status){let note=prompt('ملاحظة الإدارة','تمت المراجعة');try{await api(`/api/admin/topups/${id}/review`,{method:'POST',body:JSON.stringify({status,admin_note:note})});toast('تمت المراجعة');admin()}catch(e){toast(e.message)}}
 function ledgerTable(rows){return `<div class="card"><h2>سجل الرصيد</h2>${!rows.length?'<div class="empty">لا يوجد</div>':`<table class="table"><tr><th>النوع</th><th>المبلغ</th><th>الرصيد بعد العملية</th><th>ملاحظة</th><th>التاريخ</th></tr>${rows.map(l=>`<tr><td>${l.type}</td><td>${l.amount}</td><td>${l.balance_after}</td><td>${l.note||''}</td><td>${l.created_at}</td></tr>`).join('')}</table>`}</div>`}
-async function admin(){let menu=[['dash','الإحصائيات'],['users','المستخدمين'],['orders','الطلبات'],['topups','شحن الفنيين'],['services','المهن والخدمات'],['packages','الباقات']];let c='';if(state.tab==='users'){let j=await api('/api/admin/users');c=usersTable(j.users)}else if(state.tab==='orders'){let j=await api('/api/requests');c=`<div class="card"><h2>كل الطلبات</h2>${reqTable(j.requests)}</div>`}else if(state.tab==='topups'){let j=await api('/api/topups');c=topupTable(j.topups)}else if(state.tab==='services')c=servicesAdmin();else if(state.tab==='packages')c=packagesAdmin();else{let j=await api('/api/admin/stats');let s=j.stats;c=`<div class="cards4"><div class="stat"><span>العملاء</span><br><b>${s.customers}</b></div><div class="stat"><span>الفنيين</span><br><b>${s.technicians}</b></div><div class="stat"><span>الطلبات</span><br><b>${s.requests}</b></div><div class="stat"><span>شحن بانتظار</span><br><b>${s.pendingTopups}</b></div></div>`}layout('لوحة الإدارة',menu,c)}
 function usersTable(rows){return `<div class="card"><h2>المستخدمين</h2><table class="table"><tr><th>#</th><th>الصورة</th><th>الدور</th><th>الاسم</th><th>الهاتف</th><th>الرقم الوطني</th><th>الرصيد</th><th>التقييم</th><th>حالة</th><th></th></tr>${rows.map(u=>`<tr><td>${u.id}</td><td>${u.avatar_url?`<img src="${u.avatar_url}" class="miniAvatar">`:'-'}</td><td>${v15EscapeHtml(u.role||"")}</td><td>${v15EscapeHtml(u.name||"")}</td><td>${v15EscapeHtml(u.phone||"")}</td><td>${v15EscapeHtml(u.national_number||"-")}</td><td>${u.balance}</td><td>${u.role==='technician'?stars(u.rating_avg):'-'}</td><td>${u.is_active?'فعال':'موقوف'}</td><td>${u.role!=='admin'?`<button class="btn ghost" onclick="toggleUser(${u.id})">تفعيل/إيقاف</button>`:''}</td></tr>`).join('')}</table></div>`}
 async function toggleUser(id){await api(`/api/admin/users/${id}/toggle`,{method:'POST'});admin()}
 
 function servicesAdmin(){return `<div class="card"><h2>إضافة مهنة / خدمة جديدة</h2><form class="form two" onsubmit="addService(event)"><div class="field"><label>اسم المهنة</label><input id="sname" placeholder="مثال: فني طاقة شمسية" required></div><div class="field"><label>أيقونة اختيارية</label><input id="sicon" placeholder="🔧"></div><button class="btn">إضافة</button></form></div><br><div class="grid">${state.meta.services.map(s=>`<div class="card"><div class="icon">${s.icon||'🔧'}</div><h3>${s.name}</h3></div>`).join('')}</div>`}
 async function addService(e){e.preventDefault();try{await api('/api/admin/services',{method:'POST',body:JSON.stringify({name:sname.value,icon:sicon.value||'🔧'})});state.meta=await api('/api/meta');toast('تمت إضافة المهنة بنجاح');state.tab='services';admin()}catch(err){toast(err.message)}}
 
-function packagesAdmin(){return `<div class="card"><h2>إضافة باقة</h2><form class="form two" onsubmit="addPkg(event)"><input id="pname" placeholder="اسم الباقة"><input id="pamount" type="number" placeholder="المبلغ"><input id="pbonus" type="number" placeholder="بونص"><input id="pcomm" type="number" value="2" placeholder="خصم الطلب"><button class="btn">إضافة</button></form></div><br><div class="cards2">${state.meta.packages.map(p=>`<div class="card"><h3>${p.name}</h3><b>${p.amount} د.أ</b><p>بونص ${p.bonus} - خصم ${p.commission_per_order}</p></div>`).join('')}</div>`}
+function packagesAdmin(){
+  const pkgsHtml = state.meta.packages.length ? state.meta.packages.map(p=>`
+    <div class="dash-card" style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px">
+      <div>
+        <h3 style="margin:0 0 6px;font-size:18px">${v15EscapeHtml(p.name||'')}</h3>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <span class="v20-chip-row" style="margin:0"><span>💰 ${Number(p.amount||0)} د.أ</span></span>
+          <span class="v20-chip-row" style="margin:0"><span>🎁 بونص: ${Number(p.bonus||0)} د.أ</span></span>
+          <span class="v20-chip-row" style="margin:0"><span>✂️ خصم: ${Number(p.commission_per_order||2)} د.أ/طلب</span></span>
+        </div>
+      </div>
+      <button class="btn red" style="min-width:90px" onclick="deletePkg(${p.id},'${v15EscapeHtml(p.name||'')}')">حذف</button>
+    </div>
+  `).join('') : '<div class="empty">لا توجد باقات بعد</div>';
+
+  return `
+    <div class="dash-card">
+      <h2>إضافة باقة جديدة</h2>
+      <form class="form two" onsubmit="addPkg(event)">
+        <div class="field"><label>اسم الباقة</label><input id="pname" placeholder="مثال: باقة البداية" required></div>
+        <div class="field"><label>المبلغ (د.أ)</label><input id="pamount" type="number" min="1" placeholder="10" required></div>
+        <div class="field"><label>بونص (د.أ)</label><input id="pbonus" type="number" min="0" value="0" placeholder="0"></div>
+        <div class="field"><label>خصم الطلب (د.أ)</label><input id="pcomm" type="number" min="0" value="2" placeholder="2"></div>
+        <button class="btn" style="grid-column:1/-1">إضافة الباقة</button>
+      </form>
+    </div>
+    <div style="display:grid;gap:14px;margin-top:18px">
+      <h2 style="margin:0">الباقات الحالية</h2>
+      ${pkgsHtml}
+    </div>
+  `;
+}
+async function deletePkg(id, name){
+  if(!confirm(`هل تريد حذف باقة "${name}"؟ هذا الإجراء لا يمكن التراجع عنه.`)) return;
+  try{
+    await api(`/api/admin/packages/${id}`, {method:'DELETE'});
+    state.meta = await api('/api/meta');
+    toast('تم حذف الباقة');
+    admin();
+  }catch(err){ toast(err.message||'تعذر حذف الباقة'); }
+}
 async function addPkg(e){e.preventDefault();try{await api('/api/admin/packages',{method:'POST',body:JSON.stringify({name:pname.value,amount:pamount.value,bonus:pbonus.value,commission_per_order:pcomm.value})});state.meta=await api('/api/meta');toast('تمت إضافة الباقة');admin()}catch(err){toast(err.message)}}
 init();
 
@@ -1319,7 +1396,6 @@ function chartsBox(){return `<div class="dash-grid"><div class="dash-card"><h2>�
 function layout(title,menu,content){document.body.classList.add('dashboard-mode');let user=state.user||{};app.innerHTML=`<div class="admin-shell"><aside class="admin-sidebar"><div class="admin-logo"><img src="/logo.png" alt="صلّحلي" class="logo-img">صلّحلي</div><div class="admin-section-label">الرئيسية</div><div class="admin-menu">${menu.map(m=>`<button class="sidebtn ${state.tab===m[0]?'active':''}" onclick="state.tab='${m[0]}';dashboard();setTimeout(v35ScrollToContent,80)"><b>${m[1]}</b><span class="mi">${menuIcon(m[0])}</span></button>`).join('')}</div><div class="admin-section-label">النظام</div><div class="admin-menu"><button class="sidebtn" onclick="toast('الإعدادات لاحقاً')"><b>الإعدادات</b><span class="mi">⚙️</span></button><button class="sidebtn" onclick="logout()"><b>تسجيل الخروج</b><span class="mi">🚪</span></button></div><div class="admin-profile"><div class="avatar-sm">${(user.name||'ص').slice(0,1)}</div><div><b>${user.name||roleName()}</b><small>${user.email||roleName()}</small></div></div></aside><main class="admin-main"><div class="admin-top"><div class="admin-search">🔎 <input placeholder="ابحث هنا..." onkeydown="if(event.key==='Enter')toast('البحث التجريبي: '+this.value)"></div><div class="admin-actions"><button class="admin-icon-btn" onclick="toast('لا توجد إشعارات جديدة')">🔔</button><button class="admin-icon-btn" onclick="document.body.classList.toggle('dark-dash')">🌙</button><button class="admin-icon-btn logout" onclick="logout()">⏻</button></div></div>${content}</main></div>`}
 async function custDash(){let menu=[['dash','طلب جديد'],['near','الفنيين الأقرب'],['orders','طلباتي']];let c=''; if(state.tab==='orders'){let j=await api('/api/requests');c=dashboardHero('لوحة العميل','تابع طلباتك واختر الفنيين المناسبين بسهولة',[{label:'طلباتي',value:j.requests.length,up:'طلبات نشطة',icon:'🛒'},{label:'فنيين قريبين',value:'24',up:'حسب منطقتك',icon:'👥'},{label:'خدمات متاحة',value:state.meta.services.length,up:'خدمة',icon:'📦'},{label:'التقييم',value:'4.8',up:'موثوق',icon:'⭐'}])+`<div class="dash-card"><h2>طلباتي</h2>${reqTable(j.requests)}</div>`}else if(state.tab==='near'){c=dashboardHero('الفنيين الأقرب لك','حدد موقعك وشاهد الفنيين حسب الخدمة والمنطقة',[{label:'فنيين متاحين',value:'24',up:'متصلين',icon:'👨‍🔧'},{label:'الخدمات',value:state.meta.services.length,up:'جاهزة',icon:'💼'},{label:'المدن',value:state.meta.cities.length,up:'مغطاة',icon:'📍'},{label:'سرعة الرد',value:'15د',up:'متوسط',icon:'⚡'}])+nearbyPage()}else c=dashboardHero('لوحة العميل','اطلب خدمة خلال دقيقة وتابعها من مكان واحد',[{label:'طلباتك',value:'0',up:'ابدأ الآن',icon:'🛠️'},{label:'فنيين',value:'856',up:'نشط',icon:'👥'},{label:'خدمات',value:state.meta.services.length,up:'متوفرة',icon:'📦'},{label:'دفع',value:'كاش',up:'سهل',icon:'💵'}])+`<div class="dash-grid"><div>${activityBox()}</div><div class="dash-card v6-form">${requestForm()}</div>${promoBox('اختر الفني الأنسب','قارن التقييمات ومناطق العمل قبل إرسال الطلب')}</div>${categoriesBox()}`;layout('لوحة العميل',menu,c); if(state.tab==='near') loadNearby();}
 async function techDash(){let me=(await api('/api/me')).user;state.user=me;let menu=[['dash','الرئيسية'],['orders','الطلبات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']];let c='';if(state.tab==='orders'){let j=await api('/api/requests');c=dashboardHero('لوحة الفني','تابع الطلبات القريبة وقدم عروضك بسرعة',[{label:'طلبات مناسبة',value:j.requests.length,up:'جديدة',icon:'🛒'},{label:'رصيدك',value:(me.balance||0)+' د.أ',up:'متاح',icon:'💳'},{label:'تقييمك',value:stars(me.rating_avg),up:'ثقة',icon:'⭐'},{label:'الأعمال',value:me.completed_jobs||0,up:'مكتملة',icon:'✅'}])+`<div class="dash-card"><h2>الطلبات المناسبة</h2>${reqTable(j.requests)}</div>`}else if(state.tab==='balance'){c=dashboardHero('الرصيد والباقات','اشحن رصيدك وتابع خصم عمولة الطلبات',[{label:'الرصيد',value:(me.balance||0)+' د.أ',up:'متاح',icon:'💳'},{label:'مجاني مستخدم',value:(me.free_quota_used ?? (me.free_orders_used||0))+'/2',up:'طلبات',icon:'🎁'},{label:'الباقات',value:state.meta.packages.length,up:'متاحة',icon:'📦'},{label:'الأعمال',value:me.completed_jobs||0,up:'منجزة',icon:'✅'}])+balancePage(me)}else if(state.tab==='topups'){let j=await api('/api/topups');c=dashboardHero('طلبات الشحن','تابع حالة دفعاتك وموافقات الإدارة',[{label:'طلبات الشحن',value:j.topups.length,up:'إجمالي',icon:'🚚'},{label:'الرصيد',value:(me.balance||0)+' د.أ',up:'متاح',icon:'💳'},{label:'باقات',value:state.meta.packages.length,up:'متوفرة',icon:'📦'},{label:'حالة الحساب',value:'فعال',up:'نشط',icon:'✅'}])+topupTable(j.topups)}else if(state.tab==='ledger'){let j=await api('/api/ledger');c=dashboardHero('سجل الرصيد','كل عمليات الخصم والشحن في مكان واحد',[{label:'عمليات',value:j.ledger.length,up:'مسجلة',icon:'📘'},{label:'الرصيد',value:(me.balance||0)+' د.أ',up:'حالي',icon:'💳'},{label:'طلبات',value:me.completed_jobs||0,up:'مكتملة',icon:'✅'},{label:'تقييم',value:stars(me.rating_avg),up:'فني',icon:'⭐'}])+ledgerTable(j.ledger)}else c=dashboardHero('لوحة الفني','إدارة احترافية لطلباتك ورصيدك وتقييمك',[{label:'الرصيد',value:(me.balance||0)+' د.أ',up:'متاح',icon:'💳'},{label:'طلبات مجانية',value:(me.free_quota_used ?? (me.free_orders_used||0))+'/2',up:'مستخدمة',icon:'🎁'},{label:'التقييم',value:stars(me.rating_avg),up:'ثقة',icon:'⭐'},{label:'الأعمال',value:me.completed_jobs||0,up:'مكتملة',icon:'✅'}])+`<div class="dash-grid"><div>${activityBox()}</div>${promoBox('زِد فرص قبولك','حدّث صورتك وخدماتك ومناطق عملك لتحصل على طلبات أكثر')}<div class="dash-card"><h2>ملخص سريع</h2><div class="mini-list"><div class="mini-list-row"><span>حالة الحساب</span><b>فعال</b></div><div class="mini-list-row"><span>العمولة لكل طلب</span><b>2 د.أ</b></div><div class="mini-list-row"><span>الأعمال المكتملة</span><b>${me.completed_jobs||0}</b></div></div></div></div>${chartsBox()}`;layout('لوحة الفني',menu,c)}
-async function admin(){let menu=[['dash','لوحة الإدارة'],['users','المستخدمين'],['orders','الطلبات'],['topups','شحن الفنيين'],['services','المهن والخدمات'],['packages','الباقات']];let c='';if(state.tab==='users'){let j=await api('/api/admin/users');c=dashboardHero('إدارة المستخدمين','تحكم بحسابات العملاء والفنيين وحالات التفعيل',[{label:'المستخدمين',value:j.users.length,up:'إجمالي',icon:'👥'},{label:'الفنيين',value:j.users.filter(u=>u.role==='technician').length,up:'فنيين',icon:'👨‍🔧'},{label:'العملاء',value:j.users.filter(u=>u.role==='customer').length,up:'عملاء',icon:'🙂'},{label:'نشط',value:j.users.filter(u=>u.is_active).length,up:'حساب',icon:'✅'}])+usersTable(j.users)}else if(state.tab==='orders'){let j=await api('/api/requests');c=dashboardHero('إدارة الطلبات','راقب جميع طلبات المنصة وحالات التنفيذ',[{label:'كل الطلبات',value:j.requests.length,up:'إجمالي',icon:'🛒'},{label:'مفتوحة',value:j.requests.filter(r=>r.status==='open').length,up:'طلب',icon:'⚡'},{label:'مكتملة',value:j.requests.filter(r=>r.status==='completed').length,up:'طلب',icon:'✅'},{label:'قيد العمل',value:j.requests.filter(r=>r.status==='accepted').length,up:'طلب',icon:'🔧'}])+`<div class="dash-card"><h2>كل الطلبات</h2>${reqTable(j.requests)}</div>`}else if(state.tab==='topups'){let j=await api('/api/topups');c=dashboardHero('شحن الفنيين','راجع إثباتات الدفع وفعّل أرصدة الفنيين',[{label:'طلبات الشحن',value:j.topups.length,up:'إجمالي',icon:'🚚'},{label:'بانتظار',value:j.topups.filter(t=>t.status==='pending').length,up:'مراجعة',icon:'⏳'},{label:'موافق عليها',value:j.topups.filter(t=>t.status==='approved').length,up:'عملية',icon:'✅'},{label:'مرفوضة',value:j.topups.filter(t=>t.status==='rejected').length,up:'عملية',icon:'❌'}])+topupTable(j.topups)}else if(state.tab==='services')c=dashboardHero('المهن والخدمات','أضف خدمات جديدة ورتّبها بشكل جذاب داخل المنصة',[{label:'الخدمات',value:state.meta.services.length,up:'متاحة',icon:'💼'},{label:'الأيقونات',value:'جاهزة',up:'UI',icon:'🎨'},{label:'الفئات',value:'5',up:'رئيسية',icon:'📦'},{label:'النظام',value:'فعال',up:'مباشر',icon:'✅'}])+`<div class="dash-grid two"><div class="dash-card v6-form">${servicesAdmin()}</div>${promoBox('وسّع الخدمات','أضف مهن جديدة مثل الطاقة الشمسية، الزجاج، الأثاث وغيرها')}</div>${categoriesBox()}`;else if(state.tab==='packages')c=dashboardHero('إدارة الباقات','أنشئ باقات شحن للفنيين وحدد العمولة',[{label:'الباقات',value:state.meta.packages.length,up:'متاحة',icon:'📦'},{label:'الدفع',value:'بنكي',up:'تحويل',icon:'🏦'},{label:'العمولة',value:'2 د.أ',up:'افتراضي',icon:'💳'},{label:'حالة',value:'فعال',up:'جاهز',icon:'✅'}])+packagesAdmin();else{let j=await api('/api/admin/stats');let s=j.stats;c=dashboardHero('مرحباً بك في لوحة الإدارة','تحكم كامل في خدماتك وإحصائياتك من مكان واحد',[{label:'إجمالي الإيرادات',value:'25,680 د.ج',up:'24%',icon:'💲'},{label:'الطلبات الكلية',value:s.requests||0,up:'18%',icon:'🛍️'},{label:'المستخدمين',value:(s.customers||0)+(s.technicians||0),up:'12%',icon:'👥'},{label:'الخدمات النشطة',value:state.meta.services.length,up:'7%',icon:'📦'}])+`<div class="dash-grid"><div>${activityBox()}</div><div class="dash-card v6-form">${servicesAdmin()}</div>${promoBox('طور خدماتك','قدم أفضل الخدمات لعملائك وزد من أرباحك')}</div>${categoriesBox()}${chartsBox()}`}layout('لوحة الإدارة',menu,c)}
 
 
 
@@ -1340,7 +1416,6 @@ function securityIdeas(){return `<div class="security-strip"><div class="securit
 const __oldHome=home; home=function(){__oldHome(); const sec=document.querySelector('.services-section'); if(sec) sec.insertAdjacentHTML('beforebegin',serviceMarquee()+securityIdeas());}
 const __oldCustDash=custDash; custDash=async function(){await __oldCustDash(); const main=document.querySelector('.admin-main'); if(main && state.tab==='dash'){const hero=main.querySelector('.dashboard-hero'); if(hero) hero.insertAdjacentHTML('afterend',serviceMarquee()+securityIdeas());}}
 const __oldTechDash=techDash; techDash=async function(){await __oldTechDash(); const main=document.querySelector('.admin-main'); if(main && state.tab==='dash'){const hero=main.querySelector('.dashboard-hero'); if(hero) hero.insertAdjacentHTML('afterend',`<div class="lock-note">⚠️ نظام صلّحلي: لا يمكنك قبول طلب جديد أثناء وجود طلب قيد التنفيذ أو تم اختيارك له. أنهي الطلب الحالي أولاً.</div>`+securityIdeas());}}
-const __oldAdmin=admin; admin=async function(){await __oldAdmin(); const main=document.querySelector('.admin-main'); if(main && state.tab==='dash'){const hero=main.querySelector('.dashboard-hero'); if(hero) hero.insertAdjacentHTML('afterend',securityIdeas());}}
 
 
 const JORDAN_AREAS = {
@@ -1683,6 +1758,16 @@ window.SALLEHLY_VERSION='V20 Market Ready';
 function v20SafeTxt(x){return String(x??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 function v20Badge(n){n=Number(n||0);return n>0?`<span class="v20-badge">${n>99?'99+':n}</span>`:''}
 function v20StatusClass(s){s=String(s||''); if(s.includes('مكتمل'))return 'done'; if(s.includes('ملغي')||s.includes('رفض'))return 'cancel'; if(s.includes('عرض')||s.includes('بانتظار'))return 'wait'; if(s.includes('اختيار')||s.includes('تنفيذ'))return 'work'; return 'new'}
+// تُستخدم في لوحة الإدارة (تبويب الطلبات) لحساب عدد الطلبات بحسب حالتها الفعلية بالعربية.
+// open: لسا بانتظار عروض الفنيين | active: تم اختيار فني وجاري التنفيذ | done: مكتملة فعلياً.
+function v21StatusCounts(rows){
+  rows = Array.isArray(rows) ? rows : [];
+  const all = rows.length;
+  const open = rows.filter(r=>['بانتظار العروض','وصلت عروض'].includes(r.status)).length;
+  const active = rows.filter(r=>['تم اختيار عرض','قيد التنفيذ','بانتظار تأكيد الدفع'].includes(r.status)).length;
+  const done = rows.filter(r=>r.status==='مكتمل').length;
+  return {all, open, active, done};
+}
 function v20ServiceIcon(name){const s=(state.meta.services||[]).find(x=>x.name===name);return s?.icon||'🧰'}
 
 function v20LiveServicesStrip(){
@@ -2103,7 +2188,7 @@ previewProblemImage=function(){
       </div>`;
       renderMessages(j.messages||[]);
       await v24RefreshBadges();
-      chatTimer=setInterval(async()=>{ if(activeChatId) await refreshChat(); },2500);
+      // لا polling — Socket يكفي للتحديث الفوري
     }catch(err){
       v24Toast('تعذر فتح المحادثة: '+(err.message||err));
       dashboard();
@@ -2138,9 +2223,27 @@ previewProblemImage=function(){
   };
 
   window.renderMessages = function(messages){
-    const box=document.getElementById('chatbox'); if(!box) return;
-    box.innerHTML=(messages||[]).map(m=>`<div class="msg ${Number(m.sender_id)===Number(state.user?.id)?'me':''}"><b>${v24Safe(m.sender_name||'مستخدم')}</b><br>${messageBody(m.body)}<br><small>${v24Safe(m.created_at||'')}</small></div>`).join('') || '<div class="empty">لا توجد رسائل بعد. ابدأ المحادثة من داخل صلّحلي.</div>';
-    box.scrollTop=box.scrollHeight;
+    const box = document.getElementById('chatbox');
+    if(!box) return;
+    const isAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+    const existing = new Set([...box.querySelectorAll('[data-mid]')].map(el => el.dataset.mid));
+    let added = 0;
+    (messages||[]).forEach(m => {
+      const mid = String(m.id || m.created_at);
+      if(existing.has(mid)) return;
+      const div = document.createElement('div');
+      div.className = `msg ${Number(m.sender_id)===Number(state.user?.id)?'me':''}`;
+      div.dataset.mid = mid;
+      div.innerHTML = `<b>${v24Safe(m.sender_name||'مستخدم')}</b><br>${messageBody(m.body)}<br><small>${v24Safe(m.created_at||'')}</small>`;
+      const emptyEl = box.querySelector('.empty-chat');
+      if(emptyEl) emptyEl.remove();
+      box.appendChild(div);
+      added++;
+    });
+    if(added > 0 && isAtBottom) box.scrollTop = box.scrollHeight;
+    if(!box.children.length){
+      box.innerHTML = '<div class="empty-chat empty">لا توجد رسائل بعد. ابدأ المحادثة من داخل صلّحلي.</div>';
+    }
   };
 
   window.v24RefreshBadges = async function(){
@@ -2244,18 +2347,21 @@ setTimeout(renderBellBadge,200);
   window.v24BindRealtime = function(){
     setupSocket?.(); if(!socket || socket.__v24Bound) return; socket.__v24Bound=true;
     socket.on('messages-updated', async data=>{
+      // تحديث الرسائل لو الشات مفتوح
       if(activeChatId && Number(data.requestId)===Number(activeChatId)){
         renderMessages(data.messages || []);
       }
-    
+
       if(state.user){
+        // لا إشعار للمُرسِل نفسه
+        if(data.senderId && Number(data.senderId) === Number(state.user.id)) return;
+        // لو داخل نفس الشات ما يحتاج إشعار
+        if(activeChatId && Number(data.requestId) === Number(activeChatId)) return;
+
         v10Sound('notify');
-    
         state.chatCount = Number(state.chatCount || 0) + 1;
-    
         syncChatBell();
         renderBellBadge();
-    
         toast('وصلتك رسالة جديدة');
       }
     });
@@ -3073,7 +3179,7 @@ login = function(){
           <div class="v60-field">
             <div class="v60-label-row">
               <label class="v60-label">كلمة المرور</label>
-              <a href="#" class="v60-forgot" onclick="toast('تواصل مع الإدارة لإعادة تعيين كلمة المرور');return false">نسيت كلمة المرور؟</a>
+              <a href="#" class="v60-forgot" onclick="forgotPasswordPage();return false">نسيت كلمة المرور؟</a>
             </div>
             <div class="v60-input-wrap">
               <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -3318,3 +3424,120 @@ st.textContent = `
 `;
 
 })();
+
+// ── Forgot Password ───────────────────────────────────────────────────────
+window.forgotPasswordPage = function(){
+  const appEl = document.getElementById('app');
+  if(!appEl) return;
+  appEl.innerHTML = `
+  <div class="v60-page" id="v60Page">
+    <canvas class="v60-canvas" id="v60Canvas"></canvas>
+    <video class="v60-video" autoplay muted loop playsinline><source src="/videos/login.mp4" type="video/mp4"></video>
+    <div class="v60-overlay"></div>
+    <div class="v60-wrap">
+      <div class="v60-brand">
+        <div class="v60-brand-icon"><img src="/logo.png" alt="صلّحلي" onerror="this.parentNode.innerHTML='🔧'"></div>
+        <span class="v60-brand-name">صلّحلي</span>
+      </div>
+      <div class="v60-card" id="v60Card">
+        <div class="v60-glow"></div>
+        <div class="v60-head">
+          <h1 class="v60-title">إعادة تعيين كلمة المرور</h1>
+          <p class="v60-sub">سنرسل لك كود تحقق على بريدك الإلكتروني</p>
+        </div>
+        <div class="v60-error" id="fpErr" style="display:none"><span class="v60-error-icon">⚠️</span><span id="fpErrMsg"></span></div>
+        <div id="fpOk" style="display:none;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.35);border-radius:12px;padding:13px 16px;margin-bottom:14px;color:#34d399;font-size:14px;font-weight:800;text-align:center"></div>
+        <div id="fpStep1">
+          <form class="v60-form" onsubmit="fpSendOtp(event)" novalidate>
+            <div class="v60-field">
+              <label class="v60-label">البريد الإلكتروني</label>
+              <div class="v60-input-wrap">
+                <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>
+                <input id="fpEmail" class="v60-input" type="email" autocomplete="email" placeholder="example@email.com" required>
+              </div>
+            </div>
+            <button class="v60-btn" type="submit" id="fpSendBtn"><span id="fpSendTxt">إرسال كود التحقق</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+          </form>
+        </div>
+        <div id="fpStep2" style="display:none">
+          <form class="v60-form" onsubmit="fpResetPassword(event)" novalidate>
+            <div class="v60-field">
+              <label class="v60-label">كود التحقق (6 أرقام)</label>
+              <div class="v60-input-wrap">
+                <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <input id="fpOtp" class="v60-input" type="text" inputmode="numeric" maxlength="6" placeholder="● ● ● ● ● ●" required style="letter-spacing:8px;text-align:center;font-size:22px;font-weight:900" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+              </div>
+            </div>
+            <div class="v60-field">
+              <label class="v60-label">كلمة المرور الجديدة</label>
+              <div class="v60-input-wrap">
+                <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input id="fpNewPass" class="v60-input" type="password" placeholder="8 أحرف على الأقل" minlength="8" required>
+              </div>
+            </div>
+            <div class="v60-field">
+              <label class="v60-label">تأكيد كلمة المرور</label>
+              <div class="v60-input-wrap">
+                <svg class="v60-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input id="fpConfirm" class="v60-input" type="password" placeholder="أعد كتابة كلمة المرور" required>
+              </div>
+            </div>
+            <button class="v60-btn" type="submit" id="fpResetBtn"><span id="fpResetTxt">تغيير كلمة المرور</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+          </form>
+          <div style="text-align:center;margin-top:12px"><a href="#" onclick="fpSendOtp(null,true);return false" style="color:#60a5fa;font-size:13px;font-weight:800">لم يصلك الكود؟ إعادة الإرسال</a></div>
+        </div>
+        <div class="v60-divider"><span>أو</span></div>
+        <button class="v60-secondary" onclick="typeof v60Init==='function'?v60Init():location.reload()">رجوع لتسجيل الدخول</button>
+      </div>
+      <div class="v60-trust"><span>🔒 اتصال آمن</span><span>⚡ كود صالح 10 دقائق</span><span>🛡️ محمي بالتشفير</span></div>
+    </div>
+  </div>`;
+  if(typeof v60Particles==='function') try{ v60Particles(); }catch(e){}
+  requestAnimationFrame(()=>{
+    const card=document.getElementById('v60Card');
+    if(card){ card.style.opacity='0'; card.style.transform='translateY(24px) scale(0.97)';
+      setTimeout(()=>{ card.style.transition='all 0.65s cubic-bezier(0.22,1,0.36,1)'; card.style.opacity='1'; card.style.transform='none'; },40);
+    }
+  });
+};
+
+window.fpSendOtp = async function(e, resend){
+  if(e) e.preventDefault();
+  const email=(document.getElementById('fpEmail')?.value||'').trim();
+  const errBox=document.getElementById('fpErr'), errMsg=document.getElementById('fpErrMsg');
+  const okBox=document.getElementById('fpOk'), btn=document.getElementById('fpSendBtn'), txt=document.getElementById('fpSendTxt');
+  if(errBox) errBox.style.display='none';
+  if(okBox) okBox.style.display='none';
+  if(!email){ if(errBox){errMsg.textContent='أدخل البريد الإلكتروني';errBox.style.display='flex';} return; }
+  if(btn){ btn.disabled=true; if(txt) txt.textContent='جاري الإرسال...'; }
+  try{
+    await fetch('/api/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    if(okBox){ okBox.textContent='✅ تم الإرسال! تحقق من بريدك وأدخل الكود.'; okBox.style.display='block'; }
+    document.getElementById('fpStep1').style.display='none';
+    document.getElementById('fpStep2').style.display='block';
+  }catch(err){ if(errBox){errMsg.textContent='تعذر الإرسال، حاول مرة أخرى';errBox.style.display='flex';} }
+  finally{ if(btn){ btn.disabled=false; if(txt) txt.textContent='إرسال كود التحقق'; } }
+};
+
+window.fpResetPassword = async function(e){
+  e.preventDefault();
+  const email=(document.getElementById('fpEmail')?.value||'').trim();
+  const otp=(document.getElementById('fpOtp')?.value||'').trim();
+  const pass=document.getElementById('fpNewPass')?.value||'';
+  const confirm=document.getElementById('fpConfirm')?.value||'';
+  const errBox=document.getElementById('fpErr'), errMsg=document.getElementById('fpErrMsg');
+  const okBox=document.getElementById('fpOk'), btn=document.getElementById('fpResetBtn'), txt=document.getElementById('fpResetTxt');
+  if(errBox) errBox.style.display='none';
+  if(pass!==confirm){ if(errBox){errMsg.textContent='كلمتا المرور غير متطابقتين';errBox.style.display='flex';} return; }
+  if(pass.length<8){ if(errBox){errMsg.textContent='كلمة المرور يجب أن تكون 8 أحرف على الأقل';errBox.style.display='flex';} return; }
+  if(btn){ btn.disabled=true; if(txt) txt.textContent='جاري التغيير...'; }
+  try{
+    const res=await fetch('/api/auth/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,otp,new_password:pass})});
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'تعذر تغيير كلمة المرور');
+    if(okBox){ okBox.textContent='✅ تم تغيير كلمة المرور! سيتم تحويلك لتسجيل الدخول...'; okBox.style.display='block'; }
+    document.getElementById('fpStep2').style.display='none';
+    setTimeout(()=>{ if(typeof v60Init==='function') v60Init(); else location.reload(); },2200);
+  }catch(err){ if(errBox){errMsg.textContent=err.message||'تعذر تغيير كلمة المرور';errBox.style.display='flex';} }
+  finally{ if(btn){ btn.disabled=false; if(txt) txt.textContent='تغيير كلمة المرور'; } }
+};
