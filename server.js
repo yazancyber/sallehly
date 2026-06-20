@@ -1,5 +1,50 @@
 require('dotenv').config?.();
 const express = require('express');
+// ── Firebase Admin SDK للإشعارات الخارجية ──
+let firebaseAdmin = null;
+try {
+  const admin = require('firebase-admin');
+  if(!admin.apps.length){
+    // يدعم FIREBASE_SERVICE_ACCOUNT (JSON كامل) أو المتغيرات المنفصلة
+    let credential;
+    if(process.env.FIREBASE_SERVICE_ACCOUNT){
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      credential = admin.credential.cert(serviceAccount);
+    } else {
+      credential = admin.credential.cert({
+        projectId:   process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey:  (process.env.FIREBASE_PRIVATE_KEY||'').replace(/\\n/g,'\n')
+      });
+    }
+    admin.initializeApp({ credential });
+  }
+  firebaseAdmin = admin;
+  console.log('[Firebase] Admin SDK initialized ✓');
+} catch(e) {
+  console.warn('[Firebase] SDK not available — push notifications disabled:', e.message);
+}
+
+// دالة مساعدة لإرسال Push Notification
+async function sendPush(token, title, body, data={}) {
+  if(!firebaseAdmin || !token) return;
+  try {
+    await firebaseAdmin.messaging().send({
+      token,
+      notification: { title, body },
+      data: Object.fromEntries(Object.entries(data).map(([k,v])=>[k,String(v)])),
+      android: { priority: 'high', notification: { sound: 'default', channelId: 'sallehly_main' } },
+      apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+      webpush: { notification: { icon: '/icons/icon-192.png', badge: '/icons/badge-72.png' }, fcmOptions: { link: 'https://sallehly.com' } }
+    });
+  } catch(e) {
+    if(e.code === 'messaging/registration-token-not-registered'){
+      // Token منتهي — امسحه من DB
+      try { db.prepare('UPDATE users SET fcm_token=NULL WHERE fcm_token=?').run(token); } catch(dbErr){}
+    }
+    console.warn('[Firebase] sendPush error:', e.message);
+  }
+}
 const path = require('path');
 const fs = require('fs');
 const helmet = require('helmet');
@@ -465,6 +510,7 @@ try { db.prepare('ALTER TABLE requests ADD COLUMN problem_image_url TEXT').run()
 try { db.prepare("ALTER TABLE support_tickets ADD COLUMN status TEXT DEFAULT 'open'").run(); } catch(e) {}
 try { db.prepare('CREATE INDEX IF NOT EXISTS idx_requests_technician ON requests(technician_id)').run(); } catch(e) {}
 try { db.prepare('ALTER TABLE users ADD COLUMN active_commission REAL DEFAULT 2').run(); } catch(e) {}
+try { db.prepare('ALTER TABLE users ADD COLUMN fcm_token TEXT').run(); } catch(e) {}
 try { db.prepare('CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_id)').run(); } catch(e) {}
 // تمت إزالة سطر إعادة تفعيل الفنيين الموقوفين تلقائياً عند كل تشغيل للسيرفر.
 // كان هذا السطر يلغي قرار إيقاف أي فني من الإدارة (بسبب شكوى أو مخالفة) في كل مرة يعاد تشغيل السيرفر أو يتم نشر تحديث جديد.
@@ -924,7 +970,15 @@ app.post('/api/requests/:id/offer', auth, requireRole('technician'), (req,res)=>
     io.to(`user-${r.customer_id}`).emit('requests-updated', { request });
     io.to(`user-${r.customer_id}`).emit('offer-created', { requestId:r.id, request, offers });
     io.to('admin-room').emit('requests-updated', { request });
-    
+    // Push Notification للعميل خارج التطبيق
+    const customer = db.prepare('SELECT fcm_token FROM users WHERE id=?').get(r.customer_id);
+    if(customer?.fcm_token){
+      sendPush(customer.fcm_token,
+        '🛠️ وصل عرض جديد!',
+        `الفني ${req.user.name||''} أرسل عرضاً على طلبك — اضغط للمراجعة`,
+        { type:'offer', requestId: String(r.id) }
+      );
+    }
     res.json({request, offers});
 });
 
@@ -966,13 +1020,21 @@ app.post('/api/offers/:id/decision', auth, requireRole('customer'), (req,res)=>{
   if(request.technician_id) io.to(`user-${request.technician_id}`).emit('requests-updated', { request });
   io.to('admin-room').emit('requests-updated', { request });
   if(decision === 'accepted'){
-    // Notify the winning technician specifically
     io.to(`user-${offer.technician_id}`).emit('offer-accepted', {
       requestId: offer.request_id,
       technicianId: offer.technician_id,
       offerId: offer.id,
       service: request.service
     });
+    // Push Notification للفني خارج التطبيق
+    const techUser = db.prepare('SELECT fcm_token, name FROM users WHERE id=?').get(offer.technician_id);
+    if(techUser?.fcm_token){
+      sendPush(techUser.fcm_token,
+        '🎉 تم قبول عرضك!',
+        `العميل وافق على عرضك لخدمة ${request.service||''} — افتح التطبيق للتواصل`,
+        { type:'offer_accepted', requestId: String(request.id) }
+      );
+    }
   }
   res.json({request, offers});
 });
@@ -1116,6 +1178,19 @@ io.to('admin-room').emit('chat-message-notify', chatPayload);
 io.to(`user-${r.customer_id}`).emit('chat-badges-updated', { requestId:Number(r.id) });
 if(r.technician_id) io.to(`user-${r.technician_id}`).emit('chat-badges-updated', { requestId:Number(r.id) });
 io.to('admin-room').emit('chat-badges-updated', { requestId:Number(r.id) });
+// Push Notification للطرف الثاني إذا كان خارج التطبيق
+if(otherPartyId){
+  const otherUser = db.prepare('SELECT fcm_token, name FROM users WHERE id=?').get(otherPartyId);
+  if(otherUser?.fcm_token){
+    const senderName = req.user.name || 'مستخدم';
+    const isCustomerSender = req.user.id === r.customer_id;
+    sendPush(otherUser.fcm_token,
+      isCustomerSender ? `📨 رسالة من العميل` : `📨 رسالة من الفني`,
+      `${senderName}: ${(body||'').slice(0,80)}`,
+      { type:'chat', requestId: String(r.id) }
+    );
+  }
+}
   res.json({messages});
 });
 
@@ -1399,6 +1474,14 @@ app.post('/api/support/:id/status', auth, requireRole('admin'), (req,res)=>{
   db.prepare('UPDATE support_tickets SET status=? WHERE id=?').run(status, req.params.id);
   res.json({ticket: db.prepare('SELECT * FROM support_tickets WHERE id=?').get(req.params.id)});
 });
+// ── FCM Token: يحفظ token الجهاز لإرسال إشعارات خارجية ──
+app.post('/api/fcm-token', auth, (req,res)=>{
+  const { token } = req.body;
+  if(!token || typeof token !== 'string') return res.status(400).json({error:'token مطلوب'});
+  db.prepare('UPDATE users SET fcm_token=? WHERE id=?').run(token, req.user.id);
+  res.json({ok:true});
+});
+
 // endpoint جديد: يرجع تذاكر الدعم الخاصة بالمستخدم الحالي
 app.get('/api/support/my', auth, (req,res)=>{
   const tickets = db.prepare(
@@ -1462,6 +1545,27 @@ app.post('/api/support/:id/messages', auth, (req,res)=>{
   const refreshPayload = { ticketId:Number(req.params.id), senderId:req.user.id };
   io.to(`user-${ticket.user_id}`).emit('support-message-refresh', refreshPayload);
   io.to('admin-room').emit('support-message-refresh', refreshPayload);
+  // Push Notification لرسائل الدعم
+  const isAdminSender = req.user.role === 'admin';
+  if(isAdminSender){
+    // الأدمن رد — إشعار للعميل
+    const ticketOwner = db.prepare('SELECT fcm_token FROM users WHERE id=?').get(ticket.user_id);
+    if(ticketOwner?.fcm_token){
+      sendPush(ticketOwner.fcm_token,
+        '🎧 رد من الدعم الفني',
+        `${(req.body.body||'').slice(0,100)}`,
+        { type:'support', ticketId: String(req.params.id) }
+      );
+    }
+  } else {
+    // العميل بعت — إشعار للأدمن
+    const admins = db.prepare("SELECT fcm_token FROM users WHERE role='admin' AND fcm_token IS NOT NULL").all();
+    admins.forEach(a => sendPush(a.fcm_token,
+      '📋 رسالة دعم جديدة',
+      `العميل ${req.user.name||''}: ${(req.body.body||'').slice(0,80)}`,
+      { type:'support', ticketId: String(req.params.id) }
+    ));
+  }
   res.json({success:true});
 });
 
