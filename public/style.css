@@ -741,3 +741,280 @@ body:not(.dark-dash) .tech-item strong{
   text-align:center;
   color:#cbd5e1;
 }
+/* ═══════════════════════════════════════════════════════════════
+   SALLEHLY DARK MODE – COMPREHENSIVE FIX
+   يصلح كل العناصر اللي بتبقى فاتحة في الـdark mode
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── الشات الرئيسي (بين العميل والفني) ── */
+body.dark-dash .chat,
+body.dark-dash .chat-box,
+body.dark-dash #chatbox,
+body.dark-dash #supportMessages {
+  background: #0b1428 !important;
+  border-color: rgba(148,163,184,.2) !important;
+  color: #eaf1ff !important;
+}
+
+body.dark-dash .msg {
+  background: #111e3a !important;
+  border-color: rgba(148,163,184,.18) !important;
+  color: #ddeaff !important;
+}
+
+body.dark-dash .msg.me {
+  background: linear-gradient(135deg, #1e3a6e, #152d5a) !important;
+  border-color: rgba(59,130,246,.3) !important;
+  color: #fff !important;
+}
+
+body.dark-dash .msg b,
+body.dark-dash .msg p,
+body.dark-dash .msg small {
+  color: inherit !important;
+}
+
+/* ── input, textarea, select في كل مكان ── */
+body.dark-dash input:not([type="file"]),
+body.dark-dash textarea,
+body.dark-dash select {
+  background: #0d1a36 !important;
+  color: #eaf1ff !important;
+  border-color: rgba(148,163,184,.3) !important;
+}
+
+body.dark-dash input::placeholder,
+body.dark-dash textarea::placeholder {
+  color: rgba(255,255,255,.3) !important;
+}
+
+body.dark-dash input:focus,
+body.dark-dash textarea:focus,
+body.dark-dash select:focus {
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 3px rgba(96,165,250,.15) !important;
+}
+
+/* ── الشات input row ── */
+body.dark-dash .chat-input-row input {
+  background: #0d1a36 !important;
+  color: #eaf1ff !important;
+  border-color: rgba(148,163,184,.3) !important;
+}
+
+/* ── رسائل الدعم ── */
+body.dark-dash .dash-card {
+  background: linear-gradient(180deg,#101c3d,#0b1530) !important;
+  border-color: rgba(148,163,184,.2) !important;
+  color: #eaf1ff !important;
+}
+
+/* ── جدول ── */
+body.dark-dash .table td,
+body.dark-dash .table th {
+  background: #0f1c3a !important;
+  border-color: rgba(148,163,184,.15) !important;
+  color: #ddeaff !important;
+}
+
+body.dark-dash .table th {
+  color: #a0b4d4 !important;
+}
+
+/* ── status badges ── */
+body.dark-dash .status {
+  border-color: rgba(148,163,184,.2) !important;
+}
+
+/* ── request-card, offer-card ── */
+body.dark-dash .request-card,
+body.dark-dash .v20-request-card,
+body.dark-dash .offer-card,
+body.dark-dash .v20-offer {
+  background: linear-gradient(135deg,#0f1c3a,#0b1530) !important;
+  border-color: rgba(148,163,184,.2) !important;
+  color: #eaf1ff !important;
+}
+
+body.dark-dash .request-meta span,
+body.dark-dash .v20-request-meta span {
+  background: #0d1a36 !important;
+  border-color: rgba(148,163,184,.2) !important;
+  color: #dbeafe !important;
+}
+
+/* ── chat protection note ── */
+body.dark-dash .chat-protection-note,
+body.dark-dash .v14-chat-protection-note,
+body.dark-dash .v15-chat-protection-note {
+  background: rgba(37,99,235,.12) !important;
+  border-color: rgba(96,165,250,.25) !important;
+  color: #dbeafe !important;
+}
+
+/* ── فورم الدعم الفني ── */
+body.dark-dash .v33-support-page .dash-card,
+body.dark-dash .v33-support-main,
+body.dark-dash .v33-support-side {
+  background: linear-gradient(180deg,#101c3d,#0b1530) !important;
+  border-color: rgba(148,163,184,.2) !important;
+  color: #eaf1ff !important;
+}
+
+body.dark-dash .faq-list details {
+  background: rgba(255,255,255,.05) !important;
+  border-color: rgba(148,163,184,.2) !important;
+  color: #eaf1ff !important;
+}
+
+body.dark-dash .faq-list summary {
+  color: #dbeafe !important;
+}
+
+body.dark-dash .faq-list p {
+  color: #a0b4d4 !important;
+}
+
+/* ── تذاكر الدعم في الـsidebar ── */
+body.dark-dash #myTicketsBox button {
+  background: rgba(124,58,237,.15) !important;
+  border-color: rgba(124,58,237,.3) !important;
+  color: #eaf1ff !important;
+}
+
+/* ── أزرار ghost في dark mode ── */
+body.dark-dash .btn.ghost {
+  background: rgba(255,255,255,.08) !important;
+  color: #93c5fd !important;
+  border-color: rgba(148,163,184,.25) !important;
+}
+
+body.dark-dash .btn.ghost:hover {
+  background: rgba(255,255,255,.14) !important;
+}
+
+/* ── activity list ── */
+body.dark-dash .activity-item {
+  border-color: rgba(148,163,184,.15) !important;
+}
+
+body.dark-dash .activity-icon {
+  background: rgba(255,255,255,.06) !important;
+}
+
+/* ── rating card ── */
+body.dark-dash .rating-card textarea {
+  background: #0d1a36 !important;
+  color: #eaf1ff !important;
+  border-color: rgba(148,163,184,.3) !important;
+}
+
+/* ── صفحات الإعدادات والبروفايل ── */
+body.dark-dash .settings-grid > div,
+body.dark-dash .tech-item {
+  background: #101c3d !important;
+  border-color: rgba(148,163,184,.2) !important;
+}
+
+body.dark-dash .tech-item span {
+  color: #a0b4d4 !important;
+}
+
+body.dark-dash .tech-item strong {
+  color: #eaf1ff !important;
+}
+
+/* ── mini-list, activity ── */
+body.dark-dash .mini-list-row {
+  border-color: rgba(148,163,184,.15) !important;
+}
+
+/* ── chat page cards ── */
+body.dark-dash .v13-chat-item {
+  background: rgba(255,255,255,.04) !important;
+  border-color: rgba(148,163,184,.18) !important;
+  color: #eaf1ff !important;
+}
+
+body.dark-dash .v13-chat-item:hover {
+  background: rgba(255,255,255,.08) !important;
+}
+
+body.dark-dash .v13-chat-item small,
+body.dark-dash .v13-chat-item p {
+  color: #7f94b8 !important;
+}
+
+/* ── offer card price ── */
+body.dark-dash .offer-price {
+  background: rgba(124,58,237,.12) !important;
+}
+
+body.dark-dash .offer-price b {
+  color: #818cf8 !important;
+}
+
+/* ── empty states ── */
+body.dark-dash .empty,
+body.dark-dash .empty-chat {
+  color: #7f94b8 !important;
+}
+
+/* ── lock-note (تحذير الفني) ── */
+body.dark-dash .lock-note {
+  background: rgba(249,115,22,.12) !important;
+  border-color: rgba(249,115,22,.3) !important;
+  color: #fdba74 !important;
+}
+
+/* ── v25 balance alert ── */
+body.dark-dash .v25-balance-alert,
+body.dark-dash .v25-balance-alert-sm {
+  background: rgba(251,191,36,.1) !important;
+  border-color: rgba(251,191,36,.3) !important;
+  color: #fde68a !important;
+}
+
+/* ── tech cards في البحث ── */
+body.dark-dash .v20-tech-card,
+body.dark-dash .techcard {
+  background: linear-gradient(135deg,#0f1c3a,#0b1530) !important;
+  border-color: rgba(148,163,184,.2) !important;
+  color: #eaf1ff !important;
+}
+
+body.dark-dash .v20-chip-row span,
+body.dark-dash .tech-tags span {
+  background: #0d1a36 !important;
+  border-color: rgba(59,130,246,.3) !important;
+  color: #93c5fd !important;
+}
+
+/* ── support chat messages ── */
+body.dark-dash .msg[style*="sender_role"] {
+  color: #eaf1ff !important;
+}
+
+/* ── scrollbar في dark mode ── */
+body.dark-dash ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+body.dark-dash ::-webkit-scrollbar-track {
+  background: #0a1428;
+}
+body.dark-dash ::-webkit-scrollbar-thumb {
+  background: #2d3f6b;
+  border-radius: 3px;
+}
+body.dark-dash ::-webkit-scrollbar-thumb:hover {
+  background: #3d5490;
+}
+
+/* ── support tickets buttons in sidebar ── */
+body.dark-dash #myTicketsBox button[style] {
+  background: rgba(124,58,237,.12) !important;
+  border-color: rgba(124,58,237,.28) !important;
+  color: #eaf1ff !important;
+}
+

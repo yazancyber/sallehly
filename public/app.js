@@ -43,29 +43,36 @@ function setupSocket(){
   socket.on('new-request-created', ()=>{
     if(state.user && state.user.role==='technician'){
       addBellNotification('request','طلب جديد','وصل طلب جديد من عميل','orders');
-      toast('وصل طلب جديد');
-      dashboard();
+      toast('🛠️ وصل طلب جديد');
+      // بس حدّث لو الفني شايف تاب الطلبات
+      if(state.tab === 'orders' || state.tab === 'dash') dashboard();
     }
   });
 
   socket.on('requests-updated', ()=>{
-    if(state.user){
+    if(!state.user) return;
+    // بس حدّث لو المستخدم شايف الطلبات — ما يكسر الصفحة الحالية
+    if(state.tab === 'orders' || state.tab === 'dash'){
       dashboard();
     }
   });
 
   socket.on('offer-created', (data)=>{
     if(state.user && state.user.role==='customer'){
-  
-      addBellNotification(
-        'offer',
-        'عرض جديد',
-        'وصل عرض جديد على أحد طلباتك',
-        'orders'
-      );
-  
-      toast('وصلت عروض جديدة');
-      dashboard();
+      addBellNotification('offer','عرض جديد','وصل عرض جديد على أحد طلباتك','orders');
+      toast('🛠️ وصل عرض جديد من فني');
+      if(state.tab === 'orders') dashboard();
+    }
+  });
+
+  // [FIX-OFFER-ACCEPTED] إشعار للفني لما العميل يقبل عرضه
+  socket.on('offer-accepted', (data)=>{
+    if(!state.user) return;
+    if(state.user.role === 'technician'){
+      addBellNotification('offer','تم قبول عرضك! 🎉','العميل وافق على عرضك — يمكنك البدء بالدردشة الآن','chats');
+      v10Sound('done');
+      toast('🎉 تهانينا! تم قبول عرضك');
+      if(state.tab === 'orders' || state.tab === 'chats') dashboard();
     }
   });
 
@@ -74,74 +81,72 @@ function setupSocket(){
   });
 
   socket.on('messages-updated', data=>{
+    if(!state.user) return;
     // تحديث الرسائل لو الشات مفتوح
     if(activeChatId && Number(data.requestId)===Number(activeChatId)){
       renderMessages(data.messages || []);
     }
+    // لا إشعار للمُرسِل نفسه
+    if(data.senderId && Number(data.senderId) === Number(state.user.id)) return;
+    // لو داخل نفس الشات ما يحتاج إشعار
+    if(activeChatId && Number(data.requestId) === Number(activeChatId)) return;
 
-    if(state.user){
-      // لا إشعار للمُرسِل نفسه
-      if(data.senderId && Number(data.senderId) === Number(state.user.id)) return;
-      // لو داخل نفس الشات ما يحتاج إشعار
-      if(activeChatId && Number(data.requestId) === Number(activeChatId)) return;
-
-      v10Sound('notify');
-      v24RefreshBadges?.();
-
-      state.notifications = state.notifications.filter(n=>n.type!=='chat');
-      state.notifications.unshift({
-        id: Date.now(),
-        type:'chat',
-        title:'رسائل جديدة',
-        text:'وصلتك رسالة جديدة',
-        tab:'chats',
-        read:false,
-        time:new Date().toLocaleTimeString('ar-JO',{hour:'2-digit',minute:'2-digit'})
-      });
-
-      state.unread = state.notifications.filter(n=>!n.read).length;
-      renderBellBadge?.();
-      setTimeout(()=>renderBellBadge?.(), 150);
-      toast('وصلتك رسالة جديدة');
-    }
+    // [FIX-NOTIF] إشعار واضح للفني والعميل
+    v10Sound('notify');
+    v24RefreshBadges?.();
+    const notifTitle = state.user.role==='technician' ? 'رسالة من العميل' : 'رسالة من الفني';
+    const notifText  = state.user.role==='technician' ? 'العميل أرسل لك رسالة — اضغط للرد' : 'الفني أرسل لك رسالة — اضغط لعرضها';
+    addBellNotification('chat', notifTitle, notifText, 'chats');
+    state.notifications = state.notifications.filter(n=>n.type!=='chat'||n.requestId!==data.requestId);
+    state.notifications.unshift({
+      id: Date.now(),
+      type:'chat',
+      title: notifTitle,
+      text: notifText,
+      tab:'chats',
+      requestId: data.requestId,
+      read:false,
+      time:new Date().toLocaleTimeString('ar-JO',{hour:'2-digit',minute:'2-digit'})
+    });
+    state.unread = state.notifications.filter(n=>!n.read).length;
+    renderBellBadge?.();
+    setTimeout(()=>renderBellBadge?.(), 150);
+    toast('📨 ' + notifTitle);
   });
   socket.on('topup-created', (data)=>{
     if(state.user && state.user.role==='admin'){
-  
-      addBellNotification(
-        'topup',
-        'طلب شحن جديد',
-        'وصل طلب شحن جديد بانتظار الموافقة',
-        'topups'
-      );
-  
-      toast('وصل طلب شحن جديد');
-      dashboard();
+      addBellNotification('topup','طلب شحن جديد','وصل طلب شحن جديد بانتظار الموافقة','topups');
+      toast('💳 وصل طلب شحن جديد');
+      // بس حدّث لو الأدمن شايف تاب الشحن
+      if(state.tab === 'topups') dashboard();
     }
   });
   socket.on('support-created', (data)=>{
-  
     if(state.user && state.user.role === 'admin'){
-  
-      addBellNotification(
-        'support',
-        'تذكرة دعم جديدة',
-        'وصلت تذكرة دعم جديدة',
-        'support'
-      );
-  
-      toast('وصلت تذكرة دعم جديدة');
-      dashboard();
+      addBellNotification('support','تذكرة دعم جديدة','وصلت تذكرة دعم جديدة','support', data?.ticket?.id || null);
+      v10Sound?.('notify');
+      toast('📋 وصلت تذكرة دعم جديدة');
+      // بس حدّث لو الأدمن شايف تاب الدعم
+      if(state.tab === 'support') dashboard();
     }
   });
-  socket.on('support-message', (data)=>{
+  socket.on('support-message', async (data)=>{
     if(!state.user) return;
     if(Number(data.senderId) === Number(state.user.id)) return;
     const isAdmin = state.user.role === 'admin';
     const isOwner = Number(data.ticketUserId) === Number(state.user.id);
     if(!isAdmin && !isOwner) return;
-    // لو الشات مفتوح الحين — ما نضيف إشعار، الـrefresh تلقائي
-    if(Number(state.activeSupportTicketId) === Number(data.ticketId)) return;
+
+    // لو الشات مفتوح الحين — حدّث الرسائل مباشرة بدون إشعار
+    if(Number(state.activeSupportTicketId) === Number(data.ticketId)){
+      try{
+        const fresh = await fetch(`/api/support/${data.ticketId}/messages`,{credentials:'include'}).then(r=>r.json());
+        if(typeof window._renderSupportMsgs === 'function') window._renderSupportMsgs(fresh.messages);
+      }catch(e){}
+      return;
+    }
+
+    // الشات مش مفتوح — أضف إشعار
     if(isAdmin){
       addBellNotification('support','رسالة دعم جديدة','العميل أرسل رسالة — اضغط للرد','support',data.ticketId);
       v10Sound('notify');
@@ -1102,7 +1107,14 @@ function offerForm(id,service=''){app.innerHTML=`<div class="page"><button class
 async function sendOffer(e,id){e.preventDefault();try{await api(`/api/requests/${id}/offer`,{method:'POST',body:JSON.stringify({offer_price:offerPrice.value,duration:arrivalTime.value,note:offerNote.value||''})});toast('تم إرسال العرض، بانتظار موافقة العميل');state.tab='orders';dashboard()}catch(e){toast(e.message)}}
 async function loadOffers(id){try{let j=await api(`/api/requests/${id}/offers`);let box=$(`#offers-${id}`); if(!box)return; box.innerHTML=offerCards(j.offers,j.request)}catch(e){toast(e.message)}}
 function offerCards(offers,req){if(!offers.length)return '<div class="empty small">لا توجد عروض بعد</div>';return `<div class="offers-list"><h3>العروض المستلمة</h3>${offers.map(o=>`<div class="offer-card ${_x(o.status)}">${o.avatar_url?`<img class="miniAvatar" src="${_safeSrc(o.avatar_url)}" onerror="this.outerHTML='<div class=\'miniAvatar fallback\'>ف</div>'">`:'<div class="miniAvatar fallback">ف</div>'}<div class="offer-info"><b>${_x(o.technician_name||'-')}</b><small>${_x(o.technician_city||'')} • ${_x(o.technician_areas||'')}</small><span>${stars(o.rating_avg)} (${o.rating_count||0}) • ${o.completed_jobs||0} عمل</span><p>${_x(o.note||'لا توجد ملاحظة')}</p></div><div class="offer-price"><b>${_x(String(o.price||0))} د.أ</b><span>${_x(o.duration||'')}</span><em>${o.status==='accepted'?'مقبول':o.status==='rejected'?'مرفوض':'بانتظار قرارك'}</em>${state.user.role==='customer'&&o.status==='pending'&&req.customer_id===state.user.id?`<button class="btn green mini" onclick="decideOffer(${o.id},'accepted',${req.id})">موافق</button><button class="btn red mini" onclick="decideOffer(${o.id},'rejected',${req.id})">رفض</button>`:''}</div></div>`).join('')}</div>`}
-async function decideOffer(id,decision,requestId){try{await api(`/api/offers/${id}/decision`,{method:'POST',body:JSON.stringify({decision})});toast(decision==='accepted'?'تم قبول العرض وفتح الشات':'تم رفض العرض والطلب ما زال مطروحاً');state.tab='orders';dashboard()}catch(e){toast(e.message)}}
+async function decideOffer(id,decision,requestId){try{await api(`/api/offers/${id}/decision`,{method:'POST',body:JSON.stringify({decision})});
+  if(decision==='accepted'){
+    addBellNotification('offer','قبلت العرض ✅','تم فتح الدردشة مع الفني — يمكنك التواصل معه الآن','chats');
+    toast('✅ تم قبول العرض وفتح الدردشة مع الفني');
+  } else {
+    toast('تم رفض العرض والطلب ما زال مطروحاً');
+  }
+  state.tab='orders';dashboard()}catch(e){toast(e.message)}}
 async function setStatus(id,s){try{await api(`/api/requests/${id}/status`,{method:'POST',body:JSON.stringify({status:s})});toast(s==='مكتمل'?'تم إكمال الطلب وخصم عمولة الفني حسب النظام':'تم تحديث الحالة');dashboard()}catch(e){toast(e.message)}}
 function rate(id){
   app.innerHTML=`<div class="page"><button class="btn ghost" onclick="dashboard()">رجوع</button><div class="card rating-card" style="max-width:620px;margin:auto;text-align:center">
@@ -1202,8 +1214,15 @@ async function toggleRec(id){
   if(recorder && recorder.state==='recording') return stopRec(id);
   return startRec(id);
 }
-async function startRec(id){try{let stream=await navigator.mediaDevices.getUserMedia({audio:true});audioChunks=[];recordingId=id;recorder=new MediaRecorder(stream);recorder.ondataavailable=e=>audioChunks.push(e.data);recorder.start();$('#micBtn')?.classList.add('recording');$('#sendVoiceBtn')?.classList.remove('hide');$('#recordingLabel')?.classList.remove('hide');toast('بدأ التسجيل الصوتي')}catch(e){toast('لم يتم السماح باستخدام الميكروفون')}}
-async function stopRec(id){try{if(!recorder||recorder.state!=='recording')return toast('لا يوجد تسجيل يعمل');recorder.onstop=async()=>{let blob=new Blob(audioChunks,{type:'audio/webm'});let fd=new FormData();fd.append('audio',blob,'voice.webm');let j=await api(`/api/requests/${id}/audio`,{method:'POST',body:fd});renderMessages(j.messages||[]);$('#micBtn')?.classList.remove('recording');$('#sendVoiceBtn')?.classList.add('hide');$('#recordingLabel')?.classList.add('hide');toast('تم إرسال التسجيل الصوتي')};recorder.stop()}catch(e){toast(e.message)}}
+async function startRec(id){try{let stream=await navigator.mediaDevices.getUserMedia({audio:true});audioChunks=[];recordingId=id;recorder=new MediaRecorder(stream);
+  // [FIX-MIC] احفظ الـstream في recorder عشان نوقفه بعدين
+  recorder.stream = stream;
+  recorder.ondataavailable=e=>audioChunks.push(e.data);recorder.start();$('#micBtn')?.classList.add('recording');$('#sendVoiceBtn')?.classList.remove('hide');$('#recordingLabel')?.classList.remove('hide');toast('بدأ التسجيل الصوتي')}catch(e){toast('لم يتم السماح باستخدام الميكروفون')}}
+async function stopRec(id){try{if(!recorder||recorder.state!=='recording')return toast('لا يوجد تسجيل يعمل');recorder.onstop=async()=>{let blob=new Blob(audioChunks,{type:'audio/webm'});let fd=new FormData();fd.append('audio',blob,'voice.webm');let j=await api(`/api/requests/${id}/audio`,{method:'POST',body:fd});renderMessages(j.messages||[]);$('#micBtn')?.classList.remove('recording');$('#sendVoiceBtn')?.classList.add('hide');$('#recordingLabel')?.classList.add('hide');toast('تم إرسال التسجيل الصوتي');
+    // [FIX-MIC] أوقف الـstream تماماً عشان المايك يطفأ
+    try{ recorder.stream?.getTracks().forEach(t=>t.stop()); }catch(e){}
+    recorder=null; audioChunks=[];
+  };recorder.stop()}catch(e){toast(e.message)}}
 async function sendLocation(id){if(!navigator.geolocation)return toast('المتصفح لا يدعم تحديد الموقع');navigator.geolocation.getCurrentPosition(async pos=>{let lat=pos.coords.latitude.toFixed(6),lng=pos.coords.longitude.toFixed(6);try{let j=await api(`/api/requests/${id}/messages`,{method:'POST',body:JSON.stringify({body:`[location]${lat},${lng}`})});renderMessages(j.messages);toast('تم إرسال الموقع')}catch(e){toast(e.message)}},()=>toast('لم يتم السماح بالوصول للموقع'),{enableHighAccuracy:true,timeout:10000})}
 
 async function techDash(){let me=(await api('/api/me')).user;state.user=me;let menu=[['dash','الرئيسية'],['orders','الطلبات'],['balance','الرصيد والباقات'],['topups','طلبات الشحن'],['ledger','سجل الرصيد']];let c='';if(state.tab==='orders'){let j=await api('/api/requests');c=`<div class="card"><h2>الطلبات المناسبة</h2>${reqTable(j.requests)}</div>`}else if(state.tab==='balance'){c=balancePage(me)}else if(state.tab==='topups'){let j=await api('/api/topups');c=topupTable(j.topups)}else if(state.tab==='ledger'){let j=await api('/api/ledger');c=ledgerTable(j.ledger)}else c=`<div class="cards4"><div class="stat"><span>الرصيد</span><br><b>${me.balance} د.أ</b></div><div class="stat"><span>طلبات مجانية مستخدمة</span><br><b>${me.free_orders_used}/2</b></div><div class="stat"><span>التقييم</span><br><b>${stars(me.rating_avg)}</b></div><div class="stat"><span>الأعمال</span><br><b>${me.completed_jobs}</b></div></div>`;layout('لوحة الفني',menu,c)}
