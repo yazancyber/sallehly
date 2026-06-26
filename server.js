@@ -135,7 +135,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const RESEND_FROM = process.env.RESEND_FROM || 'onboarding@resend.dev';
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 const BASE = __dirname;
-const DATA_DIR = path.join(BASE, 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(BASE, 'data');
 const UPLOAD_DIR = path.join(BASE, 'public', 'uploads');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -511,6 +511,16 @@ try { db.prepare("ALTER TABLE support_tickets ADD COLUMN status TEXT DEFAULT 'op
 try { db.prepare('CREATE INDEX IF NOT EXISTS idx_requests_technician ON requests(technician_id)').run(); } catch(e) {}
 try { db.prepare('ALTER TABLE users ADD COLUMN active_commission REAL DEFAULT 2').run(); } catch(e) {}
 try { db.prepare('ALTER TABLE users ADD COLUMN fcm_token TEXT').run(); } catch(e) {}
+
+// جدول الشكاوى — منفصل عن الدعم العادي، للأدمن فقط
+db.prepare(`CREATE TABLE IF NOT EXISTS complaints (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER,
+  customer_id INTEGER NOT NULL,
+  technician_id INTEGER,
+  body TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`).run();
 try { db.prepare('CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_id)').run(); } catch(e) {}
 // تمت إزالة سطر إعادة تفعيل الفنيين الموقوفين تلقائياً عند كل تشغيل للسيرفر.
 // كان هذا السطر يلغي قرار إيقاف أي فني من الإدارة (بسبب شكوى أو مخالفة) في كل مرة يعاد تشغيل السيرفر أو يتم نشر تحديث جديد.
@@ -1214,6 +1224,26 @@ app.post('/api/requests/:id/audio', auth, messagesLimiter, uploadAudio.single('a
   res.json({messages});
 });
 
+// ── إرسال صورة في الشات (يستخدم نفس حماية ونمط مسار الصوت) ──
+app.post('/api/requests/:id/images', auth, messagesLimiter, upload.single('image'), (req,res)=>{
+  const r=db.prepare('SELECT * FROM requests WHERE id=?').get(req.params.id);
+  if(!r) return res.status(404).json({error:'الطلب غير موجود'});
+  const hasOffer = req.user.role==='technician' ? db.prepare('SELECT id FROM offers WHERE request_id=? AND technician_id=? LIMIT 1').get(r.id, req.user.id) : null;
+  if(req.user.role!=='admin' && req.user.id!==r.customer_id && req.user.id!==r.technician_id && !hasOffer) return res.status(403).json({error:'لا تملك صلاحية'});
+  if(['مكتمل','ملغي'].includes(r.status) && req.user.role!=='admin') return res.status(400).json({error:'لا يمكن إرسال رسائل على طلب مغلق'});
+  if(!req.file) return res.status(400).json({error:'لم يتم استقبال الصورة'});
+  const url='/uploads/requests/'+req.file.filename;
+  const body='[image]'+url;
+  db.prepare('INSERT INTO messages(request_id,sender_id,body) VALUES(?,?,?)').run(r.id,req.user.id,body);
+  markChatRead(r.id, req.user.id);
+  const messages = getMessages(r.id);
+  safeEmit(r.id, 'messages-updated', { requestId:r.id, messages, senderId:Number(req.user.id) });
+  io.to(`user-${r.customer_id}`).emit('chat-badges-updated', { requestId:r.id });
+  if(r.technician_id) io.to(`user-${r.technician_id}`).emit('chat-badges-updated', { requestId:r.id });
+  io.to('admin-room').emit('chat-badges-updated', { requestId:r.id });
+  res.json({messages});
+});
+
 app.get('/api/requests/:id/messages', auth, (req,res)=>{
   const r=db.prepare('SELECT * FROM requests WHERE id=?').get(req.params.id);
   if(!r) return res.status(404).json({error:'الطلب غير موجود'});
@@ -1480,6 +1510,36 @@ app.post('/api/fcm-token', auth, (req,res)=>{
   if(!token || typeof token !== 'string') return res.status(400).json({error:'token مطلوب'});
   db.prepare('UPDATE users SET fcm_token=? WHERE id=?').run(token, req.user.id);
   res.json({ok:true});
+});
+
+// ── شكاوى العملاء — للأدمن فقط ──
+app.post('/api/complaints', auth, requireRole('customer'), (req,res)=>{
+  const { request_id, body } = req.body;
+  if(!body?.trim()) return res.status(400).json({error:'الشكوى فارغة'});
+  // جيب الـtechnician_id من الطلب
+  const request = request_id ? db.prepare('SELECT technician_id FROM requests WHERE id=? AND customer_id=?').get(request_id, req.user.id) : null;
+  const info = db.prepare('INSERT INTO complaints (request_id, customer_id, technician_id, body) VALUES (?,?,?,?)')
+    .run(request_id||null, req.user.id, request?.technician_id||null, body.trim());
+  const complaint = db.prepare('SELECT * FROM complaints WHERE id=?').get(info.lastInsertRowid);
+  // إشعار للأدمن
+  io.to('admin-room').emit('new-complaint', { complaint });
+  // Push للأدمن
+  const admins = db.prepare("SELECT fcm_token FROM users WHERE role='admin' AND fcm_token IS NOT NULL").all();
+  admins.forEach(a => sendPush(a.fcm_token, '⚠️ شكوى جديدة', `العميل ${req.user.name||''} قدّم شكوى على طلب #${request_id||''}`, { type:'complaint' }));
+  res.json({ ok:true, complaint });
+});
+
+app.get('/api/complaints', auth, requireRole('admin'), (req,res)=>{
+  const complaints = db.prepare(`
+    SELECT c.*, 
+      cu.name as customer_name, cu.phone as customer_phone,
+      t.name as technician_name, t.phone as technician_phone
+    FROM complaints c
+    LEFT JOIN users cu ON cu.id = c.customer_id
+    LEFT JOIN users t  ON t.id  = c.technician_id
+    ORDER BY c.id DESC
+  `).all();
+  res.json({ complaints });
 });
 
 // endpoint جديد: يرجع تذاكر الدعم الخاصة بالمستخدم الحالي

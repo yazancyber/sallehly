@@ -8,6 +8,72 @@ let state={
 };
 let chatTimer=null, activeChatId=null;
 let socket=null;
+// ═══════════════════════════════════════════════
+// Firebase Push Notifications — Web
+// ═══════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", // ← من Firebase Console
+  authDomain:        "sallehly-9bc16.firebaseapp.com",
+  projectId:         "sallehly-9bc16",
+  storageBucket:     "sallehly-9bc16.appspot.com",
+  messagingSenderId: "XXXXXXXXXXXX",                             // ← من Firebase Console
+  appId:             "1:XXXXXXXXXXXX:web:XXXXXXXXXXXXXXXX"       // ← من Firebase Console
+};
+
+// VAPID Key من Firebase Console → Cloud Messaging → Web Push certificates
+const VAPID_KEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+
+async function initFirebasePush(){
+  if(!state.user) return;
+  try{
+    // سجّل Service Worker
+    if(!('serviceWorker' in navigator) || !('Notification' in window)) return;
+    const swReg = await navigator.serviceWorker.register('/firebase-sw.js');
+
+    // اطلب إذن الإشعارات (مرة واحدة بس)
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){ console.log('[FCM] Permission denied'); return; }
+
+    // جهّز Firebase
+    if(!firebase.apps?.length) firebase.initializeApp(FIREBASE_CONFIG);
+    const messaging = firebase.messaging();
+
+    // احصل على الـtoken
+    const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+    if(!token){ console.log('[FCM] No token received'); return; }
+
+    // ارسل الـtoken للسيرفر
+    await api('/api/fcm-token', { method:'POST', body: JSON.stringify({ token }) });
+    console.log('[FCM] Token saved ✓');
+
+    // استقبل الإشعارات لما التطبيق مفتوح
+    messaging.onMessage((payload) => {
+      const { title, body } = payload.notification || {};
+      const data = payload.data || {};
+      // استخدم الـtoast الموجود بدل إشعار المتصفح لما التطبيق مفتوح
+      if(title) toast(`🔔 ${title}${body ? ': '+body : ''}`);
+      // حدّث الإشعارات الداخلية
+      if(data.type==='offer')   addBellNotification('offer','عرض جديد',body||'','orders');
+      if(data.type==='chat')    addBellNotification('chat','رسالة جديدة',body||'','chats');
+      if(data.type==='support') addBellNotification('support','رسالة دعم',body||'','support');
+      renderBellBadge?.();
+    });
+
+    // استقبل click على الإشعار من الـSW
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if(event.data?.type === 'PUSH_CLICK'){
+        const data = event.data.data || {};
+        if(data.type==='chat')    { state.tab='chats';   dashboard(); }
+        if(data.type==='offer')   { state.tab='orders';  dashboard(); }
+        if(data.type==='support') { state.tab='support'; dashboard(); }
+      }
+    });
+
+  } catch(e){
+    console.warn('[FCM] Push init failed:', e.message);
+  }
+}
+
 function setupSocket(){
   if(typeof io==='undefined' || socket) return;
 
@@ -126,8 +192,16 @@ function setupSocket(){
       addBellNotification('support','تذكرة دعم جديدة','وصلت تذكرة دعم جديدة','support', data?.ticket?.id || null);
       v10Sound?.('notify');
       toast('📋 وصلت تذكرة دعم جديدة');
-      // بس حدّث لو الأدمن شايف تاب الدعم
       if(state.tab === 'support') dashboard();
+    }
+  });
+
+  socket.on('new-complaint', (data)=>{
+    if(state.user && state.user.role === 'admin'){
+      addBellNotification('complaint','⚠️ شكوى جديدة','العميل قدّم شكوى على فني — اضغط للمراجعة','complaints');
+      v10Sound?.('notify');
+      toast('⚠️ وصلت شكوى جديدة من عميل');
+      if(state.tab === 'complaints') dashboard();
     }
   });
   socket.on('support-message', async (data)=>{
@@ -622,6 +696,7 @@ async function doLogin(e){
     state.user = j.user;
     toast('تم تسجيل الدخول');
     dashboard();
+    setTimeout(()=>initFirebasePush(), 1500);
   } catch(err){
     if(errBox){ errBox.textContent=err.message||'بيانات غير صحيحة'; errBox.style.display='block'; }
     else toast(err.message);
@@ -1005,6 +1080,7 @@ async function doVerifyOtp(e) {
     state._pendingOtpEmail = null;
     toast('🎉 تم إنشاء الحساب بنجاح!');
     dashboard();
+    setTimeout(()=>initFirebasePush(), 1500);
     if(localStorage.pendingService){
       const ps = localStorage.pendingService;
       localStorage.removeItem('pendingService');
@@ -1115,7 +1191,78 @@ async function decideOffer(id,decision,requestId){try{await api(`/api/offers/${i
     toast('تم رفض العرض والطلب ما زال مطروحاً');
   }
   state.tab='orders';dashboard()}catch(e){toast(e.message)}}
-async function setStatus(id,s){try{await api(`/api/requests/${id}/status`,{method:'POST',body:JSON.stringify({status:s})});toast(s==='مكتمل'?'تم إكمال الطلب وخصم عمولة الفني حسب النظام':'تم تحديث الحالة');dashboard()}catch(e){toast(e.message)}}
+async function setStatus(id,s){
+  try{
+    await api(`/api/requests/${id}/status`,{method:'POST',body:JSON.stringify({status:s})});
+    if(s==='مكتمل'){
+      toast('تم إكمال الطلب ✓');
+      // popup الشكوى — بيطلع بعد إكمال الطلب للعميل بس
+      if(state.user?.role === 'customer'){
+        showComplaintPopup(id);
+      } else {
+        dashboard();
+      }
+    } else {
+      toast('تم تحديث الحالة');
+      dashboard();
+    }
+  }catch(e){toast(e.message)}
+}
+
+function showComplaintPopup(requestId){
+  // شيل أي popup قديم
+  document.getElementById('complaintOverlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'complaintOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+
+  overlay.innerHTML = `
+    <div style="background:var(--card,#1a1a35);border:1px solid rgba(255,255,255,.15);border-radius:18px;padding:28px;max-width:460px;width:100%;text-align:center">
+      <div style="font-size:40px;margin-bottom:12px">⭐</div>
+      <h2 style="margin:0 0 8px;font-size:20px">هل لديك شكوى على الفني؟</h2>
+      <p style="color:var(--muted,#94a3b8);font-size:14px;margin-bottom:20px">شكواك ستصل للإدارة فقط ولن يراها الفني</p>
+      <div id="complaintFormBox" style="display:none;margin-bottom:16px;text-align:right">
+        <textarea id="complaintText" placeholder="اكتب شكواك بالتفصيل..." style="width:100%;min-height:100px;box-sizing:border-box;resize:vertical;border-radius:10px;padding:12px;font-size:14px"></textarea>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn red" id="complaintYesBtn" onclick="showComplaintForm()">نعم، لدي شكوى</button>
+        <button class="btn" id="complaintSendBtn" style="display:none" onclick="submitComplaint(${requestId})">إرسال الشكوى</button>
+        <button class="btn ghost" onclick="document.getElementById('complaintOverlay').remove();dashboard()">لا، كل شي تمام</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+}
+
+function showComplaintForm(){
+  document.getElementById('complaintFormBox').style.display = 'block';
+  document.getElementById('complaintYesBtn').style.display = 'none';
+  document.getElementById('complaintSendBtn').style.display = 'block';
+  document.getElementById('complaintText').focus();
+}
+
+async function submitComplaint(requestId){
+  const text = document.getElementById('complaintText')?.value?.trim();
+  if(!text){ toast('اكتب الشكوى أولاً'); return; }
+  const btn = document.getElementById('complaintSendBtn');
+  try{
+    if(btn){ btn.disabled=true; btn.textContent='جاري الإرسال...'; }
+    await api('/api/complaints', {
+      method:'POST',
+      body: JSON.stringify({
+        request_id: requestId,
+        body: text
+      })
+    });
+    document.getElementById('complaintOverlay').remove();
+    toast('✅ تم إرسال شكواك للإدارة بنجاح');
+    dashboard();
+  }catch(e){
+    toast(e.message||'تعذر إرسال الشكوى');
+    if(btn){ btn.disabled=false; btn.textContent='إرسال الشكوى'; }
+  }
+}
 function rate(id){
   app.innerHTML=`<div class="page"><button class="btn ghost" onclick="dashboard()">رجوع</button><div class="card rating-card" style="max-width:620px;margin:auto;text-align:center">
     <h2>قيّم الفني</h2>
