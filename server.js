@@ -633,7 +633,16 @@ function calcRating(techId){
 }
 
 function safeEmit(room, event, payload){ try{ io.to(String(room)).emit(event, payload); }catch(e){} }
-function getMessages(requestId){ return db.prepare('SELECT m.*,u.name sender_name FROM messages m JOIN users u ON u.id=m.sender_id WHERE request_id=? ORDER BY id').all(requestId); }
+function getMessages(requestId){
+  const msgs = db.prepare('SELECT m.*,u.name sender_name FROM messages m JOIN users u ON u.id=m.sender_id WHERE request_id=? ORDER BY id').all(requestId);
+  // أعلى رقم رسالة قرأها أي طرف آخر في هذا الطلب (لإظهار "تمت المشاهدة")
+  const reads = db.prepare('SELECT user_id, last_read_message_id FROM chat_reads WHERE request_id=?').all(requestId);
+  msgs.forEach(m => {
+    // الرسالة تُعتبر "تمت مشاهدتها" إذا قرأها طرف غير المُرسِل
+    m.seen = reads.some(r => r.user_id !== m.sender_id && Number(r.last_read_message_id) >= Number(m.id)) ? 1 : 0;
+  });
+  return msgs;
+}
 function markChatRead(requestId, userId){
   const row = db.prepare('SELECT COALESCE(MAX(id),0) max_id FROM messages WHERE request_id=?').get(requestId);
   const last = Number(row?.max_id || 0);
@@ -1254,7 +1263,10 @@ app.get('/api/requests/:id/messages', auth, (req,res)=>{
   io.to(`user-${r.customer_id}`).emit('chat-badges-updated', { requestId:r.id });
   if(r.technician_id) io.to(`user-${r.technician_id}`).emit('chat-badges-updated', { requestId:r.id });
   io.to('admin-room').emit('chat-badges-updated', { requestId:r.id });
-  res.json({messages: getMessages(req.params.id)});
+  // [FIX-02] تحديث حالة "تمت المشاهدة" لدى الطرف الآخر فوراً
+  const readMessages = getMessages(req.params.id);
+  safeEmit(r.id, 'messages-updated', { requestId:r.id, messages: readMessages, senderId:Number(req.user.id) });
+  res.json({messages: readMessages});
 });
 app.post('/api/requests/:id/rate', auth, requireRole('customer'), (req,res)=>{
   const r=db.prepare('SELECT * FROM requests WHERE id=? AND customer_id=? AND status=?').get(req.params.id, req.user.id, 'مكتمل');
@@ -1307,6 +1319,20 @@ app.post('/api/admin/topups/:id/review', auth, requireRole('admin'), (req,res)=>
     db.prepare('UPDATE topups SET status=?, admin_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?').run(status, adminNote, t.id);
   });
   doReview();
+  // [REALTIME] إبلاغ الفني فوراً بنتيجة الشحن وتحديث رصيده دون إعادة تشغيل
+  if(status==='approved'){
+    const updated = db.prepare('SELECT balance, active_commission FROM users WHERE id=?').get(t.technician_id);
+    io.to(`user-${t.technician_id}`).emit('balance-updated', {
+      balance: updated?.balance ?? 0,
+      active_commission: updated?.active_commission ?? 2,
+      topupId: t.id,
+      status: 'approved'
+    });
+    sendPush(db.prepare('SELECT fcm_token FROM users WHERE id=?').get(t.technician_id)?.fcm_token,
+      '✅ تمت الموافقة على الشحن', `تم إضافة ${Number(t.amount)+Number(t.bonus||0)} د.أ إلى رصيدك`, { type:'topup' });
+  } else {
+    io.to(`user-${t.technician_id}`).emit('balance-updated', { topupId: t.id, status: 'rejected' });
+  }
   res.json({topup: db.prepare('SELECT * FROM topups WHERE id=?').get(t.id)});
 });
 
@@ -1413,6 +1439,15 @@ app.post('/api/admin/services', auth, requireRole('admin'), (req,res)=>{
   }
 });
 
+app.delete('/api/admin/services/:id', auth, requireRole('admin'), (req,res)=>{
+  const id = parseInt(req.params.id, 10);
+  if(isNaN(id)) return res.status(400).json({error:'معرّف غير صحيح'});
+  const svc = db.prepare('SELECT * FROM service_categories WHERE id=?').get(id);
+  if(!svc) return res.status(404).json({error:'المهنة غير موجودة'});
+  db.prepare('DELETE FROM service_categories WHERE id=?').run(id);
+  res.json({ok:true});
+});
+
 app.post('/api/admin/packages', auth, requireRole('admin'), (req,res)=>{
   const {name,bonus,commission_per_order}=req.body;
   const amount=Number(req.body.amount);
@@ -1483,6 +1518,11 @@ app.post('/api/support', auth, (req,res)=>{
   const ticketType = clean(type||'عام');
   if(!allowedTypes.includes(ticketType)){
     return res.status(400).json({error:'نوع التذكرة غير صحيح: ' + ticketType});
+  }
+  // [FIX-06] السماح بتذكرة واحدة مفتوحة فقط لكل مستخدم
+  const openTicket = db.prepare("SELECT id FROM support_tickets WHERE user_id=? AND status='open' LIMIT 1").get(req.user.id);
+  if(openTicket){
+    return res.status(409).json({error:'لديك تذكرة دعم مفتوحة بالفعل. انتظر رد الإدارة أو أكمل المحادثة الحالية.'});
   }
   const info=db.prepare('INSERT INTO support_tickets(user_id,type,title,body) VALUES(?,?,?,?)')
   .run(req.user.id, ticketType, clean(title), clean(body));
