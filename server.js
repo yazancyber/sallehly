@@ -63,10 +63,18 @@ const { Resend } = require('resend');
 const app = express();
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { error: 'محاولات تسجيل دخول كثيرة، حاول بعد 15 دقيقة' },
+  max: 60,
+  message: { error: 'محاولات تسجيل دخول كثيرة لهذا الحساب، حاول بعد 15 دقيقة' },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  // نحدد الحد حسب البريد الإلكتروني المُستهدف بالمحاولة وليس IP المتصل.
+  // السبب: خلف بروكسي Render، قد يُحسب أكثر من مستخدم تحت نفس عنوان IP الظاهر
+  // (بروكسي مشترك)، فيوصل حد شخص واحد يوقف بقية المستخدمين ظلماً. الاعتماد على
+  // البريد يمنع تخمين كلمة سر حساب معيّن بالتكرار، وهو نفس الهدف الأمني المطلوب.
+  keyGenerator: (req) => {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    return email || req.ip;
+  }
 });
 const passwordLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -107,6 +115,14 @@ const otpLimiter = rateLimit({
 // Render/Proxy fix: trust the first reverse proxy so express-rate-limit
 // can read X-Forwarded-For safely without throwing ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
 app.set('trust proxy', 1);
+// تشخيص مؤقت: لو رجعت مشكلة "Too many requests" رغم كل الإصلاحات، افتح Logs بلوحة
+// Render وشوف هل req.ip نفسه يتكرر لمستخدمين مختلفين (دليل قاطع على مشكلة بروكسي مشترك).
+app.use((req, _res, next) => {
+  if (req.method !== 'GET') {
+    console.log(`[IP-CHECK] ip=${req.ip} xff=${req.headers['x-forwarded-for']||'-'} path=${req.path}`);
+  }
+  next();
+});
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -188,10 +204,11 @@ app.use(rateLimit({
   limit: process.env.NODE_ENV === 'production' ? 3000 : 100000,
   standardHeaders: true,
   legacyHeaders: false,
-  // الطلبات الحساسة (تسجيل، دفع، رسائل...) عندها حدود خاصة أدق فوق (loginLimiter/messagesLimiter/...).
-  // هذا الحد العام غرضه منع إساءة استخدام عامة على السيرفر، فمش داعي يشمل طلبات القراءة (GET)
-  // متل فتح شاشة التذاكر أو المحفظة أو الدردشة، لأنها هي اللي كانت بتستهلك العداد بسرعة.
-  skip: (req)=> req.method === 'GET' || req.path.startsWith('/uploads') || req.path.startsWith('/socket.io') || req.path==='/' || req.path.endsWith('.css') || req.path.endsWith('.js')
+  // هذا الحد العام غرضه حماية السيرفر من زوار غير مسجلين (بدون توكن) يقصفوه بطلبات.
+  // أي مستخدم مسجل دخول فعلياً (عنده Authorization header) بنستثنيه من هذا العداد المشترك،
+  // لأن كل الأكشنات الحساسة (تسجيل، دخول، دفع، رسائل، تحديث حالة الطلب) أصلاً محمية بحدودها
+  // الخاصة (loginLimiter/messagesLimiter/requestsLimiter/...)، فمش داعي عداد عام إضافي يوقفهم.
+  skip: (req)=> req.method === 'GET' || Boolean(req.headers.authorization) || req.path.startsWith('/uploads') || req.path.startsWith('/socket.io') || req.path==='/' || req.path.endsWith('.css') || req.path.endsWith('.js')
 }));
 // [SEC-FIX-06] CSRF Protection — Origin/Referer validation for state-changing requests
 const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
