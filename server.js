@@ -63,7 +63,7 @@ const { Resend } = require('resend');
 const app = express();
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 20,
   message: { error: 'محاولات تسجيل دخول كثيرة، حاول بعد 15 دقيقة' },
   standardHeaders: true,
   legacyHeaders: false
@@ -136,7 +136,9 @@ const RESEND_FROM = process.env.RESEND_FROM || 'onboarding@resend.dev';
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 const BASE = __dirname;
 const DATA_DIR = process.env.DATA_DIR || path.join(BASE, 'data');
-const UPLOAD_DIR = path.join(BASE, 'public', 'uploads');
+const UPLOAD_DIR = process.env.DATA_DIR
+  ? path.join(DATA_DIR, 'uploads')
+  : path.join(BASE, 'public', 'uploads');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(path.join(UPLOAD_DIR, 'payments'), { recursive: true });
@@ -211,6 +213,10 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(BASE, 'public')));
+// قدّم الملفات المرفوعة من القرص الدائم (إن وُجد) حتى تظهر الصور بعد الـ deploy.
+if (process.env.DATA_DIR) {
+  app.use('/uploads', express.static(UPLOAD_DIR));
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -767,7 +773,7 @@ app.post('/api/auth/verify-otp', (req,res)=>{
     const user = db.prepare('SELECT * FROM users WHERE id=?').get(info.lastInsertRowid);
     const token = sign(user);
     res.cookie('token', token, COOKIE_OPTS);
-    res.json({user:userPublic(user), message:'تم إنشاء الحساب بنجاح'});
+    res.json({user:userPublic(user), token, message:'تم إنشاء الحساب بنجاح'});
   } catch(e){
     if(String(e.message).includes('UNIQUE')) return res.status(409).json({error:'البريد أو رقم الهاتف مستخدم مسبقاً'});
     res.status(500).json({error:'تعذر إنشاء الحساب'});
@@ -784,7 +790,7 @@ app.post('/api/auth/login', loginLimiter, (req,res)=>{
   const valid = bcrypt.compareSync(password, hashToCheck);
   if(!user || !valid) return res.status(401).json({error:'بيانات الدخول غير صحيحة'});
   if(!user.is_active) return res.status(403).json({error:'الحساب موقوف'});
-  const token = sign(user); res.cookie('token', token, COOKIE_OPTS); res.json({user:userPublic(user)});
+  const token = sign(user); res.cookie('token', token, COOKIE_OPTS); res.json({user:userPublic(user), token});
 });
 app.post('/api/auth/logout', (req,res)=>{ res.clearCookie('token'); res.json({ok:true}); });
 
